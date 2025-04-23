@@ -20,3 +20,15 @@ To run the tests
 ```shell
 uv run pytest
 ```
+
+To format the code
+
+```shell
+uvx ruff format
+```
+
+To lint the code
+
+```shell
+uvx ruff check
+```

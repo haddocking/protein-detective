@@ -8,6 +8,12 @@ dependencies = [
     "sparqlwrapper>=2.0.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/haddocking/protein-detective"
+Issues = "https://github.com/haddocking/protein-detective/issues"
+Documentation = "https://github.com/haddocking/protein-detective#readme"
+Source = "https://github.com/haddocking/protein-detective"
+
 [dependency-groups]
 dev = [
     "pytest>=8.3.5",
@@ -19,3 +25,85 @@ docs = [
 [build-system]
 requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 120
+extend-include = ["*.ipynb"]
+
+[tool.ruff.lint]
+select = [
+    "A",
+    # TODO enable ANN and make code more typed
+    # "ANN",
+    "ARG",
+    "B",
+    "BLE",
+    "C",
+    # TODO enable D and make code more descriptive
+    # "D",
+    "DTZ",
+    "E",
+    "EM",
+    "ERA",
+    "F",
+    # TODO enable FBT and factor out booleans args to seperate functions
+    # "FBT",
+    "FURB",
+    "I",
+    "ICN",
+    "ISC",
+    "LOG",
+    "N",
+    # TODO enable NPT and use modern random
+    # "NPY",
+    "PD",
+    "PERF",
+    "PGH",
+    "PLC",
+    "PLE",
+    # TODO enable PLR and make code less complex
+    # "PLR",
+    # TODO enable PT for tests/**
+    # "PT",
+    "PTH",
+    "PLW",
+    "Q",
+    "RET",
+    "RSE",
+    "RUF",
+    "S",
+    "SLOT",
+    "SIM",
+    "T",
+    "TCH",
+    "TID",
+    "TRY",
+    "UP",
+    "W",
+    "YTT"
+]
+ignore = [
+    # Conflicts with formatting
+    "ISC001",
+    # Conflicts with default rules
+    "PLC0414",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*" = [
+    "ARG", "ANN", "D", "E501", "DTZ001", "N802", "S101", "S108", "PLR2004"
+]
+"docs/**/*.ipynb" = [
+    # Allow wide lines in notebooks
+    "E501",
+    # Allow prints
+    "T201",
+    # Allow pprints
+    "T203",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["protein_detective"]

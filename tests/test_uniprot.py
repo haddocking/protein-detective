@@ -1,7 +1,7 @@
 from textwrap import dedent
-import pytest
 
 from protein_detective.uniprot import Query, build_sparql_query
+
 
 def test_build_sparql_query():
     # Test with a simple query
@@ -10,7 +10,7 @@ def test_build_sparql_query():
         reviewed=True,
         subcellular_location_uniprot="nucleus",
         subcellular_location_go="GO:0005634",  # Cellular component - Nucleus
-        molecular_function_go="GO:0003677"  # Molecular function - DNA binding
+        molecular_function_go="GO:0003677",  # Molecular function - DNA binding
     )
     result = build_sparql_query(query, limit=10)
 
@@ -66,4 +66,6 @@ def test_build_sparql_query():
     """)
 
     # Compare without leading whitespaces
-    assert [r.lstrip() for r in result.split("\n")] == [e.strip() for e in expected.split("\n")]
+    assert [r.lstrip() for r in result.split("\n")] == [
+        e.strip() for e in expected.split("\n")
+    ]

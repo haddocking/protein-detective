@@ -1,12 +1,11 @@
-
-
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 from textwrap import dedent
 
-from SPARQLWrapper import SPARQLWrapper, JSON
+from SPARQLWrapper import JSON, SPARQLWrapper
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class Query:
@@ -16,6 +15,7 @@ class Query:
     subcellular_location_go: str | None
     molecular_function_go: str | None
 
+
 @dataclass(frozen=True)
 class PdbResult:
     id: str
@@ -23,10 +23,12 @@ class PdbResult:
     chain: str
     resolution: str | None = None
 
+
 @dataclass
 class Result:
     alphafold: set[str]
     pdb: dict[str, set[PdbResult]]
+
 
 def query2dynamic_sparql_triples(query: Query):
     parts: list[str] = []
@@ -38,6 +40,23 @@ def query2dynamic_sparql_triples(query: Query):
     elif query.reviewed is False:
         parts.append("?protein up:reviewed false .")
 
+    parts.append(
+        append_subcellular_location_filters(query)
+    )
+
+    if query.molecular_function_go:
+        if not query.molecular_function_go.startswith("GO:"):
+            msg = "Molecular function GO term must start with 'GO:'."
+            raise ValueError(msg)
+        parts.append(
+            dedent(f"""
+            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) {query.molecular_function_go} .
+        """)
+        )
+
+    return "\n".join(parts)
+
+def append_subcellular_location_filters(query: Query) -> str:
     if query.subcellular_location_uniprot:
         subcellular_location_uniprot_part = dedent(f"""
             ?protein up:annotation ?subcellAnnotation .
@@ -46,38 +65,32 @@ def query2dynamic_sparql_triples(query: Query):
         """)
     if query.subcellular_location_go:
         if not query.subcellular_location_go.startswith("GO:"):
-            raise ValueError("Subcellular location GO term must start with 'GO:'.")
+            msg = "Subcellular location GO term must start with 'GO:'."
+            raise ValueError(msg)
         subcellular_location_go_part = dedent(f"""
             ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) {query.subcellular_location_go} .
         """)
     if query.subcellular_location_uniprot and query.subcellular_location_go:
         # If both are provided include results for both with logical OR
-        parts.append(dedent(f"""
+        return dedent(f"""
             {{
                 {subcellular_location_uniprot_part}
             }} UNION {{
                 {subcellular_location_go_part}
             }}
-        """))
-    elif query.subcellular_location_uniprot:
-        parts.append(subcellular_location_uniprot_part)
-    elif query.subcellular_location_go:
-        parts.append(subcellular_location_go_part)
+        """)
+    if query.subcellular_location_uniprot:
+        return subcellular_location_uniprot_part
+    if query.subcellular_location_go:
+        return subcellular_location_go_part
+    return ""
 
-    if query.molecular_function_go:
-        if not query.molecular_function_go.startswith("GO:"):
-            raise ValueError("Molecular function GO term must start with 'GO:'.")
-        parts.append(dedent(f"""
-            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) {query.molecular_function_go} .
-        """))
 
-    return "\n".join(parts)
-
-def build_sparql_query(query: Query, limit =10_000) -> str:
+def build_sparql_query(query: Query, limit=10_000) -> str:
     dynamic_triples = query2dynamic_sparql_triples(query)
 
     # TODO allow for return of pdb or alphafold or both
-    q = dedent(f"""\
+    return dedent(f"""\
         PREFIX up: <http://purl.uniprot.org/core/>
         PREFIX taxon: <http://purl.uniprot.org/taxonomy/>
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -89,7 +102,7 @@ def build_sparql_query(query: Query, limit =10_000) -> str:
         WHERE {{
             # --- Protein Selection ---
             ?protein a up:Protein .
-                   
+
             {dynamic_triples}
 
             # --- Optional PDB Info ---
@@ -110,12 +123,12 @@ def build_sparql_query(query: Query, limit =10_000) -> str:
         }}
         LIMIT {limit}
     """)
-    return q
 
-def search(query: Query, limit =10_000, timeout=1_800) -> Result:  
+
+def search(query: Query, limit=10_000, timeout=1_800) -> Result:
     """
     Search for pdbs and alphafold entries in UniProtKB based on the given query.
-    
+
     Example:
 
     ```python
@@ -130,10 +143,13 @@ def search(query: Query, limit =10_000, timeout=1_800) -> Result:
     results = search(query)
     print(results)
     ```
-    
+
     """
     if timeout > 2_700:
-        raise ValueError("Uniprot SPARQL timeout is limited to 2,700 seconds (45 minutes).")    
+        msg = "Uniprot SPARQL timeout is limited to 2,700 seconds (45 minutes)."
+        raise ValueError(
+            msg
+        )
 
     q = build_sparql_query(query, limit)
 
@@ -147,7 +163,10 @@ def search(query: Query, limit =10_000, timeout=1_800) -> Result:
     sparql.setQuery(q)
     rawresults = sparql.queryAndConvert()
     if not isinstance(rawresults, dict):
-        raise TypeError("Expected rawresults to be a dict, but got {}".format(type(rawresults)))
+        msg = f"Expected rawresults to be a dict, but got {type(rawresults)}"
+        raise TypeError(
+            msg
+        )
 
     # Parse the results
     return flatten_results(rawresults["results"]["bindings"])
@@ -166,17 +185,13 @@ def flatten_results(rawresults: list[dict]) -> Result:
         pdb_id = result["pdb_db"]["value"].split("/")[-1]
         method = result["pdb_method"]["value"].split("/")[-1]
         chain = result["pdb_chain"]["value"]
-        pdb = PdbResult(
-            id=pdb_id,
-            method=method,
-            chain=chain
-        )
-        if 'pdb_resolution' in result:
+        pdb = PdbResult(id=pdb_id, method=method, chain=chain)
+        if "pdb_resolution" in result:
             pdb = PdbResult(
                 id=pdb_id,
                 method=method,
                 chain=chain,
-                resolution = result["pdb_resolution"]["value"],
+                resolution=result["pdb_resolution"]["value"],
             )
         if protein not in pdb_entries:
             pdb_entries[protein] = set()
