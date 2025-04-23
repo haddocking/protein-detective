@@ -276,17 +276,13 @@ dependencies = [
 [package.dev-dependencies]
 docs = [
     { name = "ipykernel" },
-    { name = "sparql-burger" },
 ]
 
 [package.metadata]
 requires-dist = [{ name = "sparqlwrapper", specifier = ">=2.0.0" }]
 
 [package.metadata.requires-dev]
-docs = [
-    { name = "ipykernel", specifier = ">=6.29.5" },
-    { name = "sparql-burger", specifier = ">=1.0.2" },
-]
+docs = [{ name = "ipykernel", specifier = ">=6.29.5" }]
 
 [[package]]
 name = "psutil"
@@ -419,15 +415,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050 },
-]
-
-[[package]]
-name = "sparql-burger"
-version = "1.0.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/62/c0/5b31eb3d07878c96c23c9aed9865bf0c3a6cd046c28ced183c0336e61fdb/SPARQL-Burger-1.0.2.tar.gz", hash = "sha256:88ec0a9aeb001d5c3dd08b82405059ae7a0365e7839efee3cbe57123f0ed7bce", size = 12561 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/66/84/b6a724a0f8da44ba6c4bc459df9fe20bb2feae870be87e4a23893c31cad7/SPARQL_Burger-1.0.2-py3-none-any.whl", hash = "sha256:845ff407692027f7b977ad07204d2c55b7d476b34a4e35bfbea91f6c3a8ed3f9", size = 12480 },
 ]
 
 [[package]]

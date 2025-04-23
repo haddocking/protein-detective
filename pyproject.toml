@@ -11,7 +11,6 @@ dependencies = [
 [dependency-groups]
 docs = [
     "ipykernel>=6.29.5",
-    "sparql-burger>=1.0.2",
 ]
 
 [build-system]
