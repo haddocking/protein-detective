@@ -73,29 +73,7 @@ def query2dynamic_sparql_triples(query: Query):
 
     return "\n".join(parts)
 
-def search(query: Query, limit =10_000, timeout=1_800) -> Result:  
-    """
-    Search for pdbs and alphafold entries in UniProtKB based on the given query.
-    
-    Example:
-
-    ```python
-    from protein_detective.uniprotkb import search, Query
-    query = Query(
-        taxon_id="9606",
-        reviewed=True,
-        subcellular_location_uniprot="nucleus",
-        subcellular_location_go="GO:0005634", # Cellular component - Nucleus
-        molecular_function_go="GO:0003677" # Molecular function - DNA binding
-    )
-    results = search(query)
-    print(results)
-    ```
-    
-    """
-    if timeout > 2_700:
-        raise ValueError("Uniprot SPARQL timeout is limited to 2,700 seconds (45 minutes).")    
-
+def build_query(query: Query, limit =10_000) -> str:
     dynamic_triples = query2dynamic_sparql_triples(query)
 
     # TODO allow for return of pdb or alphafold or both
@@ -132,6 +110,32 @@ def search(query: Query, limit =10_000, timeout=1_800) -> Result:
         }}
         LIMIT {limit}
     """)
+    return q
+
+def search(query: Query, limit =10_000, timeout=1_800) -> Result:  
+    """
+    Search for pdbs and alphafold entries in UniProtKB based on the given query.
+    
+    Example:
+
+    ```python
+    from protein_detective.uniprotkb import search, Query
+    query = Query(
+        taxon_id="9606",
+        reviewed=True,
+        subcellular_location_uniprot="nucleus",
+        subcellular_location_go="GO:0005634", # Cellular component - Nucleus
+        molecular_function_go="GO:0003677" # Molecular function - DNA binding
+    )
+    results = search(query)
+    print(results)
+    ```
+    
+    """
+    if timeout > 2_700:
+        raise ValueError("Uniprot SPARQL timeout is limited to 2,700 seconds (45 minutes).")    
+
+    q = build_query(query, limit)
 
     # Execute the query
     sparql = SPARQLWrapper("https://sparql.uniprot.org/sparql")
