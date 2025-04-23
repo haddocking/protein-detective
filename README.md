@@ -14,3 +14,9 @@ To work on notebooks in docs/ directory
 uv sync --group docs
 # Open a notebook with VS code and select .venv/bin/python as kernel
 ```
+
+To run the tests
+
+```shell
+uv run pytest
+```

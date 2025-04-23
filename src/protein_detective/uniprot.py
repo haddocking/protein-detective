@@ -39,26 +39,26 @@ def query2dynamic_sparql_triples(query: Query):
         parts.append("?protein up:reviewed false .")
 
     if query.subcellular_location_uniprot:
-        subcellular_location_uniprot_part = f"""
+        subcellular_location_uniprot_part = dedent(f"""
             ?protein up:annotation ?subcellAnnotation .
             ?subcellAnnotation up:locatedIn/up:cellularComponent ?cellcmpt .
             ?cellcmpt skos:prefLabel "{query.subcellular_location_uniprot}" .
-        """
+        """)
     if query.subcellular_location_go:
         if not query.subcellular_location_go.startswith("GO:"):
             raise ValueError("Subcellular location GO term must start with 'GO:'.")
-        subcellular_location_go_part = f"""
+        subcellular_location_go_part = dedent(f"""
             ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) {query.subcellular_location_go} .
-        """
+        """)
     if query.subcellular_location_uniprot and query.subcellular_location_go:
         # If both are provided include results for both with logical OR
-        parts.append(f"""
+        parts.append(dedent(f"""
             {{
                 {subcellular_location_uniprot_part}
             }} UNION {{
                 {subcellular_location_go_part}
             }}
-        """)
+        """))
     elif query.subcellular_location_uniprot:
         parts.append(subcellular_location_uniprot_part)
     elif query.subcellular_location_go:
@@ -67,17 +67,17 @@ def query2dynamic_sparql_triples(query: Query):
     if query.molecular_function_go:
         if not query.molecular_function_go.startswith("GO:"):
             raise ValueError("Molecular function GO term must start with 'GO:'.")
-        parts.append(f"""
+        parts.append(dedent(f"""
             ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) {query.molecular_function_go} .
-        """)
+        """))
 
     return "\n".join(parts)
 
-def build_query(query: Query, limit =10_000) -> str:
+def build_sparql_query(query: Query, limit =10_000) -> str:
     dynamic_triples = query2dynamic_sparql_triples(query)
 
     # TODO allow for return of pdb or alphafold or both
-    q = dedent(f"""
+    q = dedent(f"""\
         PREFIX up: <http://purl.uniprot.org/core/>
         PREFIX taxon: <http://purl.uniprot.org/taxonomy/>
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -135,7 +135,7 @@ def search(query: Query, limit =10_000, timeout=1_800) -> Result:
     if timeout > 2_700:
         raise ValueError("Uniprot SPARQL timeout is limited to 2,700 seconds (45 minutes).")    
 
-    q = build_query(query, limit)
+    q = build_sparql_query(query, limit)
 
     # Execute the query
     sparql = SPARQLWrapper("https://sparql.uniprot.org/sparql")
