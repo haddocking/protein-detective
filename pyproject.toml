@@ -1,0 +1,19 @@
+[project]
+name = "protein_detective"
+version = "0.1.0"
+description = "Deduce the protein from a EM density"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "sparqlwrapper>=2.0.0",
+]
+
+[dependency-groups]
+docs = [
+    "ipykernel>=6.29.5",
+    "sparql-burger>=1.0.2",
+]
+
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
