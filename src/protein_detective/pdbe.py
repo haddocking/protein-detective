@@ -19,10 +19,7 @@ async def fetch(ids: set[str], save_dir: Path, max_parallel_downloads: int = 5):
     Args:
         ids: A set of PDB IDs to fetch.
         save_dir: The directory to save the fetched PDB files to.
-        max_parallel_downloads: The maximum number of parallel downloads. Defaults to 5.
-
-        Returns:
-        A list of paths to the downloaded PDB files.
+        max_parallel_downloads: The maximum number of parallel downloads.
     """
     urls = {_map_id(pdb_id) for pdb_id in ids}
     return await retrieve_files(urls, save_dir, max_parallel_downloads)
