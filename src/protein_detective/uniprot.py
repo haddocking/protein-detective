@@ -23,6 +23,7 @@ class PdbResult:
     chain: str
     resolution: str | None = None
 
+
 def _query2dynamic_sparql_triples(query: Query):
     parts: list[str] = []
     if query.taxon_id:
@@ -33,9 +34,7 @@ def _query2dynamic_sparql_triples(query: Query):
     elif query.reviewed is False:
         parts.append("?protein up:reviewed false .")
 
-    parts.append(
-        _append_subcellular_location_filters(query)
-    )
+    parts.append(_append_subcellular_location_filters(query))
 
     if query.molecular_function_go:
         if not query.molecular_function_go.startswith("GO:"):
@@ -190,7 +189,6 @@ def _execute_sparql_search(
 
     logger.debug(bindings)
     return bindings
-
 
 
 def _flatten_results_pdb(rawresults: list) -> dict[str, set[PdbResult]]:

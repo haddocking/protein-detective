@@ -6,17 +6,12 @@ import aiohttp
 from tqdm.asyncio import tqdm
 
 
-async def retrieve_files(
-    urls: set[tuple[str, str]], save_dir: Path, max_parallel_downloads: int = 5
-):
+async def retrieve_files(urls: set[tuple[str, str]], save_dir: Path, max_parallel_downloads: int = 5):
     save_dir.mkdir(parents=True, exist_ok=True)
     semaphore = asyncio.Semaphore(max_parallel_downloads)
 
     async with aiohttp.ClientSession() as session:
-        tasks = [
-            retrieve_file(session, url, save_dir / filename, semaphore)
-            for url, filename in urls
-        ]
+        tasks = [retrieve_file(session, url, save_dir / filename, semaphore) for url, filename in urls]
         await tqdm.gather(*tasks)
 
 
@@ -25,7 +20,7 @@ async def retrieve_file(
     url: str,
     save_path: Path,
     semaphore: asyncio.Semaphore,
-    chunk_size: int = 131072, # 128 KiB
+    chunk_size: int = 131072,  # 128 KiB
 ):
     if save_path.exists():
         return

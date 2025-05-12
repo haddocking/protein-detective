@@ -66,6 +66,4 @@ def test_build_sparql_query():
     """)
 
     # Compare without leading whitespaces
-    assert [r.lstrip() for r in result.split("\n")] == [
-        e.strip() for e in expected.split("\n")
-    ]
+    assert [r.lstrip() for r in result.split("\n")] == [e.strip() for e in expected.split("\n")]
