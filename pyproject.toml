@@ -5,7 +5,10 @@ description = "Deduce the protein from a EM density"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "aiofiles>=24.1.0",
+    "aiohttp>=3.11.18",
     "sparqlwrapper>=2.0.0",
+    "tqdm>=4.67.1",
 ]
 
 [project.urls]
