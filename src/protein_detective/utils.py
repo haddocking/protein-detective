@@ -12,7 +12,7 @@ async def retrieve_files(urls: set[tuple[str, str]], save_dir: Path, max_paralle
 
     async with aiohttp.ClientSession() as session:
         tasks = [retrieve_file(session, url, save_dir / filename, semaphore) for url, filename in urls]
-        await tqdm.gather(*tasks)
+        await tqdm.gather(*tasks, desc="Downloading files")
 
 
 async def retrieve_file(
