@@ -1,4 +1,3 @@
-
 from pathlib import Path
 
 import duckdb
@@ -24,19 +23,18 @@ async def flow(query: Query, session_dir: Path):
     await pdb_fetch(pdb_ids, download_dir)
 
     # AlphaFold entries for the given query
-    afs = search4af(query)
-    af_ids = set()
-    for afresults in afs.values():
-        for afresult in afresults:
-            af_ids.add(afresult)
-    await af_fetch(af_ids, download_dir)
+    af_result = search4af(query)
+    af_ids = set(af_result.keys())
+    afs = [af async for af in af_fetch(af_ids, download_dir)]
 
-    # Store uniprot -> structure mapping in sqlite/duckdb db
     db_path = session_dir / "session.db"
     con = duckdb.connect(db_path)
     con.sql(ddl)
+    # TODO Store uniprot -> structure mapping in sqlite/duckdb db
 
-    # Save processed structures to the powerfit_candidate_dir
-    # For each pdb structure remove the low confidence regions
+    # TODO Store alphafold summaries in the db
 
-    # For each af structure remove the low confidence regions
+    # TODO Save processed structures to the powerfit_candidate_dir
+    # TODO For each pdb structure remove the low confidence regions
+
+    # TODO For each af structure remove the low confidence regions
