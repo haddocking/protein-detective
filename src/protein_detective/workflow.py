@@ -2,7 +2,7 @@ from pathlib import Path
 
 import duckdb
 
-from protein_detective.alphafold import fetch as af_fetch
+from protein_detective.alphafold import fetch_many as af_fetch
 from protein_detective.db import ddl
 from protein_detective.pdbe import fetch as pdb_fetch
 from protein_detective.uniprot import Query, search4af, search4pdb

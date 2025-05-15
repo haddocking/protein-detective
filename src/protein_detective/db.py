@@ -1,4 +1,3 @@
-
 ddl = """\
 CREATE TABLE IF NOT EXISTS proteins (
     uniprot_id TEXT PRIMARY KEY,
