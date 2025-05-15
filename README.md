@@ -74,10 +74,9 @@ Pyrefly does not support notebooks yet, so we need to convert them to python scr
 ```shell
 uv run --group docs jupyter nbconvert --to python docs/*.ipynb
 # Comment out magic commands
-sed -i 's/^%/# %/' docs/*.py
+sed -i 's/^get_ipython/# get_ipython/' docs/*.py
 uv run pyrefly check docs/*.py
 rm docs/*.py
 ```
 
 </details>
-
