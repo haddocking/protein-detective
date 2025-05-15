@@ -30,7 +30,6 @@ dev = [
 ]
 docs = [
     "ipykernel>=6.29.5",
-    "rich>=14.0.0",
 ]
 
 [build-system]
