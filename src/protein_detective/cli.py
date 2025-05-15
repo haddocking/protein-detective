@@ -1,5 +1,4 @@
 import argparse
-import asyncio
 import logging
 from pathlib import Path
 
@@ -38,7 +37,7 @@ def handle_retrieve(args):
         molecular_function_go=args.molecular_function_go,
     )
     session_dir = Path(args.session_dir)
-    db_path = asyncio.run(retrieve_structures(query, session_dir, limit=args.limit))
+    db_path = retrieve_structures(query, session_dir, limit=args.limit)
     logger = logging.getLogger("protein_detective.cli")
     logger.info(f"Structures retrieved and stored in: {db_path}")
 

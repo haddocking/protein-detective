@@ -1,3 +1,4 @@
+import asyncio
 from asyncio import Semaphore
 from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
@@ -41,7 +42,7 @@ def url2name(url: str) -> str:
     return url.split("/")[-1]
 
 
-async def fetch_many(ids: Iterable[str], save_dir: Path) -> AsyncGenerator[AlphaFoldEntry]:
+async def fetch_many_async(ids: Iterable[str], save_dir: Path) -> AsyncGenerator[AlphaFoldEntry]:
     """Asynchronously fetches summaries and pdb and pae (predicted alignment error) files from
     [AlphaFold Protein Structure Database](https://alphafold.ebi.ac.uk/).
 
@@ -67,3 +68,20 @@ async def fetch_many(ids: Iterable[str], save_dir: Path) -> AsyncGenerator[Alpha
             pdb_file=save_dir / url2name(summary.pdbUrl),
             pae_file=save_dir / url2name(summary.paeDocUrl),
         )
+
+
+def fetch_many(ids: Iterable[str], save_dir: Path) -> list[AlphaFoldEntry]:
+    """Synchronously fetches summaries and pdb and pae files from AlphaFold Protein Structure Database.
+
+    Args:
+        ids: A set of Uniprot IDs to fetch.
+        save_dir: The directory to save the fetched files to.
+
+    Returns:
+        A list of AlphaFoldEntry dataclasses containing the summary, pdb file, and pae file.
+    """
+
+    async def gather_entries():
+        return [entry async for entry in fetch_many_async(ids, save_dir)]
+
+    return asyncio.run(gather_entries())

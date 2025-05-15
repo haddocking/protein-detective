@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 from protein_detective.utils import retrieve_files
@@ -13,8 +14,8 @@ def _map_id(pdb_id: str) -> tuple[str, str]:
     return url, fn
 
 
-async def fetch(ids: set[str], save_dir: Path, max_parallel_downloads: int = 5) -> list[Path]:
-    """Asynchronously fetches gzipped PDB files from the PDBe database.
+def fetch(ids: set[str], save_dir: Path, max_parallel_downloads: int = 5) -> list[Path]:
+    """Fetches gzipped PDB files from the PDBe database.
 
     Args:
         ids: A set of PDB IDs to fetch.
@@ -24,5 +25,6 @@ async def fetch(ids: set[str], save_dir: Path, max_parallel_downloads: int = 5) 
     Returns:
         A list of paths to the downloaded PDB files.
     """
+
     urls = {_map_id(pdb_id) for pdb_id in ids}
-    return await retrieve_files(urls, save_dir, max_parallel_downloads)
+    return asyncio.run(retrieve_files(urls, save_dir, max_parallel_downloads))

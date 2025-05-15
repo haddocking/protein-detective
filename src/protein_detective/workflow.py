@@ -8,7 +8,7 @@ from protein_detective.pdbe import fetch as pdb_fetch
 from protein_detective.uniprot import Query, search4af, search4pdb
 
 
-async def retrieve_structures(query: Query, session_dir: Path, limit=10_000):
+def retrieve_structures(query: Query, session_dir: Path, limit=10_000):
     download_dir = session_dir / "downloads"
     download_dir.mkdir(parents=True, exist_ok=True)
     powerfit_candidate_dir = session_dir / "powerfit_candidates"
@@ -20,13 +20,13 @@ async def retrieve_structures(query: Query, session_dir: Path, limit=10_000):
     for pdbresults in pdbs.values():
         for pdbresult in pdbresults:
             pdb_ids.add(pdbresult.id)
-    pdb_files = await pdb_fetch(pdb_ids, download_dir)
+    pdb_files = pdb_fetch(pdb_ids, download_dir)
     pdb_files_lookup = dict(zip(pdb_ids, pdb_files, strict=True))
 
     # AlphaFold entries for the given query
     af_result = search4af(query, limit=limit)
     af_ids = set(af_result.keys())
-    afs = [af async for af in af_fetch(af_ids, download_dir)]
+    afs = af_fetch(af_ids, download_dir)
 
     db_path = session_dir / "session.db"
     con = duckdb.connect(db_path)
