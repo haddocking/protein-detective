@@ -49,7 +49,7 @@ jobs:
         run: uv sync --locked --dev        
       - name: Convert notebooks to Python scripts
         run: |
-          uv --group docs jupyter nbconvert --to python docs/*.ipynb
+          uv run --group docs jupyter nbconvert --to python docs/*.ipynb
           sed -i 's/^%/# %/' docs/*.py
           uv run pyrefly check docs/*.py
       - name: Run type checkers

@@ -72,7 +72,7 @@ uv run pyrefly check
 Pyrefly does not support notebooks yet, so we need to convert them to python scripts and then run pyrefly on them.
 
 ```shell
-uv --group docs jupyter nbconvert --to python docs/*.ipynb
+uv run --group docs jupyter nbconvert --to python docs/*.ipynb
 # Comment out magic commands
 sed -i 's/^%/# %/' docs/*.py
 uv run pyrefly check docs/*.py
