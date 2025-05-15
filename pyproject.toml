@@ -22,6 +22,9 @@ Issues = "https://github.com/haddocking/protein-detective/issues"
 Documentation = "https://github.com/haddocking/protein-detective#readme"
 Source = "https://github.com/haddocking/protein-detective"
 
+[project.scripts]
+protein-detective = "protein_detective.cli:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8.3.5",

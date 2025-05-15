@@ -4,9 +4,13 @@ from cattrs import unstructure
 from duckdb import DuckDBPyConnection
 
 from protein_detective.alphafold import AlphaFoldEntry
-from protein_detective.uniprot import PdbResult
+from protein_detective.uniprot import PdbResult, Query
 
 ddl = """\
+CREATE TABLE IF NOT EXISTS uniprot_searches (
+    query JSON,
+);
+
 CREATE TABLE IF NOT EXISTS proteins (
     uniprot_acc TEXT PRIMARY KEY,
 );
@@ -21,8 +25,8 @@ CREATE TABLE IF NOT EXISTS pdbs (
 -- pdb could have multiple proteins so use many-to-many table
 CREATE TABLE IF NOT EXISTS proteins_pdbs (
     uniprot_acc TEXT,
-    chain TEXT NOT NULL,
     pdb_id TEXT,
+    chain TEXT NOT NULL,
     FOREIGN KEY (uniprot_acc) REFERENCES proteins (uniprot_acc),
     FOREIGN KEY (pdb_id) REFERENCES pdbs (pdb_id),
     PRIMARY KEY (uniprot_acc, pdb_id)
@@ -36,6 +40,10 @@ CREATE TABLE IF NOT EXISTS alphafolds (
 )
 
 """
+
+
+def save_query(query: Query, con: DuckDBPyConnection):
+    con.execute("INSERT INTO uniprot_searches (query) VALUES (?)", (unstructure(query),))
 
 
 def save_pdbs(uniprot2pdbs: dict[str, set[PdbResult]], pdb_files: dict[str, Path], con: DuckDBPyConnection):

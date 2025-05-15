@@ -3,12 +3,12 @@ from pathlib import Path
 import duckdb
 
 from protein_detective.alphafold import fetch_many as af_fetch
-from protein_detective.db import ddl, save_alphafolds, save_pdbs
+from protein_detective.db import ddl, save_alphafolds, save_pdbs, save_query
 from protein_detective.pdbe import fetch as pdb_fetch
 from protein_detective.uniprot import Query, search4af, search4pdb
 
 
-async def fetch_structures(query: Query, session_dir: Path, limit=10_000):
+async def retrieve_structures(query: Query, session_dir: Path, limit=10_000):
     download_dir = session_dir / "downloads"
     download_dir.mkdir(parents=True, exist_ok=True)
     powerfit_candidate_dir = session_dir / "powerfit_candidates"
@@ -30,12 +30,9 @@ async def fetch_structures(query: Query, session_dir: Path, limit=10_000):
 
     db_path = session_dir / "session.db"
     con = duckdb.connect(db_path)
-
     con.sql(ddl)
-    # Store uniprot -> structure mapping in sqlite/duckdb db
+    save_query(query, con)
     save_pdbs(pdbs, pdb_files_lookup, con)
-
-    # Store alphafold summaries in the db
     save_alphafolds(afs, con)
     return db_path
 
