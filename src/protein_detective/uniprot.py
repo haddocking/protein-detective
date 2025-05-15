@@ -102,6 +102,7 @@ def _build_sparql_generic_query(select_clause: str, where_clause: str, limit: in
 def _build_sparql_query_uniprot(query: Query, limit=10_000) -> str:
     dynamic_triples = _query2dynamic_sparql_triples(query)
     # TODO add usefull columns that have 1:1 mapping to protein
+    # like uniprot_id with `?protein up:mnemonic ?mnemonic .`
     select_clause = "?protein"
     where_clause = dedent(f"""
         # --- Protein Selection ---
@@ -244,7 +245,7 @@ def search4uniprot(query: Query, limit=10_000, timeout=1_800) -> set[str]:
     Search for UniProtKB entries based on the given query.
 
     Returns:
-        Set of protein IDs.
+        Set of uniprot accessions.
     """
     sparql_query = _build_sparql_query_uniprot(query, limit)
     logger.info("Executing SPARQL query for UniProt: %s", sparql_query)

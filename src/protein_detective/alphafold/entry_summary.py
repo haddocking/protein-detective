@@ -1,4 +1,4 @@
-# ruff: noqa: N815 follow what api returns
+# ruff: noqa: N815 allow camelCase follow what api returns
 from dataclasses import dataclass
 
 
