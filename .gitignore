@@ -69,3 +69,6 @@ venv.bak/
 *.orig
 
 IDEAS.md
+/docs/session1/
+/docs/alphafold_files/
+/docs/pdb_files/
