@@ -1,25 +1,55 @@
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from pathlib import Path
 
-from pydantic import BaseModel
+import aiohttp
+from cattrs import structure
 
-from protein_detective.alphafold_client.api.public_api_api import PublicApiApi
-from protein_detective.alphafold_client.api_client import ApiClient
-from protein_detective.alphafold_client.configuration import Configuration
-from protein_detective.alphafold_client.models.entry_summary import EntrySummary
 from protein_detective.utils import retrieve_files
 
 
-class AlphaFoldEntry(BaseModel):
+# Modelled after EntrySummary in https://alphafold.ebi.ac.uk/api/openapi.json
+@dataclass
+class EntrySummary:
+    entryId: str
+    gene: str | None
+    sequenceChecksum: str | None
+    sequenceVersionDate: str | None
+    uniprotAccession: str
+    uniprotId: str
+    uniprotDescription: str
+    taxId: int
+    organismScientificName: str
+    uniprotStart: int
+    uniprotEnd: int
+    uniprotSequence: str
+    modelCreatedDate: str
+    latestVersion: int
+    allVersions: list[int]
+    bcifUrl: str
+    cifUrl: str
+    pdbUrl: str
+    paeImageUrl: str
+    paeDocUrl: str
+    amAnnotationsUrl: str | None
+    amAnnotationsHg19Url: str | None
+    amAnnotationsHg38Url: str | None
+    isReviewed: bool | None
+    isReferenceProteome: bool | None
+
+@dataclass
+class AlphaFoldEntry:
     summary: EntrySummary
     pdb_file: Path
     pae_file: Path
 
 async def fetch_summmary(qualifier: str) -> list[EntrySummary]:
-    configuration = Configuration("https://alphafold.ebi.ac.uk/api", retries=3)
-    async with ApiClient(configuration) as api_client:
-        api_instance = PublicApiApi(api_client)
-        return await api_instance.get_predictions_api_prediction_qualifier_get(qualifier)
+    async with aiohttp.ClientSession() as session:
+        url = f"https://alphafold.ebi.ac.uk/api/prediction/{qualifier}"
+        async with session.get(url) as response:
+            response.raise_for_status()
+            data = await response.json()
+            return structure(data, list[EntrySummary])
 
 
 async def fetch_summaries(qualifiers: set[str]) -> AsyncGenerator[EntrySummary]:
