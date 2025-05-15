@@ -59,3 +59,9 @@ To lint the code
 ```shell
 uvx ruff check
 ```
+
+To type check with [pyrefly](https://pyrefly.org/) the code
+
+```shell
+uv run pyrefly check
+```

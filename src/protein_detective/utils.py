@@ -25,7 +25,7 @@ async def retrieve_files(
 
 
 async def retrieve_file(
-    session: aiohttp.ClientSession,
+    session: RetryClient,
     url: str,
     save_path: Path,
     semaphore: asyncio.Semaphore,
@@ -51,7 +51,7 @@ async def retrieve_file(
 @asynccontextmanager
 async def friendly_session(retries: int = 3, total_timeout: int = 300):
     retry_options = ExponentialRetry(attempts=retries)
-    timeout = aiohttp.ClientTimeout(total=total_timeout)
+    timeout = aiohttp.ClientTimeout(total = total_timeout)  # pyrefly: ignore false positive
     async with aiohttp.ClientSession(timeout=timeout) as session:
         client = RetryClient(client_session=session, retry_options=retry_options)
         yield client

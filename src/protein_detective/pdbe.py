@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Iterable
 from pathlib import Path
 
 from protein_detective.utils import retrieve_files
@@ -14,7 +15,7 @@ def _map_id(pdb_id: str) -> tuple[str, str]:
     return url, fn
 
 
-def fetch(ids: set[str], save_dir: Path, max_parallel_downloads: int = 5) -> list[Path]:
+def fetch(ids: Iterable[str], save_dir: Path, max_parallel_downloads: int = 5) -> list[Path]:
     """Fetches gzipped PDB files from the PDBe database.
 
     Args:

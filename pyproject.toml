@@ -27,6 +27,7 @@ protein-detective = "protein_detective.cli:main"
 
 [dependency-groups]
 dev = [
+    "pyrefly>=0.15.1",
     "pytest>=8.3.5",
     "types-aiofiles>=24.1.0.20250326",
     "types-tqdm>=4.67.0.20250513",
