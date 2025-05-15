@@ -36,6 +36,7 @@ docs = [
     "duckdb-engine>=0.17.0",
     "ipykernel>=6.29.5",
     "jupysql>=0.11.1",
+    "nbconvert>=7.16.6",
 ]
 
 [build-system]

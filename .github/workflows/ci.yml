@@ -47,5 +47,10 @@ jobs:
         uses: astral-sh/setup-uv@v5
       - name: Install the project
         run: uv sync --locked --dev        
+      - name: Convert notebooks to Python scripts
+        run: |
+          uv --group docs jupyter nbconvert --to python docs/*.ipynb
+          sed -i 's/^%/# %/' docs/*.py
+          uv run pyrefly check docs/*.py
       - name: Run type checkers
         run: uv run pyrefly check

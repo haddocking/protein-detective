@@ -65,3 +65,19 @@ To type check with [pyrefly](https://pyrefly.org/) the code
 ```shell
 uv run pyrefly check
 ```
+
+<details>
+<summary>To type check with pyrefly the notebooks</summary>
+
+Pyrefly does not support notebooks yet, so we need to convert them to python scripts and then run pyrefly on them.
+
+```shell
+uv --group docs jupyter nbconvert --to python docs/*.ipynb
+# Comment out magic commands
+sed -i 's/^%/# %/' docs/*.py
+uv run pyrefly check docs/*.py
+rm docs/*.py
+```
+
+</details>
+
