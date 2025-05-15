@@ -240,6 +240,19 @@ def _flatten_results_emdb(rawresults: list) -> dict[str, set[str]]:
     return emdb_entries
 
 
+def limit_check(what: str, limit: int, len_raw_results: int):
+    if len_raw_results >= limit:
+        logger.warning(
+            "%s returned %d results."
+            "There may be more results available, "
+            "but they are not returned due to the limit of %d. "
+            "Consider increasing the limit to get more results.",
+            what,
+            len_raw_results,
+            limit,
+        )
+
+
 def search4uniprot(query: Query, limit=10_000, timeout=1_800) -> set[str]:
     """
     Search for UniProtKB entries based on the given query.
@@ -255,6 +268,7 @@ def search4uniprot(query: Query, limit=10_000, timeout=1_800) -> set[str]:
         sparql_query=sparql_query,
         timeout=timeout,
     )
+    limit_check("Search for uniprot accessions", limit, len(raw_results))
     return {result["protein"]["value"].split("/")[-1] for result in raw_results}
 
 
@@ -273,6 +287,7 @@ def search4pdb(query: Query, limit=10_000, timeout=1_800) -> dict[str, set[PdbRe
         sparql_query=sparql_query,
         timeout=timeout,
     )
+    limit_check("Search for pdbs on uniprot", limit, len(raw_results))
     return _flatten_results_pdb(raw_results)
 
 
@@ -291,6 +306,7 @@ def search4af(query: Query, limit=10_000, timeout=1_800) -> dict[str, set[str]]:
         sparql_query=sparql_query,
         timeout=timeout,
     )
+    limit_check("Search for alphafold entries on uniprot", limit, len(raw_results))
     return _flatten_results_af(raw_results)
 
 
@@ -308,4 +324,5 @@ def search4emdb(query: Query, limit=10_000, timeout=1_800) -> dict[str, set[str]
         sparql_query=sparql_query,
         timeout=timeout,
     )
+    limit_check("Search for EMDB entries on uniprot", limit, len(raw_results))
     return _flatten_results_emdb(raw_results)
