@@ -51,6 +51,8 @@ def _query2dynamic_sparql_triples(query: Query):
 
 
 def _append_subcellular_location_filters(query: Query) -> str:
+    subcellular_location_uniprot_part = ""
+    subcellular_location_go_part = ""
     if query.subcellular_location_uniprot:
         subcellular_location_uniprot_part = dedent(f"""
             ?protein up:annotation ?subcellAnnotation .
@@ -73,9 +75,9 @@ def _append_subcellular_location_filters(query: Query) -> str:
                 {subcellular_location_go_part}
             }}
         """)
-    if query.subcellular_location_uniprot:
+    if subcellular_location_uniprot_part:
         return subcellular_location_uniprot_part
-    if query.subcellular_location_go:
+    if subcellular_location_go_part:
         return subcellular_location_go_part
     return ""
 
