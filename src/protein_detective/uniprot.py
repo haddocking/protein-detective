@@ -203,7 +203,7 @@ def _execute_sparql_search(
     return bindings
 
 
-def _flatten_results_pdb(rawresults: list) -> dict[str, set[PdbResult]]:
+def _flatten_results_pdb(rawresults: Iterable) -> dict[str, set[PdbResult]]:
     pdb_entries: dict[str, set[PdbResult]] = {}
     for result in rawresults:
         protein = result["protein"]["value"].split("/")[-1]
@@ -227,7 +227,7 @@ def _flatten_results_pdb(rawresults: list) -> dict[str, set[PdbResult]]:
     return pdb_entries
 
 
-def _flatten_results_af(rawresults: list) -> dict[str, set[str]]:
+def _flatten_results_af(rawresults: Iterable) -> dict[str, set[str]]:
     alphafold_entries: dict[str, set[str]] = {}
     for result in rawresults:
         protein = result["protein"]["value"].split("/")[-1]
@@ -239,7 +239,7 @@ def _flatten_results_af(rawresults: list) -> dict[str, set[str]]:
     return alphafold_entries
 
 
-def _flatten_results_emdb(rawresults: list) -> dict[str, set[str]]:
+def _flatten_results_emdb(rawresults: Iterable) -> dict[str, set[str]]:
     emdb_entries: dict[str, set[str]] = {}
     for result in rawresults:
         protein = result["protein"]["value"].split("/")[-1]

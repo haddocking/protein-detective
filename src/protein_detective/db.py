@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from cattrs import unstructure
@@ -54,7 +54,7 @@ def save_uniprot_accessions(uniprot_accessions: Iterable[str], con: DuckDBPyConn
     )
 
 
-def save_pdbs(uniprot2pdbs: dict[str, set[PdbResult]], pdb_files: dict[str, Path], con: DuckDBPyConnection):
+def save_pdbs(uniprot2pdbs: Mapping[str, Iterable[PdbResult]], pdb_files: Mapping[str, Path], con: DuckDBPyConnection):
     save_uniprot_accessions(uniprot2pdbs.keys(), con)
     pdb_rows = []
     for pdb_results in uniprot2pdbs.values():
