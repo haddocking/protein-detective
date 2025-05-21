@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from textwrap import dedent
 
@@ -99,6 +100,25 @@ def _build_sparql_generic_query(select_clause: str, where_clause: str, limit: in
     """)
 
 
+def _build_sparql_generic_by_uniprot_accesions_query(
+    uniprot_accs: Iterable[str], select_clause: str, where_clause: str, limit: int = 10_000
+) -> str:
+    values = " ".join(f'("{ac}")' for ac in uniprot_accs)
+    where_clause2 = dedent(f"""
+        # --- Protein Selection ---
+        VALUES (?ac) {{ {values}}}
+        BIND (IRI(CONCAT("http://purl.uniprot.org/uniprot/",?ac)) AS ?protein)
+        ?protein a up:Protein .
+
+        {where_clause}
+    """)
+    return _build_sparql_generic_query(
+        select_clause=select_clause,
+        where_clause=where_clause2,
+        limit=limit,
+    )
+
+
 def _build_sparql_query_uniprot(query: Query, limit=10_000) -> str:
     dynamic_triples = _query2dynamic_sparql_triples(query)
     # TODO add usefull columns that have 1:1 mapping to protein
@@ -112,53 +132,44 @@ def _build_sparql_query_uniprot(query: Query, limit=10_000) -> str:
     return _build_sparql_generic_query(select_clause, dedent(where_clause), limit)
 
 
-def _build_sparql_query_pdb(query: Query, limit=10_000) -> str:
-    dynamic_triples = _query2dynamic_sparql_triples(query)
+def _build_sparql_query_pdb(uniprot_accs: Iterable[str], limit=10_000) -> str:
     select_clause = "DISTINCT ?protein ?pdb_db ?pdb_method ?pdb_resolution ?pdb_chain"
-    where_clause = dedent(f"""
-        # --- Protein Selection ---
-        ?protein a up:Protein .
-        {dynamic_triples}
-
+    where_clause = dedent("""
         # --- PDB Info ---
         ?protein rdfs:seeAlso ?pdb_db .
         ?pdb_db up:database <http://purl.uniprot.org/database/PDB> .
         ?pdb_db up:method ?pdb_method .
         ?pdb_db up:chainSequenceMapping ?chainSequenceMapping .
         ?chainSequenceMapping up:chain ?pdb_chain .
-        OPTIONAL {{ ?pdb_db up:resolution ?pdb_resolution . }}
+        OPTIONAL { ?pdb_db up:resolution ?pdb_resolution . }
     """)
-    return _build_sparql_generic_query(select_clause, dedent(where_clause), limit)
+    return _build_sparql_generic_by_uniprot_accesions_query(uniprot_accs, select_clause, dedent(where_clause), limit)
 
 
-def _build_sparql_query_af(query: Query, limit=10_000) -> str:
-    dynamic_triples = _query2dynamic_sparql_triples(query)
+def _build_sparql_query_af(uniprot_accs: Iterable[str], limit=10_000) -> str:
     select_clause = "DISTINCT ?protein ?af_db"
-    where_clause = dedent(f"""
+    where_clause = dedent("""
         # --- Protein Selection ---
         ?protein a up:Protein .
-        {dynamic_triples}
 
         # --- AlphaFoldDB Info ---
         ?protein rdfs:seeAlso ?af_db .
         ?af_db up:database <http://purl.uniprot.org/database/AlphaFoldDB> .
     """)
-    return _build_sparql_generic_query(select_clause, dedent(where_clause), limit)
+    return _build_sparql_generic_by_uniprot_accesions_query(uniprot_accs, select_clause, dedent(where_clause), limit)
 
 
-def _build_sparql_query_emdb(query: Query, limit=10_000) -> str:
-    dynamic_triples = _query2dynamic_sparql_triples(query)
+def _build_sparql_query_emdb(uniprot_accs: Iterable[str], limit=10_000) -> str:
     select_clause = "DISTINCT ?protein ?emdb_db"
-    where_clause = dedent(f"""
+    where_clause = dedent("""
         # --- Protein Selection ---
         ?protein a up:Protein .
-        {dynamic_triples}
 
         # --- EMDB Info ---
         ?protein rdfs:seeAlso ?emdb_db .
         ?emdb_db up:database <http://purl.uniprot.org/database/EMDB> .
     """)
-    return _build_sparql_generic_query(select_clause, dedent(where_clause), limit)
+    return _build_sparql_generic_by_uniprot_accesions_query(uniprot_accs, select_clause, dedent(where_clause), limit)
 
 
 def _execute_sparql_search(
@@ -243,7 +254,7 @@ def _flatten_results_emdb(rawresults: list) -> dict[str, set[str]]:
 def limit_check(what: str, limit: int, len_raw_results: int):
     if len_raw_results >= limit:
         logger.warning(
-            "%s returned %d results."
+            "%s returned %d results. "
             "There may be more results available, "
             "but they are not returned due to the limit of %d. "
             "Consider increasing the limit to get more results.",
@@ -272,14 +283,19 @@ def search4uniprot(query: Query, limit=10_000, timeout=1_800) -> set[str]:
     return {result["protein"]["value"].split("/")[-1] for result in raw_results}
 
 
-def search4pdb(query: Query, limit=10_000, timeout=1_800) -> dict[str, set[PdbResult]]:
+def search4pdb(uniprot_accs: Iterable[str], limit=10_000, timeout=1_800) -> dict[str, set[PdbResult]]:
     """
-    Search for PDB entries in UniProtKB based on the given query.
+    Search for PDB entries in UniProtKB accessions.
+
+    Args:
+        uniprot_accs: UniProt accessions.
+        limit: Maximum number of results to return.
+        timeout: Timeout for the SPARQL query in seconds.
 
     Returns:
         Dictionary with protein IDs as keys and sets of PDB results as values.
     """
-    sparql_query = _build_sparql_query_pdb(query, limit)
+    sparql_query = _build_sparql_query_pdb(uniprot_accs, limit)
     logger.info("Executing SPARQL query for PDB: %s", sparql_query)
 
     # Type assertion is needed because _execute_sparql_search returns a Union
@@ -291,14 +307,19 @@ def search4pdb(query: Query, limit=10_000, timeout=1_800) -> dict[str, set[PdbRe
     return _flatten_results_pdb(raw_results)
 
 
-def search4af(query: Query, limit=10_000, timeout=1_800) -> dict[str, set[str]]:
+def search4af(uniprot_accs: Iterable[str], limit=10_000, timeout=1_800) -> dict[str, set[str]]:
     """
-    Search for AlphaFold entries in UniProtKB based on the given query.
+    Search for AlphaFold entries in UniProtKB accessions.
+
+    Args:
+        uniprot_accs: UniProt accessions.
+        limit: Maximum number of results to return.
+        timeout: Timeout for the SPARQL query in seconds.
 
     Returns:
         Dictionary with protein IDs as keys and sets of AlphaFold IDs as values.
     """
-    sparql_query = _build_sparql_query_af(query, limit)
+    sparql_query = _build_sparql_query_af(uniprot_accs, limit)
     logger.info("Executing SPARQL query for AlphaFold: %s", sparql_query)
 
     # Type assertion is needed because _execute_sparql_search returns a Union
@@ -310,14 +331,19 @@ def search4af(query: Query, limit=10_000, timeout=1_800) -> dict[str, set[str]]:
     return _flatten_results_af(raw_results)
 
 
-def search4emdb(query: Query, limit=10_000, timeout=1_800) -> dict[str, set[str]]:
+def search4emdb(uniprot_accs: Iterable[str], limit=10_000, timeout=1_800) -> dict[str, set[str]]:
     """
-    Search for EMDB entries in UniProtKB based on the given query.
+    Search for EMDB entries in UniProtKB accessions.
+
+    Args:
+        uniprot_accs: UniProt accessions.
+        limit: Maximum number of results to return.
+        timeout: Timeout for the SPARQL query in seconds.
 
     Returns:
         Dictionary with protein IDs as keys and sets of EMDB IDs as values.
     """
-    sparql_query = _build_sparql_query_emdb(query, limit)
+    sparql_query = _build_sparql_query_emdb(uniprot_accs, limit)
     logger.info("Executing SPARQL query for EMDB: %s", sparql_query)
 
     raw_results = _execute_sparql_search(
