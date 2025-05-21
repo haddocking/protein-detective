@@ -3,6 +3,7 @@ from pathlib import Path
 import duckdb
 
 from protein_detective.alphafold import fetch_many as af_fetch
+from protein_detective.alphafold.density import filter_on_density
 from protein_detective.db import ddl, save_alphafolds, save_pdbs, save_query, save_uniprot_accessions
 from protein_detective.pdbe import fetch as pdb_fetch
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
@@ -24,8 +25,6 @@ def retrieve_structures(query: Query, session_dir: Path, limit=10_000) -> Path:
     """
     download_dir = session_dir / "downloads"
     download_dir.mkdir(parents=True, exist_ok=True)
-    powerfit_candidate_dir = session_dir / "powerfit_candidates"
-    powerfit_candidate_dir.mkdir(parents=True, exist_ok=True)
 
     uniprot_accessions = search4uniprot(query, limit)
 
@@ -59,3 +58,19 @@ def prepare_structures(session_dir: Path):
 
     # TODO For each af structure remove the low confidence regions
     pass
+
+
+def density_filter(session_dir: Path, confidence: float, min_threshold: int, max_threshold: int):
+    """Filter the structures based on density confidence.
+
+    For AlphaFoldDB entries use the b-factor column of the PDB file.
+    All residues with a b-factor above the confidence threshold are counted.
+    Then if the count is outside the min and max threshold, the structure is filtered out.
+    The remaining structures have the residues with a b-factor below the confidence threshold removed.
+    And are written to the session_dir / "density_filtered" directory.
+
+    """
+    density_filtered = filter_on_density(session_dir, confidence, min_threshold, max_threshold)
+
+    # TODO store filter workflow step args in db
+    # TODO store which files where filtered in db
