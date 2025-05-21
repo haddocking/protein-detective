@@ -8,7 +8,20 @@ from protein_detective.pdbe import fetch as pdb_fetch
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
 
 
-def retrieve_structures(query: Query, session_dir: Path, limit=10_000):
+def retrieve_structures(query: Query, session_dir: Path, limit=10_000) -> Path:
+    """Find uniprot entries based on query and
+    retrieve structure files from PDBe and AlphaFold databases for the found Uniprot entries.
+
+    Args:
+        query: The search query.
+        session_dir: The directory to store downloaded files and the session database.
+        limit: The maximum number of results to retrieve.
+
+    Returns:
+        The path to the DuckDB database containing non-file data like
+        * AlphaFold entry summaries and
+        * Which PDB chains correspond to which Uniprot accessions.
+    """
     download_dir = session_dir / "downloads"
     download_dir.mkdir(parents=True, exist_ok=True)
     powerfit_candidate_dir = session_dir / "powerfit_candidates"
