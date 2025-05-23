@@ -22,11 +22,10 @@ def find_high_confidence_residues(pdb_file: Path, confidence: float) -> Generato
                 if b_factor > confidence:
                     # Extract the residue index from the PDB line
                     res_index = int(line[22:26].strip())
+                    # yield once per residue, not for every atom of the residue
                     if res_index != prev_res_index:
                         yield res_index
                         prev_res_index = res_index
-        if prev_res_index is not None:
-            yield prev_res_index
 
 
 def filter_out_low_confidence_residues(input_pdb_file: Path, allowed_residues: set[int], output_pdb_file: Path):
