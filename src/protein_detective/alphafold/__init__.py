@@ -1,6 +1,7 @@
 import asyncio
 from asyncio import Semaphore
 from collections.abc import AsyncGenerator, Iterable
+import concurrent
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -84,4 +85,9 @@ def fetch_many(ids: Iterable[str], save_dir: Path) -> list[AlphaFoldEntry]:
     async def gather_entries():
         return [entry async for entry in fetch_many_async(ids, save_dir)]
 
-    return asyncio.run(gather_entries())
+    def run_async_task():
+        return asyncio.run(gather_entries())
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(run_async_task)
+        return future.result()

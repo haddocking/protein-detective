@@ -11,7 +11,6 @@ predicted local distance difference test (pLDDT).
 See https://www.ebi.ac.uk/training/online/courses/alphafold/inputs-and-outputs/evaluating-alphafolds-predicted-structures-using-confidence-scores/plddt-understanding-local-confidence/
 """
 
-
 def find_high_confidence_residues(pdb_file: Path, confidence: float) -> Generator[int]:
     prev_res_index = None
     with pdb_file.open("r") as f:
