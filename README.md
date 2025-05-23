@@ -59,6 +59,8 @@ To lint the code
 ```shell
 uvx ruff check
 ```
+(Use `uvx ruff check --fix` to fix the issues automatically)
+
 
 To type check with [pyrefly](https://pyrefly.org/) the code
 
