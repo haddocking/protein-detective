@@ -9,6 +9,7 @@ from protein_detective.alphafold.density import filter_out_low_confidence_residu
 def sample_pdb() -> Path:
     return Path(__file__).parent / "AF-A1YPR0-F1-model_v4.pdb"
 
+
 def test_find_high_confidence_residues(sample_pdb: Path):
     residues = list(find_high_confidence_residues(sample_pdb, 90))
 
