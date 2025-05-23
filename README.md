@@ -8,7 +8,7 @@ pip install git+https://github.com/haddocking/protein-detective.git
 
 ## Usage
 
-To retrieve a bunch of structures
+### To retrieve a bunch of structures
 
 ```shell
 protein-detective retrieve \
@@ -26,6 +26,23 @@ In `./mysession` directory, you will find
 - PDB files from PDBe and AlphaFold DB
 - predicted alignment error (pae) files from AlphaFold DB
 - session.db - a duckdb database with the metadata of the structures
+
+### To filter AlphaFold structures on confidence
+
+```shell
+protein-detective density-filter \
+--confidence-threshold 50 \
+--min-residues 100 \
+--max-residues 1000 \
+./mysession
+```
+
+
+### To prune PDBe files
+
+```shell
+protein-detective prune-pdbs ./mysession
+```
 
 ## Develop
 

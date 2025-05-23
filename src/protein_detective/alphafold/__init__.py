@@ -1,7 +1,7 @@
 import asyncio
+import concurrent
 from asyncio import Semaphore
 from collections.abc import AsyncGenerator, Iterable
-import concurrent
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,6 +18,10 @@ class AlphaFoldEntry:
     summary: EntrySummary
     pdb_file: Path
     pae_file: Path
+
+    @property
+    def uniprot_acc(self) -> str:
+        return self.summary.uniprotAccession
 
 
 async def fetch_summmary(qualifier: str, session: RetryClient, semaphore: Semaphore) -> list[EntrySummary]:
@@ -88,6 +92,7 @@ def fetch_many(ids: Iterable[str], save_dir: Path) -> list[AlphaFoldEntry]:
     def run_async_task():
         return asyncio.run(gather_entries())
 
+    # pyrefly: ignore  # noqa: ERA001
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(run_async_task)
         return future.result()
