@@ -5,7 +5,7 @@ import duckdb
 from protein_detective.alphafold import fetch_many as af_fetch
 from protein_detective.alphafold.density import filter_on_density
 from protein_detective.db import ddl, save_alphafolds, save_pdbs, save_query, save_uniprot_accessions
-from protein_detective.pdbe import fetch as pdb_fetch
+from protein_detective.pdbe.fetch import fetch as pdb_fetch
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
 
 

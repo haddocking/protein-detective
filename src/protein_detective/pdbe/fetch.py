@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures  # Added import
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -28,4 +29,10 @@ def fetch(ids: Iterable[str], save_dir: Path, max_parallel_downloads: int = 5) -
     """
 
     urls = {_map_id(pdb_id) for pdb_id in ids}
-    return asyncio.run(retrieve_files(urls, save_dir, max_parallel_downloads))
+
+    def run_async_task():
+        return asyncio.run(retrieve_files(urls, save_dir, max_parallel_downloads))
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(run_async_task)
+        return future.result()
