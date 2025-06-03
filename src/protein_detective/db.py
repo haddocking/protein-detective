@@ -2,14 +2,18 @@ from collections.abc import Iterable, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 
-from cattrs import structure, unstructure
+from cattrs import unstructure
+from cattrs.preconf.json import make_converter
 from duckdb import DuckDBPyConnection
+from duckdb import connect as duckdb_connect
 
 from protein_detective.alphafold import AlphaFoldEntry
 from protein_detective.alphafold.density import DensityFilterQuery, DensityFilterResult
 from protein_detective.alphafold.entry_summary import EntrySummary
 from protein_detective.pdbe.io import ProteinPdbRow, SingleChainResult
 from protein_detective.uniprot import PdbResult, Query
+
+converter = make_converter()
 
 ddl = """\
 CREATE TABLE IF NOT EXISTS uniprot_searches (
@@ -43,18 +47,19 @@ CREATE TABLE IF NOT EXISTS alphafolds (
     summary JSON NOT NULL,
     pdb_file TEXT NOT NULL,
     pae_file TEXT NOT NULL,
-)
+);
 
-CREATE SEQUENCE id_density_filters START 1;
+CREATE SEQUENCE IF NOT EXISTS id_density_filters START 1;
 CREATE TABLE IF NOT EXISTS density_filters (
     density_filter_id INTEGER DEFAULT nextval('id_density_filters') PRIMARY KEY,
     confidence REAL NOT NULL,
     min_threshold INTEGER NOT NULL,
     max_threshold INTEGER NOT NULL,
-)
+    UNIQUE (confidence, min_threshold, max_threshold)
+);
 
 CREATE TABLE IF NOT EXISTS density_filtered_alphafolds (
-    density_filter_id NOT NULL,
+    density_filter_id INTEGER NOT NULL,
     uniprot_acc TEXT NOT NULL,
     nr_residues_above_confidence INTEGER NOT NULL,
     keep BOOLEAN,
@@ -62,14 +67,20 @@ CREATE TABLE IF NOT EXISTS density_filtered_alphafolds (
     PRIMARY KEY (density_filter_id, uniprot_acc),
     FOREIGN KEY (density_filter_id) REFERENCES density_filters (density_filter_id),
     FOREIGN KEY (uniprot_acc) REFERENCES alphafolds (uniprot_acc),
-)
+);
 """
+
+
+def db_path(session_dir: Path) -> Path:
+    """Return the path to the DuckDB database file in the given session directory."""
+    return session_dir / "session.db"
 
 
 @contextmanager
 def connect(session_dir: Path):
-    db_path = session_dir / "session.db"
-    con = DuckDBPyConnection(db_path)
+    # wrapper around duckdb.connect to create tables on connect
+    database = db_path(session_dir)
+    con = duckdb_connect(database)
     con.sql(ddl)
     yield con
     con.close()
@@ -80,9 +91,12 @@ def save_query(query: Query, con: DuckDBPyConnection):
 
 
 def save_uniprot_accessions(uniprot_accessions: Iterable[str], con: DuckDBPyConnection):
+    rows = [(uniprot_acc,) for uniprot_acc in uniprot_accessions]
+    if len(rows) == 0:
+        return
     con.executemany(
         "INSERT OR IGNORE INTO proteins (uniprot_acc) VALUES (?)",
-        [(uniprot_acc,) for uniprot_acc in uniprot_accessions],
+        rows,
     )
 
 
@@ -95,13 +109,16 @@ def save_pdbs(
     pdb_rows = []
     for pdb_results in uniprot2pdbs.values():
         pdb_rows.extend([(pdb.id, pdb.method, pdb.resolution, str(pdb_files[pdb.id])) for pdb in pdb_results])
-    con.executemany(
-        "INSERT OR IGNORE INTO pdbs (pdb_id, method, resolution, pdb_file) VALUES (?, ?, ?, ?)",
-        pdb_rows,
-    )
+    if len(pdb_rows) > 0:
+        con.executemany(
+            "INSERT OR IGNORE INTO pdbs (pdb_id, method, resolution, pdb_file) VALUES (?, ?, ?, ?)",
+            pdb_rows,
+        )
     prot2pdb_rows = []
     for uniprot_acc, pdb_results in uniprot2pdbs.items():
         prot2pdb_rows.extend([(uniprot_acc, pdb.id, pdb.chain) for pdb in pdb_results])
+    if len(prot2pdb_rows) == 0:
+        return
     con.executemany(
         "INSERT OR IGNORE INTO proteins_pdbs (uniprot_acc, pdb_id, chain) VALUES (?, ?, ?)",
         prot2pdb_rows,
@@ -150,7 +167,7 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     rows = con.execute(query).fetchall()
     return [
         AlphaFoldEntry(
-            summary=structure(row[0], EntrySummary),
+            summary=converter.loads(row[0], EntrySummary),
             pdb_file=Path(row[1]),
             pae_file=Path(row[2]),
         )
@@ -168,6 +185,7 @@ def save_single_chain_pdb_files(files: list[SingleChainResult], con: DuckDBPyCon
 def save_density_filtered(
     query: DensityFilterQuery,
     files: list[DensityFilterResult],
+    uniprot_accessions: list[str],
     con: DuckDBPyConnection,
 ):
     result = con.execute(
@@ -177,11 +195,29 @@ def save_density_filtered(
         RETURNING density_filter_id""",
         (query.confidence, query.min_threshold, query.max_threshold),
     ).fetchone()
+    if result is None:
+        # Already exists, so just fetch the id
+        result = con.execute(
+            """SELECT density_filter_id FROM density_filters
+            WHERE confidence = ? AND min_threshold = ? AND max_threshold = ?""",
+            (query.confidence, query.min_threshold, query.max_threshold),
+        ).fetchone()
     if result is None or len(result) != 1:
-        msg = "Failed to insert density filter query"
+        msg = "Failed to insert or retrieve density filter"
         raise ValueError(msg)
     density_filter_id = result[0]
-    values = [(density_filter_id, f.count, f.density_filtered_file, f.density_filtered_file) for f in files]
+
+    values = []
+    for file, uniprot_accession in zip(files, uniprot_accessions, strict=False):
+        values.append(
+            (
+                density_filter_id,
+                uniprot_accession,
+                file.count,
+                file.density_filtered_file is not None,
+                str(file.density_filtered_file) if file.density_filtered_file else None,
+            )
+        )
     con.executemany(
         """INSERT OR IGNORE INTO density_filtered_alphafolds
         (density_filter_id, uniprot_acc, nr_residues_above_confidence, keep, pdb_file)

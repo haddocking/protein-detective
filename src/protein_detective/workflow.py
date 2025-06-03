@@ -34,6 +34,7 @@ def retrieve_structures(query: Query, session_dir: Path, limit=10_000) -> tuple[
         * Which PDB chains correspond to which Uniprot accessions.
         And the number of PDBe and AlphaFoldDB entries found.
     """
+    session_dir.mkdir(parents=True, exist_ok=True)
     download_dir = session_dir / "downloads"
     download_dir.mkdir(parents=True, exist_ok=True)
 
@@ -62,13 +63,13 @@ def retrieve_structures(query: Query, session_dir: Path, limit=10_000) -> tuple[
 
 
 @dataclass
-class DensityFilterResult:
+class DensityFilterSessionResult:
     density_filtered_dir: Path
     nr_kept: int
     nr_discarded: int
 
 
-def density_filter(session_dir: Path, query: DensityFilterQuery) -> DensityFilterResult:
+def density_filter(session_dir: Path, query: DensityFilterQuery) -> DensityFilterSessionResult:
     """Filter the AlphaFoldDB structures based on density confidence.
 
     In AlphaFold PDB files, the b-factor column has the
@@ -84,17 +85,19 @@ def density_filter(session_dir: Path, query: DensityFilterQuery) -> DensityFilte
 
     with connect(session_dir) as conn:
         alphafold_pdb_files = [e.pdb_file for e in load_alphafolds(conn)]
+        uniproc_accs = [e.uniprot_acc for e in load_alphafolds(conn)]
 
         density_filtered = list(filter_on_density(alphafold_pdb_files, query, density_filtered_dir))
 
         save_density_filtered(
             query,
             density_filtered,
+            uniproc_accs,
             conn,
         )
         nr_kept = len([e for e in density_filtered if e.density_filtered_file is not None])
         nr_discarded = len(density_filtered) - nr_kept
-        return DensityFilterResult(
+        return DensityFilterSessionResult(
             density_filtered_dir=density_filtered_dir,
             nr_kept=nr_kept,
             nr_discarded=nr_discarded,

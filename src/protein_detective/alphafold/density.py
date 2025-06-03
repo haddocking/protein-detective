@@ -63,6 +63,7 @@ class DensityFilterResult:
     count: int
     """The number of residues with a pLDDT above the confidence threshold."""
     density_filtered_file: Path | None = None
+    """The path to the density filtered PDB file, if passed filter."""
 
 
 def filter_on_density(
