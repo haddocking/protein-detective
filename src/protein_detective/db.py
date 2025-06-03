@@ -115,6 +115,9 @@ def save_pdbs(
             pdb_rows,
         )
     prot2pdb_rows = []
+    # TODO chain does not match entry on website?
+    # In db A8MT69	4NE5	A/C/E/G=14-105
+    # On website A8MT69	4NE5		B/D/F/H	8-81
     for uniprot_acc, pdb_results in uniprot2pdbs.items():
         prot2pdb_rows.extend([(uniprot_acc, pdb.id, pdb.chain) for pdb in pdb_results])
     if len(prot2pdb_rows) == 0:
@@ -127,9 +130,9 @@ def save_pdbs(
 
 def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
     query = """
-    SELECT p.uniprot_acc, p.pdb_id, p.pdb_file, pp.chain
-    FROM proteins_pdbs pp
-    JOIN pdbs p ON pp.pdb_id = p.pdb_id
+    SELECT uniprot_acc, pdb_id, pdb_file, chain
+    FROM proteins_pdbs AS pp
+    JOIN pdbs AS p USING (pdb_id)
     """
     rows = con.execute(query).fetchall()
     return [

@@ -48,6 +48,12 @@ def write_single_chain_pdb_file(
     """
     protein_chain = parse_uniprot_chain(uniprot_chain)
     chain2keep = protein_chain.chains[0]
+    logger.warning(dict(
+        pdb_file=pdb_file,
+        uniprot_chain=uniprot_chain,
+        chain2keep=chain2keep,
+        out_chain=out_chain,
+    ))
     pdb = atomium.open(str(pdb_file))
     # pyrefly: ignore  # noqa: ERA001
     pdb.model.chain(chain2keep).copy(out_chain).save(

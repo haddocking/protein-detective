@@ -36,7 +36,7 @@ async def fetch_summaries(qualifiers: Iterable[str], max_parallel_downloads: int
     semaphore = Semaphore(max_parallel_downloads)
     async with friendly_session() as session:
         tasks = [fetch_summmary(qualifier, session, semaphore) for qualifier in qualifiers]
-        summaries_per_qualifier: list[list[EntrySummary]] = await tqdm.gather(*tasks, desc="Fetching summaries")
+        summaries_per_qualifier: list[list[EntrySummary]] = await tqdm.gather(*tasks, desc="Fetching Alphafold summaries")
         for summaries in summaries_per_qualifier:
             for summary in summaries:
                 yield summary
@@ -66,6 +66,7 @@ async def fetch_many_async(ids: Iterable[str], save_dir: Path) -> AsyncGenerator
     await retrieve_files(
         files,
         save_dir,
+        desc="Downloading AlphaFold files",
     )
     for summary in summaries:
         yield AlphaFoldEntry(

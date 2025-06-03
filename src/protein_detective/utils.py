@@ -15,12 +15,13 @@ async def retrieve_files(
     max_parallel_downloads: int = 5,
     retries: int = 3,
     total_timeout: int = 300,
+    desc="Downloading files",
 ) -> list[Path]:
     save_dir.mkdir(parents=True, exist_ok=True)
     semaphore = asyncio.Semaphore(max_parallel_downloads)
     async with friendly_session(retries, total_timeout) as session:
         tasks = [retrieve_file(session, url, save_dir / filename, semaphore) for url, filename in urls]
-        files: list[Path] = await tqdm.gather(*tasks, desc="Downloading files")
+        files: list[Path] = await tqdm.gather(*tasks, desc=desc)
         return files
 
 

@@ -42,12 +42,14 @@ def retrieve_structures(query: Query, session_dir: Path, limit=10_000) -> tuple[
 
     # PDBe entries for the given query
     pdbs = search4pdb(uniprot_accessions, limit=limit)
+    print(pdbs)
+    1/0
     pdb_ids: set[str] = set()
     for pdbresults in pdbs.values():
         for pdbresult in pdbresults:
             pdb_ids.add(pdbresult.id)
+    # TODO make paths in pdbs relative to session_dir, so db stores paths relative to session_dir
     pdb_files = pdb_fetch(pdb_ids, download_dir)
-    pdb_files_lookup = dict(zip(pdb_ids, pdb_files, strict=True))
 
     # AlphaFold entries for the given query
     af_result = search4af(uniprot_accessions, limit=limit)
@@ -57,9 +59,9 @@ def retrieve_structures(query: Query, session_dir: Path, limit=10_000) -> tuple[
     with connect(session_dir) as con:
         save_query(query, con)
         save_uniprot_accessions(uniprot_accessions, con)
-        save_pdbs(pdbs, pdb_files_lookup, con)
+        save_pdbs(pdbs, pdb_files, con)
         save_alphafolds(afs, con)
-    return download_dir, len(pdbs), len(afs)
+    return download_dir, len(pdb_files), len(afs)
 
 
 @dataclass
