@@ -151,7 +151,7 @@ def _build_sparql_query_pdb(uniprot_accs: Iterable[str], limit=10_000) -> str:
     # Also there can be multiple cnhins for the same uniprot/pdb pair, so we need to
     # do a group by and concat
 
-    select_clause = dedent("""
+    select_clause = dedent("""\
         ?protein ?pdb_db ?pdb_method ?pdb_resolution
          (GROUP_CONCAT(DISTINCT ?pdb_chain; separator=",") AS ?pdb_chains)
     """)
