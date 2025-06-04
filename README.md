@@ -101,3 +101,16 @@ rm docs/*.py
 ```
 
 </details>
+
+### Documentation
+
+Start the live-reloading docs server with
+
+```shell
+uv run mkdocs serve
+```
+Build the documentation site with
+
+```shell
+uv run mkdocs build
+```
