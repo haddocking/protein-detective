@@ -69,6 +69,8 @@ To format the code
 
 ```shell
 uvx ruff format
+# Sort imports with
+uvx ruff check --select I --fix
 ```
 
 To lint the code
