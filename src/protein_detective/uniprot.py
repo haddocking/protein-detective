@@ -82,10 +82,11 @@ def _append_subcellular_location_filters(query: Query) -> str:
     return ""
 
 
-def _build_sparql_generic_query(select_clause: str, where_clause: str, limit: int = 10_000) -> str:
+def _build_sparql_generic_query(select_clause: str, where_clause: str, limit: int = 10_000, groupby_clause="") -> str:
     """
     Builds a generic SPARQL query with the given select and where clauses.
     """
+    groupby = f" GROUP BY {groupby_clause}" if groupby_clause else ""
     return dedent(f"""
         PREFIX up: <http://purl.uniprot.org/core/>
         PREFIX taxon: <http://purl.uniprot.org/taxonomy/>
@@ -98,12 +99,13 @@ def _build_sparql_generic_query(select_clause: str, where_clause: str, limit: in
         WHERE {{
             {where_clause}
         }}
+        {groupby}
         LIMIT {limit}
     """)
 
 
 def _build_sparql_generic_by_uniprot_accesions_query(
-    uniprot_accs: Iterable[str], select_clause: str, where_clause: str, limit: int = 10_000
+    uniprot_accs: Iterable[str], select_clause: str, where_clause: str, limit: int = 10_000, groupby_clause=""
 ) -> str:
     values = " ".join(f'("{ac}")' for ac in uniprot_accs)
     where_clause2 = dedent(f"""
@@ -118,6 +120,7 @@ def _build_sparql_generic_by_uniprot_accesions_query(
         select_clause=select_clause,
         where_clause=where_clause2,
         limit=limit,
+        groupby_clause=groupby_clause,
     )
 
 
@@ -135,21 +138,44 @@ def _build_sparql_query_uniprot(query: Query, limit=10_000) -> str:
 
 
 def _build_sparql_query_pdb(uniprot_accs: Iterable[str], limit=10_000) -> str:
-    select_clause = "DISTINCT ?protein ?pdb_db ?pdb_method ?pdb_resolution ?pdb_chain"
+    # For http://purl.uniprot.org/uniprot/O00268 + http://rdf.wwpdb.org/pdb/1H3O
+    # the chainSequenceMapping are
+    # http://purl.uniprot.org/isoforms/O00268-1#PDB_1H3O_tt872tt945
+    # http://purl.uniprot.org/isoforms/Q16514-1#PDB_1H3O_tt57tt128
+    # For http://purl.uniprot.org/uniprot/O00255 + http://rdf.wwpdb.org/pdb/3U84
+    # the chainSequenceMapping are
+    # http://purl.uniprot.org/isoforms/O00255-2#PDB_3U84_tt520tt610
+    # http://purl.uniprot.org/isoforms/O00255-2#PDB_3U84_tt2tt459
+    # To get the the chain belonging to the uniprot/pdb pair we need to
+    # do some string filtering.
+    # Also there can be multiple cnhins for the same uniprot/pdb pair, so we need to
+    # do a group by and concat
+
+    select_clause = dedent("""
+        ?protein ?pdb_db ?pdb_method ?pdb_resolution
+         (GROUP_CONCAT(DISTINCT ?pdb_chain; separator=",") AS ?pdb_chains)
+    """)
+
     where_clause = dedent("""
         # --- PDB Info ---
         ?protein rdfs:seeAlso ?pdb_db .
         ?pdb_db up:database <http://purl.uniprot.org/database/PDB> .
         ?pdb_db up:method ?pdb_method .
         ?pdb_db up:chainSequenceMapping ?chainSequenceMapping .
+        BIND(STRAFTER(STR(?chainSequenceMapping), "isoforms/") AS ?isoformPart)
+        FILTER(STRSTARTS(?isoformPart, CONCAT(?ac, "-")))
         ?chainSequenceMapping up:chain ?pdb_chain .
         OPTIONAL { ?pdb_db up:resolution ?pdb_resolution . }
     """)
-    return _build_sparql_generic_by_uniprot_accesions_query(uniprot_accs, select_clause, dedent(where_clause), limit)
+
+    groupby_clause = "?protein ?pdb_db ?pdb_method ?pdb_resolution"
+    return _build_sparql_generic_by_uniprot_accesions_query(
+        uniprot_accs, select_clause, where_clause, limit, groupby_clause
+    )
 
 
 def _build_sparql_query_af(uniprot_accs: Iterable[str], limit=10_000) -> str:
-    select_clause = "DISTINCT ?protein ?af_db"
+    select_clause = "?protein ?af_db"
     where_clause = dedent("""
         # --- Protein Selection ---
         ?protein a up:Protein .
@@ -162,7 +188,7 @@ def _build_sparql_query_af(uniprot_accs: Iterable[str], limit=10_000) -> str:
 
 
 def _build_sparql_query_emdb(uniprot_accs: Iterable[str], limit=10_000) -> str:
-    select_clause = "DISTINCT ?protein ?emdb_db"
+    select_clause = "?protein ?emdb_db"
     where_clause = dedent("""
         # --- Protein Selection ---
         ?protein a up:Protein .
@@ -213,7 +239,7 @@ def _flatten_results_pdb(rawresults: Iterable) -> dict[str, set[PdbResult]]:
             continue
         pdb_id = result["pdb_db"]["value"].split("/")[-1]
         method = result["pdb_method"]["value"].split("/")[-1]
-        chain = result["pdb_chain"]["value"]
+        chain = result["pdb_chains"]["value"]
         pdb = PdbResult(id=pdb_id, method=method, chain=chain)
         if "pdb_resolution" in result:
             pdb = PdbResult(

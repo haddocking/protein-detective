@@ -42,8 +42,6 @@ def retrieve_structures(query: Query, session_dir: Path, limit=10_000) -> tuple[
 
     # PDBe entries for the given query
     pdbs = search4pdb(uniprot_accessions, limit=limit)
-    print(pdbs)
-    1/0
     pdb_ids: set[str] = set()
     for pdbresults in pdbs.values():
         for pdbresult in pdbresults:

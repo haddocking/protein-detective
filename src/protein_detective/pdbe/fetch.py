@@ -16,7 +16,7 @@ def _map_id(pdb_id: str) -> tuple[str, str]:
     return url, fn
 
 
-def fetch(ids: Iterable[str], save_dir: Path, max_parallel_downloads: int = 5) -> Mapping[str, Path]:  # noqa: F821
+def fetch(ids: Iterable[str], save_dir: Path, max_parallel_downloads: int = 5) -> Mapping[str, Path]:
     """Fetches gzipped PDB files from the PDBe database.
 
     Args:
@@ -40,7 +40,7 @@ def fetch(ids: Iterable[str], save_dir: Path, max_parallel_downloads: int = 5) -
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(run_async_task)
-        result =  future.result()
+        result = future.result()
         if set(result) != set(id2paths.values()):
             msg = "Not all files were downloaded successfully."
             raise ValueError(msg)
