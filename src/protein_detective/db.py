@@ -179,6 +179,8 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
 
 
 def save_single_chain_pdb_files(files: list[SingleChainResult], con: DuckDBPyConnection):
+    if len(files) == 0:
+        return
     con.executemany(
         "UPDATE proteins_pdbs SET single_chain_pdb_file = ? WHERE uniprot_acc = ? AND pdb_id = ?",
         [(str(file.output_file), file.uniprot_acc, file.pdb_id) for file in files],

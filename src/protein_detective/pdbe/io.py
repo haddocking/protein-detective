@@ -71,10 +71,11 @@ class SingleChainResult:
 
 def write_single_chain_pdb_files(
     proteinpdbs: list[ProteinPdbRow],
+    session_dir: Path,
     single_chain_dir: Path,
 ) -> Generator[SingleChainResult]:
     for proteinpdb in tqdm(proteinpdbs, desc="Saving single chain PDB files from PDBe"):
-        pdb_file = proteinpdb.pdb_file
+        pdb_file = session_dir / proteinpdb.pdb_file
         uniprot_chains = proteinpdb.chain
         chain2keep = first_chain_from_uniprot_chains(uniprot_chains)
         uniprot_acc = proteinpdb.uniprot_acc
@@ -88,5 +89,5 @@ def write_single_chain_pdb_files(
         yield SingleChainResult(
             uniprot_acc=uniprot_acc,
             pdb_id=proteinpdb.id,
-            output_file=output_file,
+            output_file=output_file.relative_to(session_dir),
         )

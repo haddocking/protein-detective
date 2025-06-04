@@ -46,20 +46,23 @@ def retrieve_structures(query: Query, session_dir: Path, limit=10_000) -> tuple[
     for pdbresults in pdbs.values():
         for pdbresult in pdbresults:
             pdb_ids.add(pdbresult.id)
-    # TODO make paths in pdbs relative to session_dir, so db stores paths relative to session_dir
     pdb_files = pdb_fetch(pdb_ids, download_dir)
+    # make paths in pdbs relative to session_dir, so db stores paths relative to session_dir
+    sr_pdb_files = {pdb_id: pdb_file.relative_to(session_dir) for pdb_id, pdb_file in pdb_files.items()}
 
     # AlphaFold entries for the given query
     af_result = search4af(uniprot_accessions, limit=limit)
     af_ids = set(af_result.keys())
     afs = af_fetch(af_ids, download_dir)
+    for af in afs:
+        af.pdb_file = af.pdb_file.relative_to(session_dir)
 
     with connect(session_dir) as con:
         save_query(query, con)
         save_uniprot_accessions(uniprot_accessions, con)
-        save_pdbs(pdbs, pdb_files, con)
+        save_pdbs(pdbs, sr_pdb_files, con)
         save_alphafolds(afs, con)
-    return download_dir, len(pdb_files), len(afs)
+    return download_dir, len(sr_pdb_files), len(afs)
 
 
 @dataclass
@@ -84,10 +87,14 @@ def density_filter(session_dir: Path, query: DensityFilterQuery) -> DensityFilte
     density_filtered_dir.mkdir(parents=True, exist_ok=True)
 
     with connect(session_dir) as conn:
-        alphafold_pdb_files = [e.pdb_file for e in load_alphafolds(conn)]
-        uniproc_accs = [e.uniprot_acc for e in load_alphafolds(conn)]
+        afs = load_alphafolds(conn)
+        alphafold_pdb_files = [session_dir / e.pdb_file for e in afs]
+        uniproc_accs = [e.uniprot_acc for e in afs]
 
         density_filtered = list(filter_on_density(alphafold_pdb_files, query, density_filtered_dir))
+        for e in density_filtered:
+            if e.density_filtered_file is not None:
+                e.density_filtered_file = e.density_filtered_file.relative_to(session_dir)
 
         save_density_filtered(
             query,
@@ -114,7 +121,7 @@ def prune_pdbs(session_dir: Path) -> tuple[Path, int]:
 
     with connect(session_dir) as conn:
         proteinpdbs = load_pdbs(conn)
-        new_files = list(write_single_chain_pdb_files(proteinpdbs, single_chain_dir))
+        new_files = list(write_single_chain_pdb_files(proteinpdbs, session_dir, single_chain_dir))
         save_single_chain_pdb_files(new_files, conn)
 
         return single_chain_dir, len(new_files)
