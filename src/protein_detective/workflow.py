@@ -2,10 +2,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from protein_detective.alphafold import DownloadableFormat
 from protein_detective.alphafold import fetch_many as af_fetch
 from protein_detective.alphafold import relative_to as af_relative_to
 from protein_detective.alphafold.density import DensityFilterQuery, filter_on_density
-from protein_detective.alphafold import DownloadableFormat
 from protein_detective.db import (
     connect,
     load_alphafold_ids,
@@ -21,7 +21,7 @@ from protein_detective.db import (
     save_single_chain_pdb_files,
     save_uniprot_accessions,
 )
-from protein_detective.pdbe.fetch import fetch as pdb_fetch
+from protein_detective.pdbe.fetch import fetch as pdbe_fetch
 from protein_detective.pdbe.io import write_single_chain_pdb_files
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
 
@@ -70,10 +70,8 @@ def retrieve_structures(
         what_af_formats: A tuple of formats to download from AlphaFold (e.g., "pdb", "cif").
 
     Returns:
-        The path to the DuckDB database containing non-file data like
-        * AlphaFold entry summaries and
-        * Which PDB chains correspond to which Uniprot accessions.
-        And the number of PDBe and AlphaFoldDB entries found.
+        A tuple containing the download directory, the number of PDBe mmCIF files downloaded,
+        and the number of AlphaFold files downloaded.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
     download_dir = session_dir / "downloads"
@@ -85,19 +83,19 @@ def retrieve_structures(
         msg = f"Invalid 'what' argument: {what}. Must be a subset of {what_retrieve_choices}."
         raise ValueError(msg)
 
-    sr_pdb_files = {}
+    sr_mmcif_files = {}
     if "pdbe" in what:
-        # Retrieve the PDB files for the Uniprot entries in the session.
+        # mmCIF files from PDBe for the Uniprot entries in the session.
         pdb_ids = set()
         with connect(session_dir) as con:
             pdb_ids = load_pdb_ids(con)
 
-        pdb_files = pdb_fetch(pdb_ids, download_dir)
+        mmcif_files = pdbe_fetch(pdb_ids, download_dir)
 
-        # make paths in pdbs relative to session_dir, so db stores paths relative to session_dir
-        sr_pdb_files = {pdb_id: pdb_file.relative_to(session_dir) for pdb_id, pdb_file in pdb_files.items()}
+        # make paths relative to session_dir, so db stores paths relative to session_dir
+        sr_mmcif_files = {pdb_id: mmcif_file.relative_to(session_dir) for pdb_id, mmcif_file in mmcif_files.items()}
         with connect(session_dir) as con:
-            save_pdb_files(sr_pdb_files, con)
+            save_pdb_files(sr_mmcif_files, con)
 
     afs = []
     if "alphafold" in what:
@@ -112,7 +110,7 @@ def retrieve_structures(
         with connect(session_dir) as con:
             save_alphafolds_files(sr_afs, con)
 
-    return download_dir, len(sr_pdb_files), len(afs)
+    return download_dir, len(sr_mmcif_files), len(afs)
 
 
 @dataclass

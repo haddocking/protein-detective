@@ -28,8 +28,7 @@ CREATE TABLE IF NOT EXISTS pdbs (
     pdb_id TEXT PRIMARY KEY,
     method TEXT NOT NULL,
     resolution REAL,
-    -- TODO dont use optional pdb_file, but use a pdb_files table, this makes using the rows less iffy
-    pdb_file TEXT,
+    mmcif_file TEXT,
 );
 
 -- pdb could have multiple proteins so use many-to-many table
@@ -139,18 +138,18 @@ def save_pdbs(
     )
 
 
-def save_pdb_files(pdb_files: Mapping[str, Path], con: DuckDBPyConnection):
+def save_pdb_files(mmcif_files: Mapping[str, Path], con: DuckDBPyConnection):
     """Save PDB files to the database.
 
     Args:
         pdb_files: A mapping of PDB IDs to their file paths.
         con: The DuckDB connection to use for saving the data.
     """
-    rows = [(str(pdb_file), pdb_id) for pdb_id, pdb_file in pdb_files.items()]
+    rows = [(str(mmcif_file), pdb_id) for pdb_id, mmcif_file in mmcif_files.items()]
     if len(rows) == 0:
         return
     con.executemany(
-        "UPDATE pdbs SET pdb_file = ? WHERE pdb_id = ?",
+        "UPDATE pdbs SET mmcif_file = ? WHERE pdb_id = ?",
         rows,
     )
 
@@ -171,7 +170,7 @@ def load_pdb_ids(con: DuckDBPyConnection) -> set[str]:
 
 def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
     query = """
-    SELECT uniprot_acc, pdb_id, pdb_file, uniprot_chains
+    SELECT uniprot_acc, pdb_id, mmcif_file, uniprot_chains
     FROM proteins_pdbs AS pp
     JOIN pdbs AS p USING (pdb_id)
     """
@@ -180,7 +179,7 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
         ProteinPdbRow(
             uniprot_acc=row[0],
             id=row[1],
-            pdb_file=Path(row[2]) if row[2] else None,
+            mmcif_file=Path(row[2]) if row[2] else None,
             uniprot_chains=row[3],
         )
         for row in rows
@@ -248,17 +247,17 @@ def load_alphafold_ids(con: DuckDBPyConnection) -> set[str]:
 
 def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     query = """
-    SELECT 
-    uniprot_acc, 
-    summary, 
-    bcif_file,
-    cif_file,
-    pdb_file,
-    pae_image_file,
-    pae_doc_file,
-    am_annotations_file,
-    am_annotations_hg19_file,
-    am_annotations_hg38_file
+    SELECT
+        uniprot_acc,
+        summary,
+        bcif_file,
+        cif_file,
+        pdb_file,
+        pae_image_file,
+        pae_doc_file,
+        am_annotations_file,
+        am_annotations_hg19_file,
+        am_annotations_hg38_file
     FROM alphafolds
     """
     rows = con.execute(query).fetchall()

@@ -44,14 +44,14 @@ def add_retrieve_parser(subparsers):
         "--what",
         type=str,
         action="append",
-        choices=what_retrieve_choices,
+        choices=sorted(what_retrieve_choices),
         help="What to retrieve. Can be specified multiple times. Default is pdbe and alphafold.",
     )
     retrieve_parser.add_argument(
         "--what-af-formats",
         type=str,
         action="append",
-        choices=downloadable_formats,
+        choices=sorted(downloadable_formats),
         help="AlphaFold formats to retrieve. Can be specified multiple times. Default is 'pdb'.",
     )
     return retrieve_parser
