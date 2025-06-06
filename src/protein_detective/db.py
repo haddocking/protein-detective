@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS pdbs (
     pdb_id TEXT PRIMARY KEY,
     method TEXT NOT NULL,
     resolution REAL,
+    -- TODO dont use optional pdb_file, but use a pdb_files table, this makes using the rows less iffy
     pdb_file TEXT,
 );
 

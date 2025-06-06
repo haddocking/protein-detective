@@ -16,9 +16,9 @@ from protein_detective.utils import friendly_session, retrieve_files
 @dataclass
 class AlphaFoldEntry:
     uniprot_acc: str
-    summary: EntrySummary
-    pdb_file: Path
-    pae_file: Path
+    summary: EntrySummary | None
+    pdb_file: Path | None
+    pae_file: Path | None
 
 
 async def fetch_summmary(qualifier: str, session: RetryClient, semaphore: Semaphore) -> list[EntrySummary]:

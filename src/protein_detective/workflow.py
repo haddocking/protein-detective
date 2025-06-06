@@ -93,6 +93,8 @@ def retrieve_structures(session_dir: Path, what: tuple[str, ...] = ("pdbe", "alp
         afs = af_fetch(af_ids, download_dir)
 
         for af in afs:
+            if af.pdb_file is None or af.pae_file is None:
+                continue
             af.pdb_file = af.pdb_file.relative_to(session_dir)
             af.pae_file = af.pae_file.relative_to(session_dir)
         with connect(session_dir) as con:
@@ -124,7 +126,7 @@ def density_filter(session_dir: Path, query: DensityFilterQuery) -> DensityFilte
 
     with connect(session_dir) as conn:
         afs = load_alphafolds(conn)
-        alphafold_pdb_files = [session_dir / e.pdb_file for e in afs]
+        alphafold_pdb_files = [session_dir / e.pdb_file for e in afs if e.pdb_file is not None]
         uniproc_accs = [e.uniprot_acc for e in afs]
 
         density_filtered = list(filter_on_density(alphafold_pdb_files, query, density_filtered_dir))
