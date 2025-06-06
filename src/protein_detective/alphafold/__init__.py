@@ -15,13 +15,10 @@ from protein_detective.utils import friendly_session, retrieve_files
 
 @dataclass
 class AlphaFoldEntry:
+    uniprot_acc: str
     summary: EntrySummary
     pdb_file: Path
     pae_file: Path
-
-    @property
-    def uniprot_acc(self) -> str:
-        return self.summary.uniprotAccession
 
 
 async def fetch_summmary(qualifier: str, session: RetryClient, semaphore: Semaphore) -> list[EntrySummary]:
@@ -62,6 +59,7 @@ async def fetch_many_async(ids: Iterable[str], save_dir: Path) -> AsyncGenerator
     """
     summaries = [s async for s in fetch_summaries(ids)]
 
+    # TODO allow user to select which urls of a summary to download, default should be pdb
     files = {(summary.pdbUrl, url2name(summary.pdbUrl)) for summary in summaries} | {
         (summary.paeDocUrl, url2name(summary.paeDocUrl)) for summary in summaries
     }
@@ -71,7 +69,9 @@ async def fetch_many_async(ids: Iterable[str], save_dir: Path) -> AsyncGenerator
         desc="Downloading AlphaFold files",
     )
     for summary in summaries:
+        uniprot_acc = summary.uniprotAccession
         yield AlphaFoldEntry(
+            uniprot_acc=uniprot_acc,
             summary=summary,
             pdb_file=save_dir / url2name(summary.pdbUrl),
             pae_file=save_dir / url2name(summary.paeDocUrl),

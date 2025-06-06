@@ -9,28 +9,35 @@ from protein_detective.workflow import (
     density_filter,
     prune_pdbs,
     retrieve_structures,
+    search_structures_in_uniprot,
 )
 
 
-def add_retrieve_parser(subparsers):
-    retrieve_parser = subparsers.add_parser("retrieve", help="Retrieve structures for a UniProt query")
-    retrieve_parser.add_argument("session_dir", help="Session directory to store results")
-    retrieve_parser.add_argument("--taxon-id", type=str, help="NCBI Taxon ID")
-    retrieve_parser.add_argument(
+def add_search_parser(subparsers):
+    search_parser = subparsers.add_parser("search", help="Search UniProt for structures")
+    search_parser.add_argument("session_dir", help="Session directory to store results")
+    search_parser.add_argument("--taxon-id", type=str, help="NCBI Taxon ID")
+    search_parser.add_argument(
         "--reviewed",
         type=bool,
         action=argparse.BooleanOptionalAction,
         help="Reviewed=swissprot, no-reviewed=trembl. Default is uniprot=swissprot+trembl.",
         default=None,
     )
-    retrieve_parser.add_argument("--subcellular-location-uniprot", type=str, help="Subcellular location (UniProt)")
-    retrieve_parser.add_argument(
+    search_parser.add_argument("--subcellular-location-uniprot", type=str, help="Subcellular location (UniProt)")
+    search_parser.add_argument(
         "--subcellular-location-go", type=str, help="Subcellular location (GO term, e.g. GO:0005737)"
     )
-    retrieve_parser.add_argument(
+    search_parser.add_argument(
         "--molecular-function-go", type=str, help="Molecular function (GO term, e.g. GO:0003677)"
     )
-    retrieve_parser.add_argument("--limit", type=int, default=10_000, help="Limit number of results")
+    search_parser.add_argument("--limit", type=int, default=10_000, help="Limit number of results")
+    return search_parser
+
+
+def add_retrieve_parser(subparsers):
+    retrieve_parser = subparsers.add_parser("retrieve", help="Retrieve structures")
+    retrieve_parser.add_argument("session_dir", help="Session directory to store results")
     return retrieve_parser
 
 
@@ -62,7 +69,7 @@ def add_prune_pdbs_parser(subparsers):
     return prune_pdbs_parser
 
 
-def handle_retrieve(args):
+def handle_search(args):
     query = Query(
         taxon_id=args.taxon_id,
         reviewed=args.reviewed,
@@ -71,8 +78,20 @@ def handle_retrieve(args):
         molecular_function_go=args.molecular_function_go,
     )
     session_dir = Path(args.session_dir)
-    download_dir, nr_pdbes, nr_afs = retrieve_structures(query, session_dir, limit=args.limit)
-    print(f"Structures (pdbe={nr_pdbes}, alphafold={nr_afs}) retrieved and saved in {download_dir}")
+    nr_uniprot, nr_pdbes, nr_afs = search_structures_in_uniprot(query, session_dir, limit=args.limit)
+    print(
+        f"Search completed: {nr_uniprot} UniProt entries found, "
+        f"{nr_pdbes} PDBe structures, {nr_afs} AlphaFold structures."
+    )
+
+
+def handle_retrieve(args):
+    session_dir = Path(args.session_dir)
+    download_dir, nr_pdbes, nr_afs = retrieve_structures(session_dir)
+    print(
+        "Structures retrieved successfully: "
+        f"{nr_pdbes} PDBe structures, {nr_afs} AlphaFold structures downloaded to {download_dir}"
+        )
 
 
 def handle_density_filter(args):
@@ -96,13 +115,16 @@ def handle_prune_pdbs(args):
 def main():
     parser = argparse.ArgumentParser(description="Protein Detective CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    add_search_parser(subparsers)
     add_retrieve_parser(subparsers)
     add_density_filter_parser(subparsers)
     add_prune_pdbs_parser(subparsers)
 
     args = parser.parse_args()
 
-    if args.command == "retrieve":
+    if args.command == "search":
+        handle_search(args)
+    elif args.command == "retrieve":
         handle_retrieve(args)
     elif args.command == "density-filter":
         handle_density_filter(args)

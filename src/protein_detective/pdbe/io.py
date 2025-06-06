@@ -57,7 +57,7 @@ def write_single_chain_pdb_file(
 @dataclass(frozen=True)
 class ProteinPdbRow:
     id: str
-    chain: str
+    uniprot_chains: str
     uniprot_acc: str
     pdb_file: Path
 
@@ -76,7 +76,7 @@ def write_single_chain_pdb_files(
 ) -> Generator[SingleChainResult]:
     for proteinpdb in tqdm(proteinpdbs, desc="Saving single chain PDB files from PDBe"):
         pdb_file = session_dir / proteinpdb.pdb_file
-        uniprot_chains = proteinpdb.chain
+        uniprot_chains = proteinpdb.uniprot_chains
         chain2keep = first_chain_from_uniprot_chains(uniprot_chains)
         uniprot_acc = proteinpdb.uniprot_acc
         output_file = single_chain_dir / f"{uniprot_acc}_{pdb_file.stem}_{chain2keep}2A.pdb"

@@ -28,14 +28,14 @@ CREATE TABLE IF NOT EXISTS pdbs (
     pdb_id TEXT PRIMARY KEY,
     method TEXT NOT NULL,
     resolution REAL,
-    pdb_file TEXT NOT NULL,
+    pdb_file TEXT,
 );
 
 -- pdb could have multiple proteins so use many-to-many table
 CREATE TABLE IF NOT EXISTS proteins_pdbs (
     uniprot_acc TEXT NOT NULL,
     pdb_id TEXT NOT NULL,
-    chain TEXT NOT NULL,
+    uniprot_chains TEXT NOT NULL,
     single_chain_pdb_file TEXT,
     FOREIGN KEY (uniprot_acc) REFERENCES proteins (uniprot_acc),
     FOREIGN KEY (pdb_id) REFERENCES pdbs (pdb_id),
@@ -44,9 +44,9 @@ CREATE TABLE IF NOT EXISTS proteins_pdbs (
 
 CREATE TABLE IF NOT EXISTS alphafolds (
     uniprot_acc TEXT PRIMARY KEY,
-    summary JSON NOT NULL,
-    pdb_file TEXT NOT NULL,
-    pae_file TEXT NOT NULL,
+    summary JSON,
+    pdb_file TEXT,
+    pae_file TEXT,
 );
 
 CREATE SEQUENCE IF NOT EXISTS id_density_filters START 1;
@@ -109,32 +109,61 @@ def save_uniprot_accessions(uniprot_accessions: Iterable[str], con: DuckDBPyConn
 
 def save_pdbs(
     uniprot2pdbs: Mapping[str, Iterable[PdbResult]],
-    pdb_files: Mapping[str, Path],
     con: DuckDBPyConnection,
 ):
     save_uniprot_accessions(uniprot2pdbs.keys(), con)
     pdb_rows = []
     for pdb_results in uniprot2pdbs.values():
-        pdb_rows.extend([(pdb.id, pdb.method, pdb.resolution, str(pdb_files[pdb.id])) for pdb in pdb_results])
+        pdb_rows.extend([(pdb.id, pdb.method, pdb.resolution) for pdb in pdb_results])
     if len(pdb_rows) > 0:
         con.executemany(
-            "INSERT OR IGNORE INTO pdbs (pdb_id, method, resolution, pdb_file) VALUES (?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO pdbs (pdb_id, method, resolution) VALUES (?, ?, ?)",
             pdb_rows,
         )
     prot2pdb_rows = []
     for uniprot_acc, pdb_results in uniprot2pdbs.items():
-        prot2pdb_rows.extend([(uniprot_acc, pdb.id, pdb.chain) for pdb in pdb_results])
+        prot2pdb_rows.extend([(uniprot_acc, pdb.id, pdb.uniprot_chains) for pdb in pdb_results])
     if len(prot2pdb_rows) == 0:
         return
     con.executemany(
-        "INSERT OR IGNORE INTO proteins_pdbs (uniprot_acc, pdb_id, chain) VALUES (?, ?, ?)",
+        "INSERT OR IGNORE INTO proteins_pdbs (uniprot_acc, pdb_id, uniprot_chains) VALUES (?, ?, ?)",
         prot2pdb_rows,
     )
 
 
+def save_pdb_files(pdb_files: Mapping[str, Path], con: DuckDBPyConnection):
+    """Save PDB files to the database.
+
+    Args:
+        pdb_files: A mapping of PDB IDs to their file paths.
+        con: The DuckDB connection to use for saving the data.
+    """
+    rows = [(str(pdb_file), pdb_id) for pdb_id, pdb_file in pdb_files.items()]
+    if len(rows) == 0:
+        return
+    con.executemany(
+        "UPDATE pdbs SET pdb_file = ? WHERE pdb_id = ?",
+        rows,
+    )
+
+
+def load_pdb_ids(con: DuckDBPyConnection) -> set[str]:
+    """Load PDB IDs from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A set of PDB IDs.
+    """
+    query = "SELECT pdb_id FROM pdbs"
+    rows = con.execute(query).fetchall()
+    return {row[0] for row in rows}
+
+
 def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
     query = """
-    SELECT uniprot_acc, pdb_id, pdb_file, chain
+    SELECT uniprot_acc, pdb_id, pdb_file, uniprot_chains
     FROM proteins_pdbs AS pp
     JOIN pdbs AS p USING (pdb_id)
     """
@@ -143,40 +172,67 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
         ProteinPdbRow(
             uniprot_acc=row[0],
             id=row[1],
-            pdb_file=Path(row[2]),
-            chain=row[3],
+            pdb_file=Path(row[2]) if row[2] else None,
+            uniprot_chains=row[3],
         )
         for row in rows
     ]
 
 
-def save_alphafolds(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
-    af_rows = []
-    for af in afs:
-        uniprot_acc = af.uniprot_acc
-        summary = unstructure(af.summary)
-        pdb_file = str(af.pdb_file)
-        pae_file = str(af.pae_file)
-        af_rows.append((uniprot_acc, summary, pdb_file, pae_file))
+def save_alphafolds(afs: dict[str, set[str]], con: DuckDBPyConnection):
+    rows = []
+    for af_ids_of_uniprot in afs.values():
+        rows.extend([(af_id,) for af_id in af_ids_of_uniprot])
+    if len(rows) == 0:
+        return
     con.executemany(
-        "INSERT OR IGNORE INTO alphafolds (uniprot_acc, summary, pdb_file, pae_file) VALUES (?, ?, ?, ?)",
-        af_rows,
+        "INSERT OR IGNORE INTO alphafolds (uniprot_acc) VALUES (?)",
+        rows,
     )
-    protein_rows = [af.summary.uniprotAccession for af in afs]
-    save_uniprot_accessions(protein_rows, con)
+
+    save_uniprot_accessions(afs.keys(), con)
+
+
+def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
+    rows = [
+        (
+            converter.dumps(af.summary, EntrySummary),
+            str(af.pdb_file),
+            str(af.pae_file),
+            af.uniprot_acc,
+        )
+        for af in afs
+    ]
+    if len(rows) == 0:
+        # executemany can not be called with an empty list, it raises error, so we return early
+        return
+    con.executemany(
+        "UPDATE alphafolds SET summary = ?, pdb_file = ?, pae_file = ? WHERE uniprot_acc = ?",
+        rows,
+    )
+
+
+def load_alphafold_ids(con: DuckDBPyConnection) -> set[str]:
+    query = """
+    SELECT uniprot_acc
+    FROM alphafolds
+    """
+    rows = con.execute(query).fetchall()
+    return {row[0] for row in rows}
 
 
 def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     query = """
-    SELECT summary, pdb_file, pae_file
+    SELECT uniprot_acc, summary, pdb_file, pae_file
     FROM alphafolds
     """
     rows = con.execute(query).fetchall()
     return [
         AlphaFoldEntry(
-            summary=converter.loads(row[0], EntrySummary),
-            pdb_file=Path(row[1]),
-            pae_file=Path(row[2]),
+            uniprot_acc=row[0],
+            summary=converter.loads(row[1], EntrySummary) if row[0] else None,
+            pdb_file=Path(row[2]) if row[2] else None,
+            pae_file=Path(row[3]) if row[3] else None,
         )
         for row in rows
     ]

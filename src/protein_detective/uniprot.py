@@ -21,7 +21,7 @@ class Query:
 class PdbResult:
     id: str
     method: str
-    chain: str
+    uniprot_chains: str
     resolution: str | None = None
 
 
@@ -128,12 +128,13 @@ def _build_sparql_query_uniprot(query: Query, limit=10_000) -> str:
     dynamic_triples = _query2dynamic_sparql_triples(query)
     # TODO add usefull columns that have 1:1 mapping to protein
     # like uniprot_id with `?protein up:mnemonic ?mnemonic .`
+    # and sequence, take care to take first isoform
+    # ?protein up:sequence ?isoform .
+    # ?isoform rdf:value ?sequence .
     select_clause = "?protein"
     where_clause = dedent(f"""
         # --- Protein Selection ---
         ?protein a up:Protein .
-        ?protein up:sequence ?isoform .
-        ?isoform rdf:value ?sequence .
         {dynamic_triples}
     """)
     return _build_sparql_generic_query(select_clause, dedent(where_clause), limit)
@@ -241,13 +242,13 @@ def _flatten_results_pdb(rawresults: Iterable) -> dict[str, set[PdbResult]]:
             continue
         pdb_id = result["pdb_db"]["value"].split("/")[-1]
         method = result["pdb_method"]["value"].split("/")[-1]
-        chain = result["pdb_chains"]["value"]
-        pdb = PdbResult(id=pdb_id, method=method, chain=chain)
+        uniprot_chains = result["pdb_chains"]["value"]
+        pdb = PdbResult(id=pdb_id, method=method, uniprot_chains=uniprot_chains)
         if "pdb_resolution" in result:
             pdb = PdbResult(
                 id=pdb_id,
                 method=method,
-                chain=chain,
+                uniprot_chains=uniprot_chains,
                 resolution=result["pdb_resolution"]["value"],
             )
         if protein not in pdb_entries:

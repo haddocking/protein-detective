@@ -5,10 +5,14 @@ from protein_detective.alphafold import fetch_many as af_fetch
 from protein_detective.alphafold.density import DensityFilterQuery, filter_on_density
 from protein_detective.db import (
     connect,
+    load_alphafold_ids,
     load_alphafolds,
+    load_pdb_ids,
     load_pdbs,
     save_alphafolds,
+    save_alphafolds_files,
     save_density_filtered,
+    save_pdb_files,
     save_pdbs,
     save_query,
     save_single_chain_pdb_files,
@@ -19,14 +23,41 @@ from protein_detective.pdbe.io import write_single_chain_pdb_files
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
 
 
-def retrieve_structures(query: Query, session_dir: Path, limit: int = 10_000) -> tuple[Path, int, int]:
-    """Find uniprot entries based on query and
-    retrieve structure files from PDBe and AlphaFold databases for the found Uniprot entries.
+def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 10_000) -> tuple[int, int, int]:
+    """Searches for protein structures in UniProt database.
 
     Args:
         query: The search query.
+        session_dir: The directory to store the search results.
+        limit: The maximum number of results to return from each database query.
+
+    Returns:
+        A tuple containing the number of UniProt accessions, the number of PDB structures,
+        and the number of AlphaFold structures found.
+    """
+    session_dir.mkdir(parents=True, exist_ok=True)
+
+    uniprot_accessions = search4uniprot(query, limit)
+    pdbs = search4pdb(uniprot_accessions, limit=limit)
+    af_result = search4af(uniprot_accessions, limit=limit)
+
+    with connect(session_dir) as con:
+        save_query(query, con)
+        save_uniprot_accessions(uniprot_accessions, con)
+        save_pdbs(pdbs, con)
+        save_alphafolds(af_result, con)
+
+    nr_pdbs = len(set().union(*pdbs.values()))
+    nr_afs = len(set().union(*af_result.values()))
+    return len(uniprot_accessions), nr_pdbs, nr_afs
+
+
+def retrieve_structures(session_dir: Path, what: tuple[str, ...] = ("pdbe", "alphafold")) -> tuple[Path, int, int]:
+    """Retrieve structure files from PDBe and AlphaFold databases for the Uniprot entries in the session.
+
+    Args:
         session_dir: The directory to store downloaded files and the session database.
-        limit: The maximum number of results to retrieve.
+        what: A tuple of strings indicating which databases to retrieve files from.
 
     Returns:
         The path to the DuckDB database containing non-file data like
@@ -38,30 +69,35 @@ def retrieve_structures(query: Query, session_dir: Path, limit: int = 10_000) ->
     download_dir = session_dir / "downloads"
     download_dir.mkdir(parents=True, exist_ok=True)
 
-    uniprot_accessions = search4uniprot(query, limit)
+    sr_pdb_files = {}
+    if "pdbe" in what:
+        # Retrieve the PDB files for the Uniprot entries in the session.
+        pdb_ids = set()
+        with connect(session_dir) as con:
+            pdb_ids = load_pdb_ids(con)
 
-    # PDBe entries for the given query
-    pdbs = search4pdb(uniprot_accessions, limit=limit)
-    pdb_ids: set[str] = set()
-    for pdbresults in pdbs.values():
-        for pdbresult in pdbresults:
-            pdb_ids.add(pdbresult.id)
-    pdb_files = pdb_fetch(pdb_ids, download_dir)
-    # make paths in pdbs relative to session_dir, so db stores paths relative to session_dir
-    sr_pdb_files = {pdb_id: pdb_file.relative_to(session_dir) for pdb_id, pdb_file in pdb_files.items()}
+        pdb_files = pdb_fetch(pdb_ids, download_dir)
 
-    # AlphaFold entries for the given query
-    af_result = search4af(uniprot_accessions, limit=limit)
-    af_ids = set(af_result.keys())
-    afs = af_fetch(af_ids, download_dir)
-    for af in afs:
-        af.pdb_file = af.pdb_file.relative_to(session_dir)
+        # make paths in pdbs relative to session_dir, so db stores paths relative to session_dir
+        sr_pdb_files = {pdb_id: pdb_file.relative_to(session_dir) for pdb_id, pdb_file in pdb_files.items()}
+        with connect(session_dir) as con:
+            save_pdb_files(sr_pdb_files, con)
 
-    with connect(session_dir) as con:
-        save_query(query, con)
-        save_uniprot_accessions(uniprot_accessions, con)
-        save_pdbs(pdbs, sr_pdb_files, con)
-        save_alphafolds(afs, con)
+    afs = []
+    if "alphafold" in what:
+        # AlphaFold entries for the given query
+        af_ids = set()
+        with connect(session_dir) as con:
+            af_ids = load_alphafold_ids(con)
+
+        afs = af_fetch(af_ids, download_dir)
+
+        for af in afs:
+            af.pdb_file = af.pdb_file.relative_to(session_dir)
+            af.pae_file = af.pae_file.relative_to(session_dir)
+        with connect(session_dir) as con:
+            save_alphafolds_files(afs, con)
+
     return download_dir, len(sr_pdb_files), len(afs)
 
 

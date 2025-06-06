@@ -13,6 +13,9 @@ def _map_id(pdb_id: str) -> tuple[str, str]:
     fn = f"pdb{pdb_id.lower()}.ent.gz"
     middle = pdb_id.lower()[1:3]
     url = f"https://ftp.ebi.ac.uk/pub/databases/rcsb/pdb-remediated/data/structures/divided/pdb/{middle}/{fn}"
+    # not all PDB entries have PDB files, as they are not compatible with the PDB format.
+    # TODO download as mmCIF files instead, e.g. for 7ENC:
+    # https://www.ebi.ac.uk/pdbe/entry-files/download/7enc.cif
     return url, fn
 
 
