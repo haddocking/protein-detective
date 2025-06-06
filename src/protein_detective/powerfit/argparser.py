@@ -1,6 +1,5 @@
 from argparse import ArgumentParser, FileType, Namespace
 from dataclasses import dataclass
-import os
 from pathlib import Path
 from shlex import join
 

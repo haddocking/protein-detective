@@ -1,5 +1,4 @@
 import argparse
-import os
 from pathlib import Path
 
 from rich import print as rprint

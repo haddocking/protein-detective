@@ -2,7 +2,6 @@ import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from textwrap import dedent
 from typing import Literal
 
 from protein_detective.alphafold import DownloadableFormat
