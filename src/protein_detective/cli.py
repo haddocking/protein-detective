@@ -3,6 +3,7 @@ from pathlib import Path
 
 from rich import print  # noqa: A004
 
+from protein_detective.alphafold import downloadable_formats
 from protein_detective.alphafold.density import DensityFilterQuery
 from protein_detective.uniprot import Query
 from protein_detective.workflow import (
@@ -10,6 +11,7 @@ from protein_detective.workflow import (
     prune_pdbs,
     retrieve_structures,
     search_structures_in_uniprot,
+    what_retrieve_choices,
 )
 
 
@@ -38,6 +40,20 @@ def add_search_parser(subparsers):
 def add_retrieve_parser(subparsers):
     retrieve_parser = subparsers.add_parser("retrieve", help="Retrieve structures")
     retrieve_parser.add_argument("session_dir", help="Session directory to store results")
+    retrieve_parser.add_argument(
+        "--what",
+        type=str,
+        action="append",
+        choices=what_retrieve_choices,
+        help="What to retrieve. Can be specified multiple times. Default is pdbe and alphafold.",
+    )
+    retrieve_parser.add_argument(
+        "--what-af-formats",
+        type=str,
+        action="append",
+        choices=downloadable_formats,
+        help="AlphaFold formats to retrieve. Can be specified multiple times. Default is 'pdb'.",
+    )
     return retrieve_parser
 
 
@@ -87,11 +103,15 @@ def handle_search(args):
 
 def handle_retrieve(args):
     session_dir = Path(args.session_dir)
-    download_dir, nr_pdbes, nr_afs = retrieve_structures(session_dir)
+    download_dir, nr_pdbes, nr_afs = retrieve_structures(
+        session_dir,
+        what=set(args.what) if args.what else None,
+        what_af_formats=set(args.what_af_formats) if args.what_af_formats else None,
+    )
     print(
         "Structures retrieved successfully: "
         f"{nr_pdbes} PDBe structures, {nr_afs} AlphaFold structures downloaded to {download_dir}"
-        )
+    )
 
 
 def handle_density_filter(args):

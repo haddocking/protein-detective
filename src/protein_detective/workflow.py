@@ -1,8 +1,11 @@
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from protein_detective.alphafold import fetch_many as af_fetch
+from protein_detective.alphafold import relative_to as af_relative_to
 from protein_detective.alphafold.density import DensityFilterQuery, filter_on_density
+from protein_detective.alphafold import DownloadableFormat
 from protein_detective.db import (
     connect,
     load_alphafold_ids,
@@ -52,12 +55,19 @@ def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 1
     return len(uniprot_accessions), nr_pdbs, nr_afs
 
 
-def retrieve_structures(session_dir: Path, what: tuple[str, ...] = ("pdbe", "alphafold")) -> tuple[Path, int, int]:
+WhatRetrieve = Literal["pdbe", "alphafold"]
+what_retrieve_choices: set[WhatRetrieve] = {"pdbe", "alphafold"}
+
+
+def retrieve_structures(
+    session_dir: Path, what: set[WhatRetrieve] | None = None, what_af_formats: set[DownloadableFormat] | None = None
+) -> tuple[Path, int, int]:
     """Retrieve structure files from PDBe and AlphaFold databases for the Uniprot entries in the session.
 
     Args:
         session_dir: The directory to store downloaded files and the session database.
         what: A tuple of strings indicating which databases to retrieve files from.
+        what_af_formats: A tuple of formats to download from AlphaFold (e.g., "pdb", "cif").
 
     Returns:
         The path to the DuckDB database containing non-file data like
@@ -68,6 +78,12 @@ def retrieve_structures(session_dir: Path, what: tuple[str, ...] = ("pdbe", "alp
     session_dir.mkdir(parents=True, exist_ok=True)
     download_dir = session_dir / "downloads"
     download_dir.mkdir(parents=True, exist_ok=True)
+
+    if what is None:
+        what = {"pdbe", "alphafold"}
+    if not (what <= what_retrieve_choices):
+        msg = f"Invalid 'what' argument: {what}. Must be a subset of {what_retrieve_choices}."
+        raise ValueError(msg)
 
     sr_pdb_files = {}
     if "pdbe" in what:
@@ -90,15 +106,11 @@ def retrieve_structures(session_dir: Path, what: tuple[str, ...] = ("pdbe", "alp
         with connect(session_dir) as con:
             af_ids = load_alphafold_ids(con)
 
-        afs = af_fetch(af_ids, download_dir)
+        afs = af_fetch(af_ids, download_dir, what=what_af_formats)
 
-        for af in afs:
-            if af.pdb_file is None or af.pae_file is None:
-                continue
-            af.pdb_file = af.pdb_file.relative_to(session_dir)
-            af.pae_file = af.pae_file.relative_to(session_dir)
+        sr_afs = [af_relative_to(af, session_dir) for af in afs]
         with connect(session_dir) as con:
-            save_alphafolds_files(afs, con)
+            save_alphafolds_files(sr_afs, con)
 
     return download_dir, len(sr_pdb_files), len(afs)
 

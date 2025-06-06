@@ -46,8 +46,15 @@ CREATE TABLE IF NOT EXISTS proteins_pdbs (
 CREATE TABLE IF NOT EXISTS alphafolds (
     uniprot_acc TEXT PRIMARY KEY,
     summary JSON,
+    bcif_file TEXT,
+    cif_file TEXT,
     pdb_file TEXT,
-    pae_file TEXT,
+    pae_image_file TEXT,
+    pae_doc_file TEXT,
+    am_annotations_file TEXT,
+    am_annotations_hg19_file TEXT,
+    am_annotations_hg38_file TEXT,
+    FOREIGN KEY (uniprot_acc) REFERENCES proteins (uniprot_acc)
 );
 
 CREATE SEQUENCE IF NOT EXISTS id_density_filters START 1;
@@ -198,8 +205,14 @@ def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
     rows = [
         (
             converter.dumps(af.summary, EntrySummary),
-            str(af.pdb_file),
-            str(af.pae_file),
+            str(af.bcif_file) if af.bcif_file else None,
+            str(af.cif_file) if af.cif_file else None,
+            str(af.pdb_file) if af.pdb_file else None,
+            str(af.pae_image_file) if af.pae_image_file else None,
+            str(af.pae_doc_file) if af.pae_doc_file else None,
+            str(af.am_annotations_file) if af.am_annotations_file else None,
+            str(af.am_annotations_hg19_file) if af.am_annotations_hg19_file else None,
+            str(af.am_annotations_hg38_file) if af.am_annotations_hg38_file else None,
             af.uniprot_acc,
         )
         for af in afs
@@ -208,7 +221,18 @@ def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
         # executemany can not be called with an empty list, it raises error, so we return early
         return
     con.executemany(
-        "UPDATE alphafolds SET summary = ?, pdb_file = ?, pae_file = ? WHERE uniprot_acc = ?",
+        """UPDATE alphafolds SET
+            summary = ?,
+            bcif_file = ?,
+            cif_file = ?,
+            pdb_file = ?,
+            pae_image_file = ?,
+            pae_doc_file = ?,
+            am_annotations_file = ?,
+            am_annotations_hg19_file = ?,
+            am_annotations_hg38_file = ?
+        WHERE uniprot_acc = ?
+        """,
         rows,
     )
 
@@ -224,7 +248,17 @@ def load_alphafold_ids(con: DuckDBPyConnection) -> set[str]:
 
 def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     query = """
-    SELECT uniprot_acc, summary, pdb_file, pae_file
+    SELECT 
+    uniprot_acc, 
+    summary, 
+    bcif_file,
+    cif_file,
+    pdb_file,
+    pae_image_file,
+    pae_doc_file,
+    am_annotations_file,
+    am_annotations_hg19_file,
+    am_annotations_hg38_file
     FROM alphafolds
     """
     rows = con.execute(query).fetchall()
@@ -232,8 +266,14 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
         AlphaFoldEntry(
             uniprot_acc=row[0],
             summary=converter.loads(row[1], EntrySummary) if row[0] else None,
-            pdb_file=Path(row[2]) if row[2] else None,
-            pae_file=Path(row[3]) if row[3] else None,
+            bcif_file=Path(row[2]) if row[2] else None,
+            cif_file=Path(row[3]) if row[3] else None,
+            pdb_file=Path(row[4]) if row[4] else None,
+            pae_image_file=Path(row[5]) if row[5] else None,
+            pae_doc_file=Path(row[6]) if row[6] else None,
+            am_annotations_file=Path(row[7]) if row[7] else None,
+            am_annotations_hg19_file=Path(row[8]) if row[8] else None,
+            am_annotations_hg38_file=Path(row[9]) if row[9] else None,
         )
         for row in rows
     ]
