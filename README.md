@@ -34,7 +34,7 @@ In `./mysession` directory, you will find session.db file, which is a duckdb dat
 protein-detective retrieve ./mysession
 ```
 
-In `./mysession` directory, you will find PDB files from PDBe and AlphaFold DB.
+In `./mysession` directory, you will find mmCIF files from PDBe and PDB files and AlphaFold DB.
 
 ### To filter AlphaFold structures on confidence
 
