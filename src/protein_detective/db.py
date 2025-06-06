@@ -142,7 +142,7 @@ def save_pdb_files(mmcif_files: Mapping[str, Path], con: DuckDBPyConnection):
     """Save PDB files to the database.
 
     Args:
-        pdb_files: A mapping of PDB IDs to their file paths.
+        mmcif_files: A mapping of PDB IDs to their file paths.
         con: The DuckDB connection to use for saving the data.
     """
     rows = [(str(mmcif_file), pdb_id) for pdb_id, mmcif_file in mmcif_files.items()]
