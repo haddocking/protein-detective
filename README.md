@@ -11,10 +11,10 @@ pip install git+https://github.com/haddocking/protein-detective.git
 
 ## Usage
 
-### To retrieve a bunch of structures
+### Search Uniprot for structures
 
 ```shell
-protein-detective retrieve \
+protein-detective search \
 --taxon-id 9606 \
 --reviewed \
 --subcellular-location-uniprot nucleus \
@@ -26,11 +26,15 @@ protein-detective retrieve \
 # GO:0003677 == DNA binding
 ```
 
-In `./mysession` directory, you will find 
+In `./mysession` directory, you will find session.db file, which is a duckdb database with search results.
 
-- PDB files from PDBe and AlphaFold DB
-- predicted alignment error (pae) files from AlphaFold DB
-- session.db - a duckdb database with the metadata of the structures
+### To retrieve a bunch of structures
+
+```shell
+protein-detective retrieve ./mysession
+```
+
+In `./mysession` directory, you will find PDB files from PDBe and AlphaFold DB.
 
 ### To filter AlphaFold structures on confidence
 
@@ -46,10 +50,9 @@ protein-detective density-filter \
 ./mysession
 ```
 
-
 ### To prune PDBe files
 
-Only keep first chain of found uniprot protein and rename to chain A.
+Make PDBe files smaller by only keeping first chain of belonging to found uniprot entry and renaming to chain A.
 
 ```shell
 protein-detective prune-pdbs ./mysession

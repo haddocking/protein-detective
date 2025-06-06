@@ -33,20 +33,20 @@ def first_chain_from_uniprot_chains(uniprot_chains: str) -> str:
 
 
 def write_single_chain_pdb_file(
-    pdb_file: Path | str, chain2keep: str, output_file: Path | str, out_chain: str = "A"
+    mmcif_file: Path | str, chain2keep: str, output_file: Path | str, out_chain: str = "A"
 ) -> None:
-    """Saves a specific protein chain from a PDB file to a new PDB file.
+    """Saves a specific protein chain from a mmCIF file to a new PDB file.
 
     Args:
-        pdb_file: Path to the input PDB file.
+        mmcif_file: Path to the input mmCIF file.
         chain2keep: Chain to keep.
         output_file: Path to the output PDB file.
         out_chain: Chain identifier for the saved chain in the output file..
     """
     logger.info(
-        'From %s taking chain "%s" and saving as "%s" with chain %s.', pdb_file, chain2keep, output_file, out_chain
+        'From %s taking chain "%s" and saving as "%s" with chain %s.', mmcif_file, chain2keep, output_file, out_chain
     )
-    pdb = atomium.open(str(pdb_file))
+    pdb = atomium.open(str(mmcif_file))
     # pyrefly: ignore  # noqa: ERA001
     pdb.model.chain(chain2keep).copy(out_chain).save(
         str(output_file),
@@ -57,9 +57,9 @@ def write_single_chain_pdb_file(
 @dataclass(frozen=True)
 class ProteinPdbRow:
     id: str
-    chain: str
+    uniprot_chains: str
     uniprot_acc: str
-    pdb_file: Path
+    mmcif_file: Path | None
 
 
 @dataclass(frozen=True)
@@ -74,18 +74,39 @@ def write_single_chain_pdb_files(
     session_dir: Path,
     single_chain_dir: Path,
 ) -> Generator[SingleChainResult]:
+    """Writes single chain PDB files from the provided protein PDB rows.
+
+    Args:
+        proteinpdbs: A list of ProteinPdbRow objects.
+        session_dir: The directory where the session files are stored.
+        single_chain_dir: The directory where the single chain PDB files will be saved.
+
+    Yields:
+        SingleChainResult objects containing the UniProt accession, PDB ID, and output file path.
+    """
     for proteinpdb in tqdm(proteinpdbs, desc="Saving single chain PDB files from PDBe"):
-        pdb_file = session_dir / proteinpdb.pdb_file
-        uniprot_chains = proteinpdb.chain
-        chain2keep = first_chain_from_uniprot_chains(uniprot_chains)
-        uniprot_acc = proteinpdb.uniprot_acc
-        output_file = single_chain_dir / f"{uniprot_acc}_{pdb_file.stem}_{chain2keep}2A.pdb"
-        if output_file.exists():
-            logger.info(
-                f"Output file {output_file} already exists. Skipping saving single chain PDB file for {pdb_file}.",
+        if not proteinpdb.mmcif_file:
+            logger.warning(
+                "Skipping %s, because it does not have a file.",
+                proteinpdb.id,
             )
             continue
-        write_single_chain_pdb_file(pdb_file, chain2keep, output_file)
+        mmcif_file = session_dir / proteinpdb.mmcif_file
+        uniprot_chains = proteinpdb.uniprot_chains
+        chain2keep = first_chain_from_uniprot_chains(uniprot_chains)
+        uniprot_acc = proteinpdb.uniprot_acc
+        output_file = single_chain_dir / f"{uniprot_acc}_{mmcif_file.stem}_{chain2keep}2A.pdb"
+        if output_file.exists():
+            logger.info(
+                f"Output file {output_file} already exists. Skipping saving single chain PDB file for {mmcif_file}.",
+            )
+            yield SingleChainResult(
+                uniprot_acc=uniprot_acc,
+                pdb_id=proteinpdb.id,
+                output_file=output_file.relative_to(session_dir),
+            )
+            continue
+        write_single_chain_pdb_file(mmcif_file, chain2keep, output_file)
         yield SingleChainResult(
             uniprot_acc=uniprot_acc,
             pdb_id=proteinpdb.id,
