@@ -1,4 +1,7 @@
+ <!-- --8<-- [start:mkdocindex] -->
 # protein-detective
+
+Python package to detect proteins in EM density maps.
 
 ## Install
 
@@ -22,12 +25,18 @@ protein-detective retrieve \
 # GO:0005634 == Nucleus
 # GO:0003677 == DNA binding
 ```
+
 In `./mysession` directory, you will find 
+
 - PDB files from PDBe and AlphaFold DB
 - predicted alignment error (pae) files from AlphaFold DB
 - session.db - a duckdb database with the metadata of the structures
 
 ### To filter AlphaFold structures on confidence
+
+Filter AlphaFoldDB structures based on density confidence.
+Keeps entries with requested number of residues which have a confidence score above the threshold.
+Also writes pdb files with only those residues.
 
 ```shell
 protein-detective density-filter \
@@ -40,9 +49,13 @@ protein-detective density-filter \
 
 ### To prune PDBe files
 
+Only keep first chain of found uniprot protein and rename to chain A.
+
 ```shell
 protein-detective prune-pdbs ./mysession
 ```
+
+<!-- --8<-- [end:mkdocindex] -->
 
 ## Develop
 

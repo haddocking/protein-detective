@@ -1,12 +1,32 @@
 site_name: Protein Detective
 repo_url: https://github.com/haddocking/protein-detective
+watch: [mkdocs.yml, README.md, src/protein_detective]
 theme: 
   name: mkdocs
   color_mode: auto
   user_color_mode_toggle: true
+
 plugins:
   - search
   - mkdocs-jupyter
+  - mkdocs-autoapi:
+      autoapi_dir: src
+      autoapi_add_nav_entry: False
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - src
+          options:
+            docstring_style: google
+            show_source: false
+
+markdown_extensions:
+  # Use to render part of README as home
+  - pymdownx.snippets:
+      base_path: [!relative $config_dir]
+      check_paths: true
+
 nav:
   - Home: index.md
   - Notebooks:
@@ -14,3 +34,4 @@ nav:
     - AlphaFold: alphafold.ipynb
     - PDBe: pdbe.ipynb
     - Workflow: workflow.ipynb
+  - API Reference: autoapi/summary.md

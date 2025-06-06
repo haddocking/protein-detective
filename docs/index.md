@@ -1,2 +1,1 @@
-# Welcome to Protein Detective
-
+--8<-- "README.md:mkdocindex"

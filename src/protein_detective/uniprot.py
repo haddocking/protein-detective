@@ -132,6 +132,8 @@ def _build_sparql_query_uniprot(query: Query, limit=10_000) -> str:
     where_clause = dedent(f"""
         # --- Protein Selection ---
         ?protein a up:Protein .
+        ?protein up:sequence ?isoform .
+        ?isoform rdf:value ?sequence .
         {dynamic_triples}
     """)
     return _build_sparql_generic_query(select_clause, dedent(where_clause), limit)
@@ -292,7 +294,7 @@ def limit_check(what: str, limit: int, len_raw_results: int):
         )
 
 
-def search4uniprot(query: Query, limit=10_000, timeout=1_800) -> set[str]:
+def search4uniprot(query: Query, limit: int = 10_000, timeout: int = 1_800) -> set[str]:
     """
     Search for UniProtKB entries based on the given query.
 
@@ -311,7 +313,7 @@ def search4uniprot(query: Query, limit=10_000, timeout=1_800) -> set[str]:
     return {result["protein"]["value"].split("/")[-1] for result in raw_results}
 
 
-def search4pdb(uniprot_accs: Iterable[str], limit=10_000, timeout=1_800) -> dict[str, set[PdbResult]]:
+def search4pdb(uniprot_accs: Iterable[str], limit: int = 10_000, timeout: int = 1_800) -> dict[str, set[PdbResult]]:
     """
     Search for PDB entries in UniProtKB accessions.
 
@@ -335,7 +337,7 @@ def search4pdb(uniprot_accs: Iterable[str], limit=10_000, timeout=1_800) -> dict
     return _flatten_results_pdb(raw_results)
 
 
-def search4af(uniprot_accs: Iterable[str], limit=10_000, timeout=1_800) -> dict[str, set[str]]:
+def search4af(uniprot_accs: Iterable[str], limit: int = 10_000, timeout: int = 1_800) -> dict[str, set[str]]:
     """
     Search for AlphaFold entries in UniProtKB accessions.
 
@@ -359,7 +361,7 @@ def search4af(uniprot_accs: Iterable[str], limit=10_000, timeout=1_800) -> dict[
     return _flatten_results_af(raw_results)
 
 
-def search4emdb(uniprot_accs: Iterable[str], limit=10_000, timeout=1_800) -> dict[str, set[str]]:
+def search4emdb(uniprot_accs: Iterable[str], limit: int = 10_000, timeout: int = 1_800) -> dict[str, set[str]]:
     """
     Search for EMDB entries in UniProtKB accessions.
 

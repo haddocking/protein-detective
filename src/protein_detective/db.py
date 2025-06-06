@@ -72,7 +72,14 @@ CREATE TABLE IF NOT EXISTS density_filtered_alphafolds (
 
 
 def db_path(session_dir: Path) -> Path:
-    """Return the path to the DuckDB database file in the given session directory."""
+    """Return the path to the DuckDB database file in the given session directory.
+
+    Args:
+        session_dir: The directory where the session data is stored.
+
+    Returns:
+        Path to the DuckDB database file.
+    """
     return session_dir / "session.db"
 
 

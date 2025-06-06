@@ -19,7 +19,7 @@ from protein_detective.pdbe.io import write_single_chain_pdb_files
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
 
 
-def retrieve_structures(query: Query, session_dir: Path, limit=10_000) -> tuple[Path, int, int]:
+def retrieve_structures(query: Query, session_dir: Path, limit: int = 10_000) -> tuple[Path, int, int]:
     """Find uniprot entries based on query and
     retrieve structure files from PDBe and AlphaFold databases for the found Uniprot entries.
 

@@ -39,7 +39,9 @@ docs = [
     "ipykernel>=6.29.5",
     "jupysql>=0.11.1",
     "mkdocs>=1.6.1",
+    "mkdocs-autoapi>=0.4.1",
     "mkdocs-jupyter>=0.25.1",
+    "mkdocstrings[python]>=0.29.1",
     "nbconvert>=7.16.6",
     "toml>=0.10.2",
 ]
