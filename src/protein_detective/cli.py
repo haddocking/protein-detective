@@ -1,13 +1,16 @@
 import argparse
+import os
 from pathlib import Path
 
-from rich import print  # noqa: A004
+from rich import print as rprint
 
 from protein_detective.alphafold import downloadable_formats
 from protein_detective.alphafold.density import DensityFilterQuery
+from protein_detective.powerfit.argparser import PowerfitOptions, add_powerfit_cli_parser
 from protein_detective.uniprot import Query
 from protein_detective.workflow import (
     density_filter,
+    powerfit_commands,
     prune_pdbs,
     retrieve_structures,
     search_structures_in_uniprot,
@@ -85,6 +88,22 @@ def add_prune_pdbs_parser(subparsers):
     return prune_pdbs_parser
 
 
+def add_powerfit_commands_parser(subparsers):
+    # Add the commands sub-command
+    commands_parser = subparsers.add_parser(
+        "commands", help="Generate PowerFit commands for PDB files in the session directory"
+    )
+    add_powerfit_cli_parser(commands_parser)
+
+
+def add_powerfit_parser(subparsers):
+    powerfit_parser = subparsers.add_parser("powerfit", help="PowerFit related commands")
+    powerfit_subparsers = powerfit_parser.add_subparsers(dest="powerfit_command", required=True)
+    add_powerfit_commands_parser(powerfit_subparsers)
+
+    return powerfit_parser
+
+
 def handle_search(args):
     query = Query(
         taxon_id=args.taxon_id,
@@ -95,7 +114,7 @@ def handle_search(args):
     )
     session_dir = Path(args.session_dir)
     nr_uniprot, nr_pdbes, nr_afs = search_structures_in_uniprot(query, session_dir, limit=args.limit)
-    print(
+    rprint(
         f"Search completed: {nr_uniprot} UniProt entries found, "
         f"{nr_pdbes} PDBe structures, {nr_afs} AlphaFold structures."
     )
@@ -108,7 +127,7 @@ def handle_retrieve(args):
         what=set(args.what) if args.what else None,
         what_af_formats=set(args.what_af_formats) if args.what_af_formats else None,
     )
-    print(
+    rprint(
         "Structures retrieved successfully: "
         f"{nr_pdbes} PDBe structures, {nr_afs} AlphaFold structures downloaded to {download_dir}"
     )
@@ -122,14 +141,36 @@ def handle_density_filter(args):
     )
     session_dir = Path(args.session_dir)
     result = density_filter(session_dir, query)
-    print(f"Filtered {result.nr_kept} structures, written to {result.density_filtered_dir} directory.")
-    print(f"Discarded {result.nr_discarded} structures based on density confidence.")
+    rprint(f"Filtered {result.nr_kept} structures, written to {result.density_filtered_dir} directory.")
+    rprint(f"Discarded {result.nr_discarded} structures based on density confidence.")
 
 
 def handle_prune_pdbs(args):
     session_dir = Path(args.session_dir)
     single_chain_dir, nr_files = prune_pdbs(session_dir)
-    print(f"Written {nr_files} PDB files to {single_chain_dir} directory.")
+    rprint(f"Written {nr_files} PDB files to {single_chain_dir} directory.")
+
+
+def handle_powerfit(args):
+    if args.powerfit_command == "commands":
+        handle_powerfit_commands(args)
+
+
+def handle_powerfit_commands(args):
+    commands = powerfit_commands(PowerfitOptions.from_args(args))
+    print("# Run the commands below in your own way", file=args.output)
+    print("# When you are done", file=args.output)
+    print(f"# in {Path().absolute()} directory", file=args.output)
+    print(f"# run `protein-detective powerfit ingest {args.session_dir}` to parse the results.", file=args.output)
+    # TODO capture PowerfitOptions in db
+    # each options set could have own id that must be passed to ingest command
+    # TODO make ingest command that
+    # 1. fills db to can query all powerfit/*/solutions.out
+    # 2. Store paths to top 10 pdb files in db
+    # 3. Store path to lcc.mrc in db
+    # 4. Map powerfit output dir back to pdb file in db
+    for command in commands:
+        print(command, file=args.output)
 
 
 def main():
@@ -139,6 +180,7 @@ def main():
     add_retrieve_parser(subparsers)
     add_density_filter_parser(subparsers)
     add_prune_pdbs_parser(subparsers)
+    add_powerfit_parser(subparsers)
 
     args = parser.parse_args()
 
@@ -150,6 +192,8 @@ def main():
         handle_density_filter(args)
     elif args.command == "prune-pdbs":
         handle_prune_pdbs(args)
+    elif args.command == "powerfit":
+        handle_powerfit(args)
 
 
 if __name__ == "__main__":

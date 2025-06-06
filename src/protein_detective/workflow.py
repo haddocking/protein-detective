@@ -1,5 +1,8 @@
+import logging
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from textwrap import dedent
 from typing import Literal
 
 from protein_detective.alphafold import DownloadableFormat
@@ -10,8 +13,10 @@ from protein_detective.db import (
     connect,
     load_alphafold_ids,
     load_alphafolds,
+    load_density_filtered_alphafolds_files,
     load_pdb_ids,
     load_pdbs,
+    load_single_chain_pdb_files,
     save_alphafolds,
     save_alphafolds_files,
     save_density_filtered,
@@ -23,7 +28,10 @@ from protein_detective.db import (
 )
 from protein_detective.pdbe.fetch import fetch as pdbe_fetch
 from protein_detective.pdbe.io import write_single_chain_pdb_files
+from protein_detective.powerfit.argparser import PowerfitOptions
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
+
+logger = logging.getLogger(__name__)
 
 
 def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 10_000) -> tuple[int, int, int]:
@@ -173,3 +181,45 @@ def prune_pdbs(session_dir: Path) -> tuple[Path, int]:
         save_single_chain_pdb_files(new_files, conn)
 
         return single_chain_dir, len(new_files)
+
+
+def powerfit_commands(options: PowerfitOptions) -> list[str]:
+    """
+    Generate PowerFit commands for fitting structures to a density map.
+
+    Args:
+        session_dir: Directory containing the session data.
+        density_map: Path to the density map file.
+        resolution: Resolution of the density map in Angstroms.
+
+    Returns:
+        list[str]: List of PowerFit command strings.
+    """
+    session_dir = options.session_dir
+    session_dir.mkdir(parents=True, exist_ok=True)
+    powerfit_root_dir = session_dir / "powerfit"
+    powerfit_root_dir.mkdir(parents=True, exist_ok=True)
+    density_map = options.target
+    density_map_target = powerfit_root_dir / density_map.name
+    shutil.copy(density_map, density_map_target)
+    logger.info(f"Copied density map to {density_map_target}")
+    # Load the PDB files from the session directory
+
+    pdb_files = []
+    with connect(session_dir) as con:
+        pdbe_files = load_single_chain_pdb_files(con)
+        af_files = load_density_filtered_alphafolds_files(con)
+        pdb_files = pdbe_files + af_files
+
+    commands = []
+    for pdb_file in pdb_files:
+        powerfit_dir = powerfit_root_dir / pdb_file.stem
+        real_pdb_file = session_dir / pdb_file
+        command = options.to_command(
+            density_map=density_map_target,
+            template=real_pdb_file,
+            out_dir=powerfit_dir,
+        )
+        commands.append(command)
+
+    return commands

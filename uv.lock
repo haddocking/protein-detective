@@ -1287,6 +1287,24 @@ wheels = [
 ]
 
 [[package]]
+name = "powerfit-em"
+version = "3.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pyfftw", marker = "platform_machine != 'wasm32' and sys_platform != 'darwin'" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4f/e0/5101a6517080d4b18534766fea7f728179b45c2d5a57416b6c5c0300bf14/powerfit_em-3.0.2.tar.gz", hash = "sha256:ce377777ea668f0b403ee1220059c59cf84992f70e6f2359dd6c7388bfe38063", size = 5750643 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/49/87/30edda861f40649370c5500356d3c8f686f008d74538cc70d5d599a9bcb4/powerfit_em-3.0.2-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:f57ba3a3fd13615a6fc314120e6b92abd6fb5968bf296f0a1da379d93ba471ae", size = 5867684 },
+    { url = "https://files.pythonhosted.org/packages/58/b3/d6ee61abfd94331f0ad8bcf07a4e872a4b84174d78fa89085beacf035471/powerfit_em-3.0.2-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:d2ecc9d6cecdde3f06b7779a470817d3d0fb401efe252c4f93a1bd1a70b63a39", size = 6028331 },
+    { url = "https://files.pythonhosted.org/packages/51/65/235db922b161ad542a80b91a5ad2e499000de474386be64da6d499ed7f3e/powerfit_em-3.0.2-cp313-cp313-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:abca88fd8866aba3d133eaed7c82a6051ec1bc9acf990b7642ec8753463e0e1a", size = 6030057 },
+    { url = "https://files.pythonhosted.org/packages/b0/e7/22987e50bd4eeca47f9ae192724a64db02a5361f2bd01541604a41e3b981/powerfit_em-3.0.2-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:93e3e9fb82a6feff50b56a636d1304821787d783a7b191cf338300fe1d22e161", size = 6031262 },
+    { url = "https://files.pythonhosted.org/packages/18/6b/80edb510cf15890ccfb2418d82072ad14ecf7677a31e963587edbd0fba9f/powerfit_em-3.0.2-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:b4b37c5074d37c26ac2e3508f464091e60f8babb9fec28e7d7676cb19eb36b75", size = 6036367 },
+]
+
+[[package]]
 name = "prettytable"
 version = "3.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1363,6 +1381,7 @@ dependencies = [
     { name = "attrs" },
     { name = "cattrs" },
     { name = "duckdb" },
+    { name = "powerfit-em" },
     { name = "rich" },
     { name = "sparqlwrapper" },
     { name = "tqdm" },
@@ -1397,6 +1416,7 @@ requires-dist = [
     { name = "attrs", specifier = ">=25.3.0" },
     { name = "cattrs", specifier = ">=24.1.3" },
     { name = "duckdb", specifier = ">=1.2.2" },
+    { name = "powerfit-em", specifier = ">=3.0.2" },
     { name = "rich", specifier = ">=14.0.0" },
     { name = "sparqlwrapper", specifier = ">=2.0.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
@@ -1462,6 +1482,22 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/1d/b2/31537cf4b1ca988837256c910a668b553fceb8f069bedc4b1c826024b52c/pycparser-2.22.tar.gz", hash = "sha256:491c8be9c040f5390f5bf44a5b07752bd07f56edf992381b05c701439eec10f6", size = 172736 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/13/a3/a812df4e2dd5696d1f351d58b8fe16a405b234ad2886a0dab9183fb78109/pycparser-2.22-py3-none-any.whl", hash = "sha256:c3702b6d3dd8c7abc1afa565d7e63d53a1d0bd86cdc24edd75470f4de499cfcc", size = 117552 },
+]
+
+[[package]]
+name = "pyfftw"
+version = "0.15.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "setuptools" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4b/3f/ee1bc44b080fc1e81d293cd07bed563d254bc1997d63a3b8053804a87dfd/pyfftw-0.15.0.tar.gz", hash = "sha256:2f16b9854a40c8fdd10aa5803b24ddc6ab49f9cd559dbd7f07e7d61aa205c1ca", size = 164003 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0f/66/d12a9629908008ed97446c44ca2177c8f59e570a445da4136fdbb9e8db1c/pyFFTW-0.15.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:05324c8c092aa43868554daf6ddd7fd23eee18cd284ab68e749c62427c662737", size = 2496935 },
+    { url = "https://files.pythonhosted.org/packages/ad/c4/adcf010b151564401e3d401602b0e0cacae1e7cb816f0207397c3ddec626/pyFFTW-0.15.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:474f4a0ccfddfdfbe3e4a610b1c8f5968b58edf44434bf9d08ea52108a72df54", size = 3096170 },
+    { url = "https://files.pythonhosted.org/packages/b2/96/b1eaad07d5eaf026e2ed0c6f2afdf825628706162071d2665b3824727346/pyFFTW-0.15.0-cp313-cp313-win32.whl", hash = "sha256:40f8f3341546264178a8d9e8736e91554884595a683b71f8db8399907330f47d", size = 2229713 },
+    { url = "https://files.pythonhosted.org/packages/e9/23/d06a3e5b549f7537ada2b1fc2e5f7c05c38df70c843d463bc469812b1ebd/pyFFTW-0.15.0-cp313-cp313-win_amd64.whl", hash = "sha256:bf04458c5d2fbfe5da270a4b667c59c5792cbe39300379d886acd8ea97fc55cc", size = 2640821 },
 ]
 
 [[package]]
@@ -1753,6 +1789,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/8e/038ccfe29d272b30086b25a4960f757f97122cb2ec42e62b460d02fe98e9/scipy-1.15.3-cp313-cp313t-musllinux_1_2_aarch64.whl", hash = "sha256:40e54d5c7e7ebf1aa596c374c49fa3135f04648a0caabcb66c52884b943f02b4", size = 36393132 },
     { url = "https://files.pythonhosted.org/packages/10/7e/5c12285452970be5bdbe8352c619250b97ebf7917d7a9a9e96b8a8140f17/scipy-1.15.3-cp313-cp313t-musllinux_1_2_x86_64.whl", hash = "sha256:5e721fed53187e71d0ccf382b6bf977644c533e506c4d33c3fb24de89f5c3ed5", size = 38979503 },
     { url = "https://files.pythonhosted.org/packages/81/06/0a5e5349474e1cbc5757975b21bd4fad0e72ebf138c5592f191646154e06/scipy-1.15.3-cp313-cp313t-win_amd64.whl", hash = "sha256:76ad1fb5f8752eabf0fa02e4cc0336b4e8f021e2d5f061ed37d6d264db35e3ca", size = 40308097 },
+]
+
+[[package]]
+name = "setuptools"
+version = "80.9.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/18/5d/3bf57dcd21979b887f014ea83c24ae194cfcd12b9e0fda66b957c69d1fca/setuptools-80.9.0.tar.gz", hash = "sha256:f36b47402ecde768dbfafc46e8e4207b4360c654f1f3bb84475f0a28628fb19c", size = 1319958 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl", hash = "sha256:062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922", size = 1201486 },
 ]
 
 [[package]]
