@@ -34,7 +34,7 @@ In `./mysession` directory, you will find session.db file, which is a duckdb dat
 protein-detective retrieve ./mysession
 ```
 
-In `./mysession` directory, you will find PDB files from PDBe and AlphaFold DB.
+In `./mysession` directory, you will find mmCIF files from PDBe and PDB files and AlphaFold DB.
 
 ### To filter AlphaFold structures on confidence
 
@@ -57,6 +57,16 @@ Make PDBe files smaller by only keeping first chain of belonging to found unipro
 ```shell
 protein-detective prune-pdbs ./mysession
 ```
+
+### Powerfit
+
+Generate the powerfit commands for the filtered and pruned structures.
+
+```shell
+protein-detective powerfit commands ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1 
+```
+This will print commands to the terminal, which you can then run in whatever way you prefer.
+Like just sequentially, or with [GNU parallel](https://www.gnu.org/software/parallel/) or as a [Slurm array job](https://slurm.schedmd.com/job_array.html).
 
 <!-- --8<-- [end:mkdocindex] -->
 

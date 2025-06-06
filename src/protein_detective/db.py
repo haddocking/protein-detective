@@ -287,6 +287,16 @@ def save_single_chain_pdb_files(files: list[SingleChainResult], con: DuckDBPyCon
     )
 
 
+def load_single_chain_pdb_files(con: DuckDBPyConnection) -> list[Path]:
+    query = """
+    SELECT single_chain_pdb_file
+    FROM proteins_pdbs
+    WHERE single_chain_pdb_file IS NOT NULL
+    """
+    rows = con.execute(query).fetchall()
+    return [Path(row[0]) for row in rows]
+
+
 def save_density_filtered(
     query: DensityFilterQuery,
     files: list[DensityFilterResult],
@@ -329,3 +339,15 @@ def save_density_filtered(
         VALUES (?, ?, ?, ?, ?)""",
         values,
     )
+
+
+def load_density_filtered_alphafolds_files(
+    con: DuckDBPyConnection,
+) -> list[Path]:
+    query = """
+    SELECT pdb_file
+    FROM density_filtered_alphafolds
+    WHERE keep = TRUE
+    """
+    rows = con.execute(query).fetchall()
+    return [Path(row[0]) for row in rows]
