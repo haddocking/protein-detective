@@ -52,6 +52,15 @@ def filter_out_low_confidence_residues(input_pdb_file: Path, allowed_residues: s
 
 @dataclass
 class DensityFilterQuery:
+    """Query for filtering AlphaFoldDB structures based on density confidence.
+
+    Parameters:
+        confidence: The confidence threshold for filtering residues.
+            Residues with a pLDDT (b-factor) above this value are considered high confidence.
+        min_threshold: The minimum number of high-confidence residues required to keep the structure.
+        max_threshold: The maximum number of high-confidence residues allowed to keep the structure.
+    """
+
     confidence: float
     min_threshold: int
     max_threshold: int
@@ -59,16 +68,33 @@ class DensityFilterQuery:
 
 @dataclass
 class DensityFilterResult:
+    """Result of filtering AlphaFoldDB structures based on density confidence.
+
+    Parameters:
+        pdb_file: The name of the PDB file that was processed.
+        count: The number of residues with a pLDDT above the confidence threshold.
+        density_filtered_file: The path to the density filtered PDB file, if passed filter.
+    """
+
     pdb_file: str
     count: int
-    """The number of residues with a pLDDT above the confidence threshold."""
     density_filtered_file: Path | None = None
-    """The path to the density filtered PDB file, if passed filter."""
 
 
 def filter_on_density(
     alphafold_pdb_files: list[Path], query: DensityFilterQuery, density_filtered_dir: Path
 ) -> Generator[DensityFilterResult]:
+    """Filter AlphaFoldDB structures based on density confidence.
+
+    Args:
+        alphafold_pdb_files: List of PDB files from AlphaFoldDB to filter.
+        query: The density filter query containing the confidence thresholds.
+        density_filtered_dir: Directory where the filtered PDB files will be saved.
+
+    Yields:
+        For each PDB files yields whether it was filtered or not,
+          and number of residues with pLDDT above the confidence threshold.
+    """
     for pdb_file in alphafold_pdb_files:
         residues = set(find_high_confidence_residues(pdb_file, query.confidence))
         count = len(residues)

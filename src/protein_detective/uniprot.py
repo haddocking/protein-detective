@@ -10,6 +10,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Query:
+    """Search query for UniProtKB.
+
+    Parameters:
+        taxon_id: Taxon ID to filter results by organism (e.g., "9606" for human).
+        reviewed: Whether to filter results by reviewed status (True for reviewed, False for unreviewed).
+        subcellular_location_uniprot: Subcellular location in UniProt format (e.g., "nucleus").
+        subcellular_location_go: Subcellular location in GO format (e.g., "GO:0005634" for nucleus).
+        molecular_function_go: Molecular function in GO format (e.g., "GO:0003674" for molecular_function).
+    """
+
     taxon_id: str | None
     reviewed: bool | None
     subcellular_location_uniprot: str | None
@@ -19,6 +29,15 @@ class Query:
 
 @dataclass(frozen=True)
 class PdbResult:
+    """Result of a PDB search in UniProtKB.
+
+    Parameters:
+        id: PDB ID (e.g., "1H3O").
+        method: Method used for the PDB entry (e.g., "X-ray diffraction").
+        uniprot_chains: Chains in UniProt format (e.g., "A/B=1-42,A/B=50-99").
+        resolution: Resolution of the PDB entry (e.g., "2.0" for 2.0 Å). Optional.
+    """
+
     id: str
     method: str
     uniprot_chains: str
@@ -298,6 +317,11 @@ def limit_check(what: str, limit: int, len_raw_results: int):
 def search4uniprot(query: Query, limit: int = 10_000, timeout: int = 1_800) -> set[str]:
     """
     Search for UniProtKB entries based on the given query.
+
+    Args:
+        query: Query object containing search parameters.
+        limit: Maximum number of results to return.
+        timeout: Timeout for the SPARQL query in seconds.
 
     Returns:
         Set of uniprot accessions.
