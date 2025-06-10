@@ -19,6 +19,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AlphaFoldEntry:
+    """AlphaFoldEntry represents a minimal single entry in the AlphaFold database.
+
+    See https://alphafold.ebi.ac.uk/api-docs for more details on the API and data structure.
+    """
+
     uniprot_acc: str
     summary: EntrySummary | None
     bcif_file: Path | None = None
@@ -66,7 +71,7 @@ DownloadableFormat = Literal[
     "amAnnotationsHg19",
     "amAnnotationsHg38",
 ]
-
+"""Types of formats that can be downloaded from the AlphaFold web service."""
 
 downloadable_formats: set[DownloadableFormat] = {
     "bcif",
@@ -78,6 +83,7 @@ downloadable_formats: set[DownloadableFormat] = {
     "amAnnotationsHg19",
     "amAnnotationsHg38",
 }
+"""Set of formats that can be downloaded from the AlphaFold web service."""
 
 
 async def fetch_many_async(

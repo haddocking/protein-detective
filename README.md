@@ -26,7 +26,7 @@ protein-detective search \
 # GO:0003677 == DNA binding
 ```
 
-In `./mysession` directory, you will find session.db file, which is a duckdb database with search results.
+In `./mysession` directory, you will find session.db file, which is a [DuckDB](https://duckdb.org/) database with search results.
 
 ### To retrieve a bunch of structures
 
@@ -52,7 +52,7 @@ protein-detective density-filter \
 
 ### To prune PDBe files
 
-Make PDBe files smaller by only keeping first chain of belonging to found uniprot entry and renaming to chain A.
+Make PDBe files smaller by only keeping first chain of found uniprot entry and renaming to chain A.
 
 ```shell
 protein-detective prune-pdbs ./mysession
@@ -129,4 +129,7 @@ Build the documentation site with
 
 ```shell
 uv run mkdocs build
+# The site will be built in the `site/` directory.
+# You can preview it with
+python3 -m http.server -d site
 ```
