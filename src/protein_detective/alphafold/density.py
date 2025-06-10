@@ -93,7 +93,7 @@ def filter_on_density(
 
     Yields:
         For each PDB files yields whether it was filtered or not,
-          and number of residues with pLDDT above the confidence threshold.
+            and number of residues with pLDDT above the confidence threshold.
     """
     for pdb_file in alphafold_pdb_files:
         residues = set(find_high_confidence_residues(pdb_file, query.confidence))

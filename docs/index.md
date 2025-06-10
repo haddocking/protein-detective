@@ -1,1 +1,1 @@
---8<-- "README.md:mkdocindex"
+--8<-- "README.md"

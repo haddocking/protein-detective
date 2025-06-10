@@ -18,7 +18,7 @@ plugins:
         python:
           paths:
             - src
-          import:
+          inventories:
             - https://docs.python.org/3/objects.inv
             - https://duckdb.org/docs/stable/clients/python/reference/objects.inv
           options:
@@ -38,4 +38,5 @@ nav:
     - AlphaFold: alphafold.ipynb
     - PDBe: pdbe.ipynb
     - Workflow: workflow.ipynb
+  - Contributing guidelines: CONTRIBUTING.md
   - API Reference: autoapi/summary.md
