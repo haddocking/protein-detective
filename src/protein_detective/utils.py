@@ -15,7 +15,7 @@ async def retrieve_files(
     max_parallel_downloads: int = 5,
     retries: int = 3,
     total_timeout: int = 300,
-    desc="Downloading files",
+    desc: str = "Downloading files",
 ) -> list[Path]:
     """Retrieve files from a list of URLs and save them to a directory.
 

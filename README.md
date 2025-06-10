@@ -1,6 +1,11 @@
  <!-- --8<-- [start:mkdocindex] -->
 # protein-detective
 
+[![Documentation](https://img.shields.io/badge/Documentation-bonvinlab.org-blue?style=flat-square&logo=gitbook)](https://www.bonvinlab.org/protein-detective/)
+[![CI](https://github.com/haddocking/protein-detective/actions/workflows/ci.yml/badge.svg)](https://github.com/haddocking/protein-detective/actions/workflows/ci.yml)
+[![Research Software Directory Badge](https://img.shields.io/badge/rsd-00a3e3.svg)](https://www.research-software.nl/software/protein-detective)
+<!-- [![PyPI](https://img.shields.io/pypi/v/protein-detective)](https://pypi.org/project/protein-detective/) -->
+
 Python package to detect proteins in EM density maps.
 
 ## Install
@@ -60,76 +65,6 @@ protein-detective prune-pdbs ./mysession
 
 <!-- --8<-- [end:mkdocindex] -->
 
-## Develop
+## Contributing
 
-This package uses [uv](https://docs.astral.sh/uv) to manage its development environment.
-
-```shell
-uv pip install -e .
-```
-
-To work on notebooks in docs/ directory
-
-```shell
-uv sync --group docs
-# Open a notebook with VS code and select .venv/bin/python as kernel
-```
-
-To run the tests
-
-```shell
-uv run pytest
-```
-
-To format the code
-
-```shell
-uvx ruff format
-# Sort imports with
-uvx ruff check --select I --fix
-```
-
-To lint the code
-
-```shell
-uvx ruff check
-```
-(Use `uvx ruff check --fix` to fix the issues automatically)
-
-
-To type check with [pyrefly](https://pyrefly.org/) the code
-
-```shell
-uv run pyrefly check
-```
-
-<details>
-<summary>To type check with pyrefly the notebooks</summary>
-
-Pyrefly does not support notebooks yet, so we need to convert them to python scripts and then run pyrefly on them.
-
-```shell
-uv run --group docs jupyter nbconvert --to python docs/*.ipynb
-# Comment out magic commands
-sed -i 's/^get_ipython/# get_ipython/' docs/*.py
-uv run pyrefly check docs/*.py
-rm docs/*.py
-```
-
-</details>
-
-### Documentation
-
-Start the live-reloading docs server with
-
-```shell
-uv run mkdocs serve
-```
-Build the documentation site with
-
-```shell
-uv run mkdocs build
-# The site will be built in the `site/` directory.
-# You can preview it with
-python3 -m http.server -d site
-```
+For development information and contribution guidelines, please see [CONTRIBUTING.md](CONTRIBUTING.md).
