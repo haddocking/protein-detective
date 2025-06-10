@@ -23,5 +23,4 @@ repository-code: https://github.com/haddocking/protein-detective
 identifiers:
   - description: Latest version of software
     type: doi
-    # TODO replace with actual latest DOI
-    value: TODO
+    value: 10.5281/zenodo.15632658
