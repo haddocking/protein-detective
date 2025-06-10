@@ -1,6 +1,11 @@
  <!-- --8<-- [start:mkdocindex] -->
 # protein-detective
 
+[![Documentation](https://img.shields.io/badge/Documentation-bonvinlab.org-blue?style=flat-square&logo=gitbook)](https://www.bonvinlab.org/protein-detective/)
+[![CI](https://github.com/haddocking/protein-detective/actions/workflows/ci.yml/badge.svg)](https://github.com/haddocking/protein-detective/actions/workflows/ci.yml)
+[![Research Software Directory Badge](https://img.shields.io/badge/rsd-00a3e3.svg)](https://www.research-software.nl/software/protein-detective)
+<!-- [![PyPI](https://img.shields.io/pypi/v/protein-detective)](https://pypi.org/project/protein-detective/) -->
+
 Python package to detect proteins in EM density maps.
 
 ## Install
