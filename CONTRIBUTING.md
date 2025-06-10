@@ -56,6 +56,7 @@ To create a release you need write permission on the repository.
 1. Press the Publish Release button
 1. Wait until [Build and upload to PyPI](https://github.com/haddocking/protein-detective/actions/workflows/pypi-publish.yml) has completed
 1. Verify new release is on [PyPi](https://pypi.org/project/protein-detective-em/#history)
+1. Verify new Zenodo record has been created.
 
 ## Contributing with documentation
 

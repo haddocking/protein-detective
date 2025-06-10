@@ -20,3 +20,8 @@ authors:
     affiliation: '@UtrechtUniversity'    
     orcid: "https://orcid.org/0000-0001-7369-1322"
 repository-code: https://github.com/haddocking/protein-detective
+identifiers:
+  - description: Latest version of software
+    type: doi
+    # TODO replace with actual latest DOI
+    value: TODO
