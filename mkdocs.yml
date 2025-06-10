@@ -2,6 +2,10 @@ site_name: Protein Detective
 site_url: https://bonvinlab.org/protein_detective
 repo_url: https://github.com/haddocking/protein-detective
 watch: [mkdocs.yml, README.md, src/protein_detective]
+exclude_docs: |
+  hooks.py
+hooks:
+  - docs/hooks.py
 theme: 
   name: mkdocs
   color_mode: auto
@@ -33,6 +37,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - CLI Reference: cli.md
   - Notebooks:
     - Retrieve: uniprot.ipynb
     - AlphaFold: alphafold.ipynb
