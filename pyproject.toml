@@ -51,6 +51,9 @@ docs = [
 requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 
+[tool.uv.sources]
+powerfit_em = {git = "https://github.com/haddocking/powerfit.git", branch = "more-lib-like"}
+
 [tool.ruff]
 line-length = 120
 extend-include = ["*.ipynb"]
