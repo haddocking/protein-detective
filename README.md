@@ -1,11 +1,21 @@
- <!-- --8<-- [start:mkdocindex] -->
 # protein-detective
+
+[![Documentation](https://img.shields.io/badge/Documentation-bonvinlab.org-blue?style=flat-square&logo=gitbook)](https://www.bonvinlab.org/protein-detective/)
+[![CI](https://github.com/haddocking/protein-detective/actions/workflows/ci.yml/badge.svg)](https://github.com/haddocking/protein-detective/actions/workflows/ci.yml)
+[![Research Software Directory Badge](https://img.shields.io/badge/rsd-00a3e3.svg)](https://www.research-software.nl/software/protein-detective)
+[![PyPI](https://img.shields.io/pypi/v/protein-detective)](https://pypi.org/project/protein-detective/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15632658.svg)](https://doi.org/10.5281/zenodo.15632658)
 
 Python package to detect proteins in EM density maps.
 
 ## Install
 
 ```shell
+pip install protein-detective
+```
+
+Or to use the latest development version:
+```
 pip install git+https://github.com/haddocking/protein-detective.git
 ```
 
@@ -15,18 +25,17 @@ pip install git+https://github.com/haddocking/protein-detective.git
 
 ```shell
 protein-detective search \
---taxon-id 9606 \
---reviewed \
---subcellular-location-uniprot nucleus \
---subcellular-location-go GO:0005634 \
---molecular-function-go GO:0003677 \
---limit 100 \
-./mysession
-# GO:0005634 == Nucleus
-# GO:0003677 == DNA binding
+    --taxon-id 9606 \
+    --reviewed \
+    --subcellular-location-uniprot nucleus \
+    --subcellular-location-go GO:0005634 \
+    --molecular-function-go GO:0003677 \
+    --limit 100 \
+    ./mysession
 ```
+([GO:0005634](https://www.ebi.ac.uk/QuickGO/term/GO:0005634) is "Nucleus" and [GO:0003677](https://www.ebi.ac.uk/QuickGO/term/GO:0003677) is  "DNA binding")
 
-In `./mysession` directory, you will find session.db file, which is a duckdb database with search results.
+In `./mysession` directory, you will find session.db file, which is a [DuckDB](https://duckdb.org/) database with search results.
 
 ### To retrieve a bunch of structures
 
@@ -44,15 +53,15 @@ Also writes pdb files with only those residues.
 
 ```shell
 protein-detective density-filter \
---confidence-threshold 50 \
---min-residues 100 \
---max-residues 1000 \
-./mysession
+    --confidence-threshold 50 \
+    --min-residues 100 \
+    --max-residues 1000 \
+    ./mysession
 ```
 
 ### To prune PDBe files
 
-Make PDBe files smaller by only keeping first chain of belonging to found uniprot entry and renaming to chain A.
+Make PDBe files smaller by only keeping first chain of found uniprot entry and renaming to chain A.
 
 ```shell
 protein-detective prune-pdbs ./mysession
@@ -68,75 +77,6 @@ protein-detective powerfit commands ../powerfit-tutorial/ribosome-KsgA.map 13 do
 This will print commands to the terminal, which you can then run in whatever way you prefer.
 Like just sequentially, or with [GNU parallel](https://www.gnu.org/software/parallel/) or as a [Slurm array job](https://slurm.schedmd.com/job_array.html).
 
-<!-- --8<-- [end:mkdocindex] -->
+## Contributing
 
-## Develop
-
-This package uses [uv](https://docs.astral.sh/uv) to manage its development environment.
-
-```shell
-uv pip install -e .
-```
-
-To work on notebooks in docs/ directory
-
-```shell
-uv sync --group docs
-# Open a notebook with VS code and select .venv/bin/python as kernel
-```
-
-To run the tests
-
-```shell
-uv run pytest
-```
-
-To format the code
-
-```shell
-uvx ruff format
-# Sort imports with
-uvx ruff check --select I --fix
-```
-
-To lint the code
-
-```shell
-uvx ruff check
-```
-(Use `uvx ruff check --fix` to fix the issues automatically)
-
-
-To type check with [pyrefly](https://pyrefly.org/) the code
-
-```shell
-uv run pyrefly check
-```
-
-<details>
-<summary>To type check with pyrefly the notebooks</summary>
-
-Pyrefly does not support notebooks yet, so we need to convert them to python scripts and then run pyrefly on them.
-
-```shell
-uv run --group docs jupyter nbconvert --to python docs/*.ipynb
-# Comment out magic commands
-sed -i 's/^get_ipython/# get_ipython/' docs/*.py
-uv run pyrefly check docs/*.py
-rm docs/*.py
-```
-
-</details>
-
-### Documentation
-
-Start the live-reloading docs server with
-
-```shell
-uv run mkdocs serve
-```
-Build the documentation site with
-
-```shell
-uv run mkdocs build
-```
+For development information and contribution guidelines, please see [CONTRIBUTING.md](CONTRIBUTING.md).

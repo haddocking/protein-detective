@@ -1,3 +1,4 @@
+"""Workflow steps"""
 import logging
 import shutil
 from dataclasses import dataclass
@@ -63,7 +64,9 @@ def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 1
 
 
 WhatRetrieve = Literal["pdbe", "alphafold"]
+"""Types of what to retrieve."""
 what_retrieve_choices: set[WhatRetrieve] = {"pdbe", "alphafold"}
+"""Set of what can be retrieved."""
 
 
 def retrieve_structures(
@@ -122,6 +125,14 @@ def retrieve_structures(
 
 @dataclass
 class DensityFilterSessionResult:
+    """Stats of density filtering.
+
+    Parameters:
+        density_filtered_dir: The directory where the filtered PDB files are stored.
+        nr_kept: The number of structures that were kept after filtering.
+        nr_discarded: The number of structures that were discarded after filtering.
+    """
+
     density_filtered_dir: Path
     nr_kept: int
     nr_discarded: int
@@ -137,6 +148,12 @@ def density_filter(session_dir: Path, query: DensityFilterQuery) -> DensityFilte
     The remaining structures have the residues with a b-factor below the confidence threshold removed.
     And are written to the session_dir / "density_filtered" directory.
 
+    Args:
+        session_dir: The directory where the session database is stored.
+        query: The density filter query containing the confidence thresholds.
+
+    Returns:
+        Stats of density filtering.
     """
     density_filtered_dir = session_dir / "density_filtered"
     density_filtered_dir.mkdir(parents=True, exist_ok=True)

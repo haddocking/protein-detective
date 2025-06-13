@@ -22,7 +22,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/haddocking/protein-detective"
 Issues = "https://github.com/haddocking/protein-detective/issues"
-Documentation = "https://github.com/haddocking/protein-detective#readme"
+Documentation = "https://www.bonvinlab.org/protein-detective/"
 Source = "https://github.com/haddocking/protein-detective"
 
 [project.scripts]

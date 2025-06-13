@@ -172,14 +172,19 @@ def handle_powerfit_commands(args):
         print(command, file=args.output)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Protein Detective CLI")
+def make_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Protein Detective CLI", prog="protein-detective")
     subparsers = parser.add_subparsers(dest="command", required=True)
     add_search_parser(subparsers)
     add_retrieve_parser(subparsers)
     add_density_filter_parser(subparsers)
     add_prune_pdbs_parser(subparsers)
     add_powerfit_parser(subparsers)
+    return parser
+
+
+def main():
+    parser = make_parser()
 
     args = parser.parse_args()
 

@@ -56,6 +56,15 @@ def write_single_chain_pdb_file(
 
 @dataclass(frozen=True)
 class ProteinPdbRow:
+    """Info about PDB entry and its relation to an Uniprot entry
+
+    Parameters:
+        id: The PDB ID of the entry.
+        uniprot_chains: The UniProt chains associated with the PDB entry.
+        uniprot_acc: The UniProt accession number associated with the PDB entry.
+        mmcif_file: The path to the mmCIF file for the PDB entry, or None if not retrieved yet.
+    """
+
     id: str
     uniprot_chains: str
     uniprot_acc: str
@@ -64,6 +73,15 @@ class ProteinPdbRow:
 
 @dataclass(frozen=True)
 class SingleChainResult:
+    """Result of writing a single chain PDB file.
+
+    Parameters:
+        uniprot_acc: The UniProt accession.
+        pdb_id: The PDB ID of the entry.
+        output_file: The path to the output PDB file with
+            just the first chain (renamed to A) belonging to given Uniprot accession.
+    """
+
     uniprot_acc: str
     pdb_id: str
     output_file: Path
