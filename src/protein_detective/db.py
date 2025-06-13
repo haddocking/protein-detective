@@ -11,6 +11,8 @@ from protein_detective.alphafold import AlphaFoldEntry
 from protein_detective.alphafold.density import DensityFilterQuery, DensityFilterResult
 from protein_detective.alphafold.entry_summary import EntrySummary
 from protein_detective.pdbe.io import ProteinPdbRow, SingleChainResult
+from protein_detective.powerfit.options import PowerfitOptions
+from protein_detective.powerfit.solution import PowerfitSolution
 from protein_detective.uniprot import PdbResult, Query
 
 converter = make_converter()
@@ -75,6 +77,14 @@ CREATE TABLE IF NOT EXISTS density_filtered_alphafolds (
     FOREIGN KEY (density_filter_id) REFERENCES density_filters (density_filter_id),
     FOREIGN KEY (uniprot_acc) REFERENCES alphafolds (uniprot_acc),
 );
+
+CREATE SEQUENCE IF NOT EXISTS id_powerfit_runs START 1;
+CREATE TABLE IF NOT EXISTS powerfit_runs (
+    powerfit_run_id INTEGER DEFAULT nextval('id_powerfit_runs') PRIMARY KEY,
+    options JSON NOT NULL,
+    UNIQUE (options)
+);
+
 """
 
 
@@ -287,6 +297,16 @@ def save_single_chain_pdb_files(files: list[SingleChainResult], con: DuckDBPyCon
     )
 
 
+def load_single_chain_pdb_files(con: DuckDBPyConnection) -> list[Path]:
+    query = """
+    SELECT single_chain_pdb_file
+    FROM proteins_pdbs
+    WHERE single_chain_pdb_file IS NOT NULL
+    """
+    rows = con.execute(query).fetchall()
+    return [Path(row[0]) for row in rows]
+
+
 def save_density_filtered(
     query: DensityFilterQuery,
     files: list[DensityFilterResult],
@@ -329,3 +349,93 @@ def save_density_filtered(
         VALUES (?, ?, ?, ?, ?)""",
         values,
     )
+
+
+def load_density_filtered_alphafolds_files(
+    con: DuckDBPyConnection,
+) -> list[Path]:
+    query = """
+    SELECT pdb_file
+    FROM density_filtered_alphafolds
+    WHERE keep = TRUE
+    """
+    rows = con.execute(query).fetchall()
+    return [Path(row[0]) for row in rows]
+
+
+def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> int:
+    result = con.execute(
+        """INSERT INTO powerfit_runs (options)
+        VALUES (?) RETURNING powerfit_run_id""",
+        (converter.dumps(options, PowerfitOptions),),
+    ).fetchone()
+    # TODO reuse existing options if they are the same
+    if result is None or len(result) != 1:
+        msg = "Failed to insert powerfit options"
+        raise ValueError(msg)
+    return result[0]
+
+
+def powerfit_solutions(
+    session_dir: Path, con: DuckDBPyConnection, powerfit_run_id: int | None = None
+) -> list[PowerfitSolution]:
+    solutions_pattern = session_dir / "powerfit/*/*/solutions.out"
+    if powerfit_run_id is not None:
+        solutions_pattern = session_dir / f"powerfit/{powerfit_run_id}/*/solutions.out"
+    # TODO chekc that is cc the column to sort on, to get best first?
+    con.execute(
+        """
+        SELECT
+            * EXCLUDE (structure),
+        FROM (
+            SELECT
+            * EXCLUDE (filename),
+            parse_path(filename)[-3]::INT AS powerfit_run_id,
+            parse_path(filename)[-2] AS structure,
+        FROM
+            read_csv(?, filename=True)
+        )
+        LEFT JOIN (
+            SELECT density_filter_id, uniprot_acc AS af_id, parse_filename(pdb_file, true) AS structure
+            FROM density_filtered_alphafolds WHERE keep=True
+        ) AS a USING (structure)
+        LEFT JOIN (
+            SELECT uniprot_acc, pdb_id, parse_filename(single_chain_pdb_file, true) AS structure
+            FROM proteins_pdbs
+            WHERE single_chain_pdb_file IS NOT NULL
+        ) AS p USING (structure)
+        ORDER BY cc DESC
+        """,
+        (str(solutions_pattern),),
+    )
+    rows = con.fetchall()
+    # TODO also add lcc.mrc path to db aka powerfit/10/AF-A8MT65-F1-model_v4/lcc.mrc, these are per run/structure combi
+    # TODO add top --num modles to db aka powerfit/10/AF-A8MT65-F1-model_v4/fit_1.pdb
+    return [
+        # rank	cc	Fish-z	rel-z	x	y	z	a11	a12	a13	a21	a22	a23	a31	a32	a33
+        # powerfit_run_id	density_filter_id	af_id	uniprot_acc	pdb_id
+        PowerfitSolution(
+            rank=row[0],
+            cc=row[1],
+            fish_z=row[2],
+            rel_z=row[3],
+            x=row[4],
+            y=row[5],
+            z=row[6],
+            a11=row[7],
+            a12=row[8],
+            a13=row[9],
+            a21=row[10],
+            a22=row[11],
+            a23=row[12],
+            a31=row[13],
+            a32=row[14],
+            a33=row[15],
+            powerfit_run_id=int(row[16]) if row[16] is not None else None,
+            density_filter_id=row[17],
+            af_id=row[18],
+            uniprot_acc=row[19],
+            pdb_id=row[20],
+        )
+        for row in rows
+    ]

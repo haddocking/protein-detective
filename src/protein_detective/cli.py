@@ -1,13 +1,19 @@
 import argparse
+import logging
 from pathlib import Path
 
-from rich import print  # noqa: A004
+from powerfit_em.powerfit import make_parser as make_powerfit_parser
+from rich import print as rprint
+from rich.logging import RichHandler
 
 from protein_detective.alphafold import downloadable_formats
 from protein_detective.alphafold.density import DensityFilterQuery
+from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.uniprot import Query
 from protein_detective.workflow import (
     density_filter,
+    powerfit_commands,
+    powerfit_report,
     prune_pdbs,
     retrieve_structures,
     search_structures_in_uniprot,
@@ -21,7 +27,6 @@ def add_search_parser(subparsers):
     search_parser.add_argument("--taxon-id", type=str, help="NCBI Taxon ID")
     search_parser.add_argument(
         "--reviewed",
-        type=bool,
         action=argparse.BooleanOptionalAction,
         help="Reviewed=swissprot, no-reviewed=trembl. Default is uniprot=swissprot+trembl.",
         default=None,
@@ -85,6 +90,71 @@ def add_prune_pdbs_parser(subparsers):
     return prune_pdbs_parser
 
 
+def add_powerfit_commands_parser(subparsers):
+    # Add the commands sub-command
+    commands_parser = subparsers.add_parser(
+        "commands", help="Generate PowerFit commands for PDB files in the session directory"
+    )
+    borrowed_arguments = {
+        "target",
+        "resolution",
+        "angle",
+        "laplace",
+        "core_weighted",
+        "no_resampling",
+        "resampling_rate",
+        "no_trimming",
+        "trimming_cutoff",
+        "num",
+        "nproc",
+    }
+    powerfit_parser = make_powerfit_parser()
+
+    for powerfit_argument in powerfit_parser._actions:
+        if powerfit_argument.dest in borrowed_arguments:
+            commands_parser._add_action(powerfit_argument)
+
+    # Replaces template argument
+    commands_parser.add_argument("session_dir", help="Session directory for input and output")
+
+    # Removed --chain, as protein-detective created single chain PDB files
+    # Removed --directory argument as protein_detective will generate that argument
+
+    # Replaces --gpu, from [<platform>:<device>] to boolean flag
+    # When enabled and machine has multiple GPUs, then cycles through them
+    commands_parser.add_argument(
+        "-g",
+        "--gpu",
+        dest="gpu",
+        action="store_true",
+        help="Off-load the intensive calculations to the GPU. ",
+    )
+
+    commands_parser.add_argument(
+        "--output",
+        dest="output",
+        type=argparse.FileType("w", encoding="UTF-8"),
+        default="-",
+        help="Output file for powerfit commands. If set to '-' (default) will print to stdout.",
+    )
+
+
+def add_powerfit_report_parser(subparsers):
+    # Add the report sub-command
+    report_parser = subparsers.add_parser("report", help="Generate a report of the best PowerFit solutions")
+    report_parser.add_argument("session_dir", help="Session directory containing PowerFit results")
+    report_parser.add_argument("--powerfit_run_id", type=int, default=None, help="ID of the PowerFit run to report on")
+
+
+def add_powerfit_parser(subparsers):
+    powerfit_parser = subparsers.add_parser("powerfit", help="PowerFit related commands")
+    powerfit_subparsers = powerfit_parser.add_subparsers(dest="powerfit_command", required=True)
+    add_powerfit_commands_parser(powerfit_subparsers)
+    add_powerfit_report_parser(powerfit_subparsers)
+
+    return powerfit_parser
+
+
 def handle_search(args):
     query = Query(
         taxon_id=args.taxon_id,
@@ -95,7 +165,7 @@ def handle_search(args):
     )
     session_dir = Path(args.session_dir)
     nr_uniprot, nr_pdbes, nr_afs = search_structures_in_uniprot(query, session_dir, limit=args.limit)
-    print(
+    rprint(
         f"Search completed: {nr_uniprot} UniProt entries found, "
         f"{nr_pdbes} PDBe structures, {nr_afs} AlphaFold structures."
     )
@@ -108,7 +178,7 @@ def handle_retrieve(args):
         what=set(args.what) if args.what else None,
         what_af_formats=set(args.what_af_formats) if args.what_af_formats else None,
     )
-    print(
+    rprint(
         "Structures retrieved successfully: "
         f"{nr_pdbes} PDBe structures, {nr_afs} AlphaFold structures downloaded to {download_dir}"
     )
@@ -122,23 +192,64 @@ def handle_density_filter(args):
     )
     session_dir = Path(args.session_dir)
     result = density_filter(session_dir, query)
-    print(f"Filtered {result.nr_kept} structures, written to {result.density_filtered_dir} directory.")
-    print(f"Discarded {result.nr_discarded} structures based on density confidence.")
+    rprint(f"Filtered {result.nr_kept} structures, written to {result.density_filtered_dir} directory.")
+    rprint(f"Discarded {result.nr_discarded} structures based on density confidence.")
 
 
 def handle_prune_pdbs(args):
     session_dir = Path(args.session_dir)
     single_chain_dir, nr_files = prune_pdbs(session_dir)
-    print(f"Written {nr_files} PDB files to {single_chain_dir} directory.")
+    rprint(f"Written {nr_files} PDB files to {single_chain_dir} directory.")
+
+
+def handle_powerfit(args):
+    if args.powerfit_command == "commands":
+        handle_powerfit_commands(args)
+    elif args.powerfit_command == "report":
+        handler_powerfit_report(args)
+
+
+def handle_powerfit_commands(args):
+    session_dir = Path(args.session_dir)
+    commands, powerfit_run_id = powerfit_commands(session_dir, PowerfitOptions.from_args(args))
+    print("# Run the commands below in your own way", file=args.output)
+    print("# When you are done", file=args.output)
+    print(f"# in {Path().absolute()} directory", file=args.output)
+    print(
+        f"# run `protein-detective powerfit report {session_dir} {powerfit_run_id}` to show best solutions.",
+        file=args.output,
+    )
+    # TODO capture PowerfitOptions in db
+    # each options set could have own id that must be passed to ingest command
+    # TODO make ingest command that
+    # 1. fills db to can query all powerfit/*/solutions.out
+    # 2. Store paths to top 10 pdb files in db
+    # 3. Store path to lcc.mrc in db
+    # 4. Map powerfit output dir back to pdb file in db
+    for command in commands:
+        print(command, file=args.output)
+
+
+def handler_powerfit_report(args):
+    session_dir = Path(args.session_dir)
+    powerfit_run_id = args.powerfit_run_id
+
+    solutions = powerfit_report(session_dir, powerfit_run_id)
+    # TODO return csv instead of list of dataclass objects
+    # TODO make top N an argument
+    rprint(solutions[0:9])
 
 
 def make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Protein Detective CLI", prog="protein-detective")
+    parser.add_argument("--log-level", default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+
     subparsers = parser.add_subparsers(dest="command", required=True)
     add_search_parser(subparsers)
     add_retrieve_parser(subparsers)
     add_density_filter_parser(subparsers)
     add_prune_pdbs_parser(subparsers)
+    add_powerfit_parser(subparsers)
     return parser
 
 
@@ -146,6 +257,8 @@ def main():
     parser = make_parser()
 
     args = parser.parse_args()
+
+    logging.basicConfig(level=args.log_level, handlers=[RichHandler(show_level=False)])
 
     if args.command == "search":
         handle_search(args)
@@ -155,6 +268,8 @@ def main():
         handle_density_filter(args)
     elif args.command == "prune-pdbs":
         handle_prune_pdbs(args)
+    elif args.command == "powerfit":
+        handle_powerfit(args)
 
 
 if __name__ == "__main__":

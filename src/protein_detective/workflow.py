@@ -1,5 +1,7 @@
 """Workflow steps"""
 
+import logging
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -12,20 +14,28 @@ from protein_detective.db import (
     connect,
     load_alphafold_ids,
     load_alphafolds,
+    load_density_filtered_alphafolds_files,
     load_pdb_ids,
     load_pdbs,
+    load_single_chain_pdb_files,
+    powerfit_solutions,
     save_alphafolds,
     save_alphafolds_files,
     save_density_filtered,
     save_pdb_files,
     save_pdbs,
+    save_powerfit_options,
     save_query,
     save_single_chain_pdb_files,
     save_uniprot_accessions,
 )
 from protein_detective.pdbe.fetch import fetch as pdbe_fetch
 from protein_detective.pdbe.io import write_single_chain_pdb_files
+from protein_detective.powerfit.options import PowerfitOptions
+from protein_detective.powerfit.solution import PowerfitSolution
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
+
+logger = logging.getLogger(__name__)
 
 
 def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 10_000) -> tuple[int, int, int]:
@@ -191,3 +201,61 @@ def prune_pdbs(session_dir: Path) -> tuple[Path, int]:
         save_single_chain_pdb_files(new_files, conn)
 
         return single_chain_dir, len(new_files)
+
+
+def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list[str], int]:
+    """
+    Generate PowerFit commands for fitting structures to a density map.
+
+    Args:
+        session_dir: Directory containing the session data, including PDB files.
+        options: Options for generating PowerFit commands.
+
+    Returns:
+        A tuple containing:
+            - A list of PowerFit command strings.
+            - The ID of the PowerFit run saved in the session database.
+    """
+    session_dir.mkdir(parents=True, exist_ok=True)
+    with connect(session_dir) as con:
+        powerfit_run_id = save_powerfit_options(options, con)
+    powerfit_run_dir = session_dir / "powerfit" / str(powerfit_run_id)
+    powerfit_run_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy the density map to the powerfit directory
+    density_map = options.target
+    density_map_target = powerfit_run_dir / density_map.name
+    shutil.copy(density_map, density_map_target)
+    logger.info(f"Copied density map from {density_map} to {density_map_target}")
+
+    # Load the PDB files from the session directory
+    pdb_files = []
+    with connect(session_dir) as con:
+        pdbe_files = load_single_chain_pdb_files(con)
+        af_files = load_density_filtered_alphafolds_files(con)
+        pdb_files = pdbe_files + af_files
+
+    # Generate PowerFit commands for each PDB file
+    commands = []
+    for pdb_file in pdb_files:
+        powerfit_dir = powerfit_run_dir / pdb_file.stem
+        real_pdb_file = session_dir / pdb_file
+        command = options.to_command(
+            density_map=density_map_target,
+            template=real_pdb_file,
+            out_dir=powerfit_dir,
+        )
+        commands.append(command)
+
+    return commands, powerfit_run_id
+
+
+def powerfit_report(session_dir: Path, powerfit_run_id: int | None = None) -> list[PowerfitSolution]:
+    """Report PowerFit results.
+
+    Args:
+        session_dir: Directory containing the session data.
+        powerfit_run_id: Optional ID of the PowerFit run to report. If None, reports over all runs.
+    """
+    with connect(session_dir) as con:
+        return powerfit_solutions(session_dir, con, powerfit_run_id=powerfit_run_id)

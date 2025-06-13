@@ -68,9 +68,9 @@ venv.bak/
 *.swo
 *.orig
 
-IDEAS.md
 /docs/session1/
 /docs/alphafold_files/
 /docs/pdb_files/
 /docs/density_filtered/
-/docs/cli.md
+/site
+/mysession/
