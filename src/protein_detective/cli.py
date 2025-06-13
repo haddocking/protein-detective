@@ -2,6 +2,7 @@ import argparse
 import logging
 from pathlib import Path
 
+from powerfit_em.powerfit import make_parser as make_powerfit_parser
 from rich import print as rprint
 from rich.logging import RichHandler
 
@@ -90,7 +91,9 @@ def add_prune_pdbs_parser(subparsers):
 
 def add_powerfit_commands_parser(subparsers):
     # Add the commands sub-command
-    parser = subparsers.add_parser("commands", help="Generate PowerFit commands for PDB files in the session directory")
+    commands_parser = subparsers.add_parser(
+        "commands", help="Generate PowerFit commands for PDB files in the session directory"
+    )
     borrowed_arguments = {
         "target",
         "resolution",
@@ -104,21 +107,21 @@ def add_powerfit_commands_parser(subparsers):
         "num",
         "nproc",
     }
-    powerfit_parser = make_parser()
+    powerfit_parser = make_powerfit_parser()
 
     for powerfit_argument in powerfit_parser._actions:
         if powerfit_argument.dest in borrowed_arguments:
-            parser._add_action(powerfit_argument)
+            commands_parser._add_action(powerfit_argument)
 
     # Replaces template argument
-    parser.add_argument("session_dir", help="Session directory for input and output")
+    commands_parser.add_argument("session_dir", help="Session directory for input and output")
 
     # Removed --chain, as protein-detective created single chain PDB files
     # Removed --directory argument as protein_detective will generate that argument
 
     # Replaces --gpu, from [<platform>:<device>] to boolean flag
     # When enabled and machine has multiple GPUs, then cycles through them
-    parser.add_argument(
+    commands_parser.add_argument(
         "-g",
         "--gpu",
         dest="gpu",
@@ -126,7 +129,7 @@ def add_powerfit_commands_parser(subparsers):
         help="Off-load the intensive calculations to the GPU. ",
     )
 
-    parser.add_argument(
+    commands_parser.add_argument(
         "--output",
         dest="output",
         type=argparse.FileType("w", encoding="UTF-8"),
