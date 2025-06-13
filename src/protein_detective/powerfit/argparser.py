@@ -164,6 +164,8 @@ class PowerfitOptions:
             str(self.resolution),
             str(template.absolute()),
             str(self.angle),
+            # for some density map/template combination laplace is beneficial, for others not
+            # TODO create some logic based on size to determine if laplace is beneficial
             "--laplace" if self.laplace else "",
             "--core-weighted" if self.core_weighted else "",
             "--no-resampling" if self.no_resampling else "",
