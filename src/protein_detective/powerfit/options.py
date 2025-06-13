@@ -13,16 +13,16 @@ from shlex import join
 class PowerfitOptions:
     target: Path
     resolution: float
-    angle: float
-    laplace: bool
-    core_weighted: bool
-    no_resampling: bool
-    resampling_rate: float
-    no_trimming: bool
-    trimming_cutoff: float | None
-    num: int
-    gpu: bool
-    nproc: int
+    angle: float = 10
+    laplace: bool = False
+    core_weighted: bool = False
+    no_resampling: bool = False
+    resampling_rate: float = 2
+    no_trimming: bool = False
+    trimming_cutoff: float | None = None
+    num: int = 10
+    gpu: bool = False
+    nproc: int = 1
 
     @staticmethod
     def from_args(parsed_args: Namespace) -> "PowerfitOptions":
@@ -63,6 +63,8 @@ class PowerfitOptions:
             str(self.nproc),
             "--directory",
             str(out_dir.absolute()),
+            "--delimiter",
+            ",",
         ]
         if self.angle:
             args.extend(["--angle", str(self.angle)])
