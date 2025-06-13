@@ -4,7 +4,7 @@ import argparse
 import io
 import logging
 
-from mkdocs.config import Config
+from mkdocs.config.defaults import MkDocsConfig
 from mkdocs.structure.files import File, Files
 
 from protein_detective.cli import make_parser
@@ -77,7 +77,7 @@ def generate_cli_docs() -> str:
     return argparser_to_markdown(parser)
 
 
-def on_files(files: Files, config: Config):
+def on_files(files: Files, config: MkDocsConfig) -> Files:
     logger.info("Generating CLI documentation...")
     docs_content = generate_cli_docs()
     cli_md_file = File.generated(
