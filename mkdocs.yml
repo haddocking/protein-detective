@@ -3,9 +3,9 @@ site_url: https://bonvinlab.org/protein_detective
 repo_url: https://github.com/haddocking/protein-detective
 watch: [mkdocs.yml, README.md, src/protein_detective]
 exclude_docs: |
-  hooks.py
+  cli_doc_hook.py
 hooks:
-  - docs/hooks.py
+  - docs/cli_doc_hook.py
 theme: 
   name: mkdocs
   color_mode: auto
