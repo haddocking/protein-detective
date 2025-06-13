@@ -1,7 +1,9 @@
 import argparse
+import logging
 from pathlib import Path
 
 from rich import print as rprint
+from rich.logging import RichHandler
 
 from protein_detective.alphafold import downloadable_formats
 from protein_detective.alphafold.density import DensityFilterQuery
@@ -156,11 +158,14 @@ def handle_powerfit(args):
 
 def handle_powerfit_commands(args):
     session_dir = Path(args.session_dir)
-    commands = powerfit_commands(session_dir, PowerfitOptions.from_args(args))
+    commands, powerfit_run_id = powerfit_commands(session_dir, PowerfitOptions.from_args(args))
     print("# Run the commands below in your own way", file=args.output)
     print("# When you are done", file=args.output)
     print(f"# in {Path().absolute()} directory", file=args.output)
-    print(f"# run `protein-detective powerfit ingest {args.session_dir}` to parse the results.", file=args.output)
+    print(
+        f"# run `protein-detective powerfit ingest {session_dir} {powerfit_run_id}` to parse the results.",
+        file=args.output,
+    )
     # TODO capture PowerfitOptions in db
     # each options set could have own id that must be passed to ingest command
     # TODO make ingest command that
@@ -174,6 +179,8 @@ def handle_powerfit_commands(args):
 
 def make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Protein Detective CLI", prog="protein-detective")
+    parser.add_argument("--log-level", default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+
     subparsers = parser.add_subparsers(dest="command", required=True)
     add_search_parser(subparsers)
     add_retrieve_parser(subparsers)
@@ -187,6 +194,8 @@ def main():
     parser = make_parser()
 
     args = parser.parse_args()
+
+    logging.basicConfig(level=args.log_level, handlers=[RichHandler(show_level=False)])
 
     if args.command == "search":
         handle_search(args)
