@@ -11,6 +11,7 @@ from protein_detective.alphafold import AlphaFoldEntry
 from protein_detective.alphafold.density import DensityFilterQuery, DensityFilterResult
 from protein_detective.alphafold.entry_summary import EntrySummary
 from protein_detective.pdbe.io import ProteinPdbRow, SingleChainResult
+from protein_detective.powerfit.argparser import PowerfitOptions
 from protein_detective.uniprot import PdbResult, Query
 
 converter = make_converter()
@@ -75,6 +76,14 @@ CREATE TABLE IF NOT EXISTS density_filtered_alphafolds (
     FOREIGN KEY (density_filter_id) REFERENCES density_filters (density_filter_id),
     FOREIGN KEY (uniprot_acc) REFERENCES alphafolds (uniprot_acc),
 );
+
+CREATE SEQUENCE IF NOT EXISTS id_powerfit_runs START 1;
+CREATE TABLE IF NOT EXISTS powerfit_runs (
+    powerfit_run_id INTEGER DEFAULT nextval('id_powerfit_runs') PRIMARY KEY,
+    options JSON NOT NULL,
+    UNIQUE (options)
+);
+
 """
 
 
@@ -351,3 +360,22 @@ def load_density_filtered_alphafolds_files(
     """
     rows = con.execute(query).fetchall()
     return [Path(row[0]) for row in rows]
+
+
+def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> int:
+    result = con.execute(
+        """INSERT OR IGNORE INTO powerfit_runs (options)
+        VALUES (?) RETURNING powerfit_run_id""",
+        (converter.dumps(options, PowerfitOptions),),
+    ).fetchone()
+    if result is None:
+        # Already exists, so just fetch the id
+        result = con.execute(
+            """SELECT powerfit_run_id FROM powerfit_runs
+            WHERE options = ?""",
+            (converter.dumps(options, PowerfitOptions),),
+        ).fetchone()
+    if result is None or len(result) != 1:
+        msg = "Failed to insert or retrieve powerfit options"
+        raise ValueError(msg)
+    return result[0]
