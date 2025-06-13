@@ -13,6 +13,7 @@ from protein_detective.uniprot import Query
 from protein_detective.workflow import (
     density_filter,
     powerfit_commands,
+    powerfit_report,
     prune_pdbs,
     retrieve_structures,
     search_structures_in_uniprot,
@@ -138,10 +139,18 @@ def add_powerfit_commands_parser(subparsers):
     )
 
 
+def add_powerfit_report_parser(subparsers):
+    # Add the report sub-command
+    report_parser = subparsers.add_parser("report", help="Generate a report of the best PowerFit solutions")
+    report_parser.add_argument("session_dir", help="Session directory containing PowerFit results")
+    report_parser.add_argument("--powerfit_run_id", type=int, default=None, help="ID of the PowerFit run to report on")
+
+
 def add_powerfit_parser(subparsers):
     powerfit_parser = subparsers.add_parser("powerfit", help="PowerFit related commands")
     powerfit_subparsers = powerfit_parser.add_subparsers(dest="powerfit_command", required=True)
     add_powerfit_commands_parser(powerfit_subparsers)
+    add_powerfit_report_parser(powerfit_subparsers)
 
     return powerfit_parser
 
@@ -196,6 +205,8 @@ def handle_prune_pdbs(args):
 def handle_powerfit(args):
     if args.powerfit_command == "commands":
         handle_powerfit_commands(args)
+    elif args.powerfit_command == "report":
+        handler_powerfit_report(args)
 
 
 def handle_powerfit_commands(args):
@@ -205,7 +216,7 @@ def handle_powerfit_commands(args):
     print("# When you are done", file=args.output)
     print(f"# in {Path().absolute()} directory", file=args.output)
     print(
-        f"# run `protein-detective powerfit ingest {session_dir} {powerfit_run_id}` to parse the results.",
+        f"# run `protein-detective powerfit report {session_dir} {powerfit_run_id}` to show best solutions.",
         file=args.output,
     )
     # TODO capture PowerfitOptions in db
@@ -217,6 +228,16 @@ def handle_powerfit_commands(args):
     # 4. Map powerfit output dir back to pdb file in db
     for command in commands:
         print(command, file=args.output)
+
+
+def handler_powerfit_report(args):
+    session_dir = Path(args.session_dir)
+    powerfit_run_id = args.powerfit_run_id
+
+    solutions = powerfit_report(session_dir, powerfit_run_id)
+    # TODO return csv instead of list of dataclass objects
+    # TODO make top N an argument
+    rprint(solutions[0:9])
 
 
 def make_parser() -> argparse.ArgumentParser:

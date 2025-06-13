@@ -77,6 +77,13 @@ protein-detective powerfit commands ../powerfit-tutorial/ribosome-KsgA.map 13 do
 This will print commands to the terminal, which you can then run in whatever way you prefer.
 Like just sequentially, or with [GNU parallel](https://www.gnu.org/software/parallel/) or as a [Slurm array job](https://slurm.schedmd.com/job_array.html).
 
+
+To print top 10 solutions to the terminal, you can use:
+
+```shell
+protein-detective powerfit report docs/session1
+```
+
 ## Contributing
 
 For development information and contribution guidelines, please see [CONTRIBUTING.md](CONTRIBUTING.md).
