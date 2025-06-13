@@ -1,59 +1,12 @@
-from argparse import ArgumentParser, FileType, Namespace
+from argparse import Namespace
 from dataclasses import dataclass
 from io import BufferedReader
 from pathlib import Path
 from shlex import join
 
-from powerfit_em.powerfit import make_parser
-
 # Copy of
 # https://github.com/haddocking/powerfit/blob/092c5bc387ad90d046601afa9fe79f4fb67f7408/src/powerfit_em/powerfit.py#L31-L164
 # with slight modifications to fit the protein_detective requirements.
-
-
-def add_powerfit_cli_parser(p: ArgumentParser):
-    borrowed_arguments = {
-        "target",
-        "resolution",
-        "angle",
-        "laplace",
-        "core_weighted",
-        "no_resampling",
-        "resampling_rate",
-        "no_trimming",
-        "trimming_cutoff",
-        "num",
-        "nproc",
-    }
-    powerfit_parser = make_parser()
-
-    for powerfit_argument in powerfit_parser._actions:
-        if powerfit_argument.dest in borrowed_arguments:
-            p._add_action(powerfit_argument)
-
-    # Replaces template argument
-    p.add_argument("session_dir", help="Session directory for input and output")
-
-    # Removed --chain, as protein-detective created single chain PDB files
-    # Removed --directory argument as protein_detective will generate that argument
-
-    # Replaces --gpu, from [<platform>:<device>] to boolean flag
-    # When enabled and machine has multiple GPUs, then cycles through them
-    p.add_argument(
-        "-g",
-        "--gpu",
-        dest="gpu",
-        action="store_true",
-        help="Off-load the intensive calculations to the GPU. ",
-    )
-
-    p.add_argument(
-        "--output",
-        dest="output",
-        type=FileType("w", encoding="UTF-8"),
-        default="-",
-        help="Output file for powerfit commands. If set to '-' (default) will print to stdout.",
-    )
 
 
 @dataclass

@@ -30,7 +30,7 @@ from protein_detective.db import (
 )
 from protein_detective.pdbe.fetch import fetch as pdbe_fetch
 from protein_detective.pdbe.io import write_single_chain_pdb_files
-from protein_detective.powerfit.argparser import PowerfitOptions
+from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
 
 logger = logging.getLogger(__name__)

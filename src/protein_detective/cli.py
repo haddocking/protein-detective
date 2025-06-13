@@ -7,7 +7,7 @@ from rich.logging import RichHandler
 
 from protein_detective.alphafold import downloadable_formats
 from protein_detective.alphafold.density import DensityFilterQuery
-from protein_detective.powerfit.argparser import PowerfitOptions, add_powerfit_cli_parser
+from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.uniprot import Query
 from protein_detective.workflow import (
     density_filter,
@@ -90,10 +90,49 @@ def add_prune_pdbs_parser(subparsers):
 
 def add_powerfit_commands_parser(subparsers):
     # Add the commands sub-command
-    commands_parser = subparsers.add_parser(
-        "commands", help="Generate PowerFit commands for PDB files in the session directory"
+    parser = subparsers.add_parser("commands", help="Generate PowerFit commands for PDB files in the session directory")
+    borrowed_arguments = {
+        "target",
+        "resolution",
+        "angle",
+        "laplace",
+        "core_weighted",
+        "no_resampling",
+        "resampling_rate",
+        "no_trimming",
+        "trimming_cutoff",
+        "num",
+        "nproc",
+    }
+    powerfit_parser = make_parser()
+
+    for powerfit_argument in powerfit_parser._actions:
+        if powerfit_argument.dest in borrowed_arguments:
+            parser._add_action(powerfit_argument)
+
+    # Replaces template argument
+    parser.add_argument("session_dir", help="Session directory for input and output")
+
+    # Removed --chain, as protein-detective created single chain PDB files
+    # Removed --directory argument as protein_detective will generate that argument
+
+    # Replaces --gpu, from [<platform>:<device>] to boolean flag
+    # When enabled and machine has multiple GPUs, then cycles through them
+    parser.add_argument(
+        "-g",
+        "--gpu",
+        dest="gpu",
+        action="store_true",
+        help="Off-load the intensive calculations to the GPU. ",
     )
-    add_powerfit_cli_parser(commands_parser)
+
+    parser.add_argument(
+        "--output",
+        dest="output",
+        type=argparse.FileType("w", encoding="UTF-8"),
+        default="-",
+        help="Output file for powerfit commands. If set to '-' (default) will print to stdout.",
+    )
 
 
 def add_powerfit_parser(subparsers):
