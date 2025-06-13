@@ -23,7 +23,6 @@ def add_search_parser(subparsers):
     search_parser.add_argument("--taxon-id", type=str, help="NCBI Taxon ID")
     search_parser.add_argument(
         "--reviewed",
-        type=bool,
         action=argparse.BooleanOptionalAction,
         help="Reviewed=swissprot, no-reviewed=trembl. Default is uniprot=swissprot+trembl.",
         default=None,
@@ -156,7 +155,8 @@ def handle_powerfit(args):
 
 
 def handle_powerfit_commands(args):
-    commands = powerfit_commands(PowerfitOptions.from_args(args))
+    session_dir = Path(args.session_dir)
+    commands = powerfit_commands(session_dir, PowerfitOptions.from_args(args))
     print("# Run the commands below in your own way", file=args.output)
     print("# When you are done", file=args.output)
     print(f"# in {Path().absolute()} directory", file=args.output)

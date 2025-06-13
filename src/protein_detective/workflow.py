@@ -1,4 +1,5 @@
 """Workflow steps"""
+
 import logging
 import shutil
 from dataclasses import dataclass
@@ -199,19 +200,17 @@ def prune_pdbs(session_dir: Path) -> tuple[Path, int]:
         return single_chain_dir, len(new_files)
 
 
-def powerfit_commands(options: PowerfitOptions) -> list[str]:
+def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> list[str]:
     """
     Generate PowerFit commands for fitting structures to a density map.
 
     Args:
-        session_dir: Directory containing the session data.
-        density_map: Path to the density map file.
-        resolution: Resolution of the density map in Angstroms.
+        session_dir: Directory containing the session data, including PDB files.
+        options: Options for generating PowerFit commands.
 
     Returns:
-        list[str]: List of PowerFit command strings.
+        List of PowerFit command strings.
     """
-    session_dir = options.session_dir
     session_dir.mkdir(parents=True, exist_ok=True)
     powerfit_root_dir = session_dir / "powerfit"
     powerfit_root_dir.mkdir(parents=True, exist_ok=True)
