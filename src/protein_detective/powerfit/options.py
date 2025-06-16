@@ -20,7 +20,6 @@ class PowerfitOptions:
     resampling_rate: float = 2
     no_trimming: bool = False
     trimming_cutoff: float | None = None
-    num: int = 10
     gpu: bool = False
     nproc: int = 1
 
@@ -39,7 +38,6 @@ class PowerfitOptions:
             resampling_rate=parsed_args.resampling_rate,
             no_trimming=parsed_args.no_trimming,
             trimming_cutoff=parsed_args.trimming_cutoff,
-            num=parsed_args.num,
             gpu=parsed_args.gpu,
             nproc=parsed_args.nproc,
         )
@@ -57,7 +55,7 @@ class PowerfitOptions:
             str(self.resampling_rate),
             "--no-trimming" if self.no_trimming else "",
             "--num",
-            str(self.num),
+            str(0),  # Use `protein-detective powerfit fit-pdb` command to generate fitted PDBs
             "--gpu" if self.gpu else "",
             "--nproc",
             str(self.nproc),

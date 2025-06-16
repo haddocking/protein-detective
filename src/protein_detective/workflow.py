@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+import pandas as pd
+
 from protein_detective.alphafold import DownloadableFormat
 from protein_detective.alphafold import fetch_many as af_fetch
 from protein_detective.alphafold import relative_to as af_relative_to
@@ -32,7 +34,6 @@ from protein_detective.db import (
 from protein_detective.pdbe.fetch import fetch as pdbe_fetch
 from protein_detective.pdbe.io import write_single_chain_pdb_files
 from protein_detective.powerfit.options import PowerfitOptions
-from protein_detective.powerfit.solution import PowerfitSolution
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
 
 logger = logging.getLogger(__name__)
@@ -250,12 +251,15 @@ def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list
     return commands, powerfit_run_id
 
 
-def powerfit_report(session_dir: Path, powerfit_run_id: int | None = None) -> list[PowerfitSolution]:
+def powerfit_report(session_dir: Path, powerfit_run_id: int | None = None) -> pd.DataFrame:
     """Report PowerFit results.
 
     Args:
         session_dir: Directory containing the session data.
         powerfit_run_id: Optional ID of the PowerFit run to report. If None, reports over all runs.
+
+    Returns:
+        A DataFrame containing the PowerFit solutions.
     """
     with connect(session_dir) as con:
         return powerfit_solutions(session_dir, con, powerfit_run_id=powerfit_run_id)

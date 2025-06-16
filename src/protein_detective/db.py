@@ -6,13 +6,13 @@ from cattrs import unstructure
 from cattrs.preconf.json import make_converter
 from duckdb import DuckDBPyConnection
 from duckdb import connect as duckdb_connect
+from pandas import DataFrame
 
 from protein_detective.alphafold import AlphaFoldEntry
 from protein_detective.alphafold.density import DensityFilterQuery, DensityFilterResult
 from protein_detective.alphafold.entry_summary import EntrySummary
 from protein_detective.pdbe.io import ProteinPdbRow, SingleChainResult
 from protein_detective.powerfit.options import PowerfitOptions
-from protein_detective.powerfit.solution import PowerfitSolution
 from protein_detective.uniprot import PdbResult, Query
 
 converter = make_converter()
@@ -376,66 +376,57 @@ def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> 
     return result[0]
 
 
-def powerfit_solutions(
-    session_dir: Path, con: DuckDBPyConnection, powerfit_run_id: int | None = None
-) -> list[PowerfitSolution]:
+def powerfit_solutions(session_dir: Path, con: DuckDBPyConnection, powerfit_run_id: int | None = None) -> DataFrame:
+    """Retrieve PowerFit solutions from the solutions.out files.
+
+    Args:
+        session_dir: The directory where the session data is stored.
+        con: The DuckDB connection to use for fetching the data.
+        powerfit_run_id: Optional ID of a specific PowerFit run to filter results. If None, all runs are included.
+
+    Returns:
+        A DataFrame containing the PowerFit solutions.
+    """
     solutions_pattern = session_dir / "powerfit/*/*/solutions.out"
     if powerfit_run_id is not None:
         solutions_pattern = session_dir / f"powerfit/{powerfit_run_id}/*/solutions.out"
-    # TODO chekc that is cc the column to sort on, to get best first?
+
+    # TODO check that cc is the column to sort on, to get best first? Or Fish-z	rel-z
+    # TODO rank is for each powerfit run, make clearer that this is per run/structure combination
+
+    # In database file paths are relative to session_dir
+    # Query return files paths absolute by prepending session_dir
     con.execute(
         """
         SELECT
-            * EXCLUDE (structure),
+            * EXCLUDE (pdb_file, single_chain_pdb_file, af_id, uniprot_acc),
+            ? || '/' || COALESCE(pdb_file, single_chain_pdb_file) AS pdb_file,
+            COALESCE(uniprot_acc, af_id) AS uniprot_acc,
         FROM (
             SELECT
-            * EXCLUDE (filename),
-            parse_path(filename)[-3]::INT AS powerfit_run_id,
+            parse_path(filename)[-3] AS powerfit_run_id,
             parse_path(filename)[-2] AS structure,
+            rank, cc, fishz, relz,
+            [x,y,z]::FLOAT[3] AS translation,
+            [a11, a12, a12, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation,
         FROM
-            read_csv(?, filename=True)
+            read_csv(?, filename=True, normalize_names=True)
         )
         LEFT JOIN (
-            SELECT density_filter_id, uniprot_acc AS af_id, parse_filename(pdb_file, true) AS structure
+            SELECT density_filter_id, uniprot_acc AS af_id, pdb_file, parse_filename(pdb_file, true) AS structure
             FROM density_filtered_alphafolds WHERE keep=True
         ) AS a USING (structure)
         LEFT JOIN (
-            SELECT uniprot_acc, pdb_id, parse_filename(single_chain_pdb_file, true) AS structure
+            SELECT uniprot_acc, pdb_id, single_chain_pdb_file, parse_filename(single_chain_pdb_file, true) AS structure
             FROM proteins_pdbs
             WHERE single_chain_pdb_file IS NOT NULL
         ) AS p USING (structure)
         ORDER BY cc DESC
         """,
-        (str(solutions_pattern),),
+        (
+            str(session_dir),
+            str(solutions_pattern),
+        ),
     )
-    rows = con.fetchall()
     # TODO also add lcc.mrc path to db aka powerfit/10/AF-A8MT65-F1-model_v4/lcc.mrc, these are per run/structure combi
-    # TODO add top --num modles to db aka powerfit/10/AF-A8MT65-F1-model_v4/fit_1.pdb
-    return [
-        # rank	cc	Fish-z	rel-z	x	y	z	a11	a12	a13	a21	a22	a23	a31	a32	a33
-        # powerfit_run_id	density_filter_id	af_id	uniprot_acc	pdb_id
-        PowerfitSolution(
-            rank=row[0],
-            cc=row[1],
-            fish_z=row[2],
-            rel_z=row[3],
-            x=row[4],
-            y=row[5],
-            z=row[6],
-            a11=row[7],
-            a12=row[8],
-            a13=row[9],
-            a21=row[10],
-            a22=row[11],
-            a23=row[12],
-            a31=row[13],
-            a32=row[14],
-            a33=row[15],
-            powerfit_run_id=int(row[16]) if row[16] is not None else None,
-            density_filter_id=row[17],
-            af_id=row[18],
-            uniprot_acc=row[19],
-            pdb_id=row[20],
-        )
-        for row in rows
-    ]
+    return con.df()

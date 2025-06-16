@@ -72,7 +72,7 @@ protein-detective prune-pdbs ./mysession
 Generate the powerfit commands for the filtered and pruned structures.
 
 ```shell
-protein-detective powerfit commands ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1 
+protein-detective powerfit commands ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1
 ```
 This will print commands to the terminal, which you can then run in whatever way you prefer.
 Like just sequentially, or with [GNU parallel](https://www.gnu.org/software/parallel/) or as a [Slurm array job](https://slurm.schedmd.com/job_array.html).
@@ -83,6 +83,22 @@ To print top 10 solutions to the terminal, you can use:
 ```shell
 protein-detective powerfit report docs/session1
 ```
+
+Outputs something like:
+
+```
+powerfit_run_id,structure,rank,cc,fishz,relz,translation,rotation,density_filter_id,pdb_id,pdb_file,uniprot_acc
+10,A8MT69_pdb4e45.ent_B2A,1,0.432,0.463,10.091,227.18:242.53:211.83,0.0:1.0:1.0:0.0:0.0:1.0:1.0:0.0:0.0,,4E45,docs/session1/single_chain/A8MT69_pdb4e45.ent_B2A.pdb,A8MT69
+10,A8MT69_pdb4ne5.ent_B2A,1,0.423,0.452,10.053,227.18:242.53:214.9,0.0:-0.0:-0.0:-0.604:0.797:0.0:0.797:0.604:0.0,,4NE5,docs/session1/single_chain/A8MT69_pdb4ne5.ent_B2A.pdb,A8MT69
+...
+```
+
+To generate PDB files rotated/translated to PowerFit solutions, you can use:
+
+```shell
+protein-detective powerfit fit-pdb docs/session1
+```
+
 
 ## Contributing
 

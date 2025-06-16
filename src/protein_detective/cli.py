@@ -9,6 +9,7 @@ from rich.logging import RichHandler
 from protein_detective.alphafold import downloadable_formats
 from protein_detective.alphafold.density import DensityFilterQuery
 from protein_detective.powerfit.options import PowerfitOptions
+from protein_detective.powerfit.solution import fit_pdbs
 from protein_detective.uniprot import Query
 from protein_detective.workflow import (
     density_filter,
@@ -105,7 +106,6 @@ def add_powerfit_commands_parser(subparsers):
         "resampling_rate",
         "no_trimming",
         "trimming_cutoff",
-        "num",
         "nproc",
     }
     powerfit_parser = make_powerfit_parser()
@@ -119,6 +119,8 @@ def add_powerfit_commands_parser(subparsers):
 
     # Removed --chain, as protein-detective created single chain PDB files
     # Removed --directory argument as protein_detective will generate that argument
+
+    # Removed --num, as we can make fitted pdb from translation/rotation matrix
 
     # Replaces --gpu, from [<platform>:<device>] to boolean flag
     # When enabled and machine has multiple GPUs, then cycles through them
@@ -140,10 +142,27 @@ def add_powerfit_commands_parser(subparsers):
 
 
 def add_powerfit_report_parser(subparsers):
-    # Add the report sub-command
-    report_parser = subparsers.add_parser("report", help="Generate a report of the best PowerFit solutions")
+    report_parser = subparsers.add_parser(
+        "report",
+        help="Generate a report of the best PowerFit solutions.",
+        description="Apply translation/rotation from solution to input PDB file and write",
+    )
     report_parser.add_argument("session_dir", help="Session directory containing PowerFit results")
     report_parser.add_argument("--powerfit_run_id", type=int, default=None, help="ID of the PowerFit run to report on")
+    report_parser.add_argument("--top", type=int, default=10, help="Number of top solutions to report")
+    report_parser.add_argument(
+        "--output",
+        type=argparse.FileType("w", encoding="UTF-8"),
+        default="-",
+        help="Output file for fitted PDB commands. If set to '-' (default) will print to stdout.",
+    )
+
+
+def add_powerfit_fit_pdb_parser(subparsers):
+    fit_pdb_parser = subparsers.add_parser("fit-pdb", help="Fit PDB files based on PowerFit solutions")
+    fit_pdb_parser.add_argument("session_dir", help="Session directory containing PowerFit results")
+    fit_pdb_parser.add_argument("--powerfit_run_id", type=int, default=None, help="ID of the PowerFit run to report on")
+    fit_pdb_parser.add_argument("--top", type=int, default=10, help="Number of top solutions to use for fitting")
 
 
 def add_powerfit_parser(subparsers):
@@ -151,6 +170,7 @@ def add_powerfit_parser(subparsers):
     powerfit_subparsers = powerfit_parser.add_subparsers(dest="powerfit_command", required=True)
     add_powerfit_commands_parser(powerfit_subparsers)
     add_powerfit_report_parser(powerfit_subparsers)
+    add_powerfit_fit_pdb_parser(powerfit_subparsers)
 
     return powerfit_parser
 
@@ -207,6 +227,8 @@ def handle_powerfit(args):
         handle_powerfit_commands(args)
     elif args.powerfit_command == "report":
         handler_powerfit_report(args)
+    elif args.powerfit_command == "fit-pdb":
+        handler_powerfit_fit_pdb(args)
 
 
 def handle_powerfit_commands(args):
@@ -219,13 +241,6 @@ def handle_powerfit_commands(args):
         f"# run `protein-detective powerfit report {session_dir} {powerfit_run_id}` to show best solutions.",
         file=args.output,
     )
-    # TODO capture PowerfitOptions in db
-    # each options set could have own id that must be passed to ingest command
-    # TODO make ingest command that
-    # 1. fills db to can query all powerfit/*/solutions.out
-    # 2. Store paths to top 10 pdb files in db
-    # 3. Store path to lcc.mrc in db
-    # 4. Map powerfit output dir back to pdb file in db
     for command in commands:
         print(command, file=args.output)
 
@@ -234,10 +249,28 @@ def handler_powerfit_report(args):
     session_dir = Path(args.session_dir)
     powerfit_run_id = args.powerfit_run_id
 
-    solutions = powerfit_report(session_dir, powerfit_run_id)
-    # TODO return csv instead of list of dataclass objects
-    # TODO make top N an argument
-    rprint(solutions[0:9])
+    all_solutions = powerfit_report(session_dir, powerfit_run_id)
+    solutions = all_solutions.head(args.top)
+
+    def array_to_str(arr):
+        return ":".join(map(str, arr.flatten()))
+
+    # Convert translation and rotation to : delimited string for CSV output
+    solutions.loc[:, "translation"] = solutions["translation"].apply(array_to_str)
+    solutions.loc[:, "rotation"] = solutions["rotation"].apply(array_to_str)
+
+    solutions.to_csv(args.output, index=False)
+
+
+def handler_powerfit_fit_pdb(args):
+    session_dir = Path(args.session_dir)
+    powerfit_run_id = args.powerfit_run_id
+
+    all_solutions = powerfit_report(session_dir, powerfit_run_id)
+    solutions = all_solutions.head(args.top)
+    fit_dir = session_dir / "fitted_pdbs"
+    fit_pdbs(solutions, fit_dir)
+    rprint(f"Fitted PDB files written to {fit_dir} directory.")
 
 
 def make_parser() -> argparse.ArgumentParser:
