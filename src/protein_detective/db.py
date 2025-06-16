@@ -422,7 +422,7 @@ def powerfit_solutions(session_dir: Path, con: DuckDBPyConnection, powerfit_run_
             parse_path(filename)[-2] AS structure,
             rank, cc, fishz, relz,
             [x,y,z]::FLOAT[3] AS translation,
-            [a11, a12, a12, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation,
+            [a11, a12, a13, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation,
         FROM
             read_csv(?, filename=True, normalize_names=True)
         )
