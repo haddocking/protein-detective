@@ -1,9 +1,8 @@
 import asyncio
-import concurrent
-from concurrent.futures import ThreadPoolExecutor
 import logging
 from asyncio import Semaphore
 from collections.abc import AsyncGenerator, Iterable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
