@@ -259,7 +259,7 @@ def powerfit_report(session_dir: Path, powerfit_run_id: int | None = None) -> pd
         powerfit_run_id: Optional ID of the PowerFit run to report. If None, reports over all runs.
 
     Returns:
-        A DataFrame containing the PowerFit solutions.
+        A DataFrame containing the PowerFit solutions. See [protein_detective.db.powerfit_solutions][] for details.
     """
     with connect(session_dir) as con:
         return powerfit_solutions(session_dir, con, powerfit_run_id=powerfit_run_id)

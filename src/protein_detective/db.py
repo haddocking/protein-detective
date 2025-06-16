@@ -385,7 +385,21 @@ def powerfit_solutions(session_dir: Path, con: DuckDBPyConnection, powerfit_run_
         powerfit_run_id: Optional ID of a specific PowerFit run to filter results. If None, all runs are included.
 
     Returns:
-        A DataFrame containing the PowerFit solutions.
+        A DataFrame containing the PowerFit solutions with columns:
+
+            - powerfit_run_id: The ID of the PowerFit run.
+            - structure: The structure identifier.
+            - rank: The rank of the solution.
+            - cc: The correlation coefficient of the solution.
+            - fishz: The Fish-Z score of the solution.
+            - relz: The relative Z-score of the solution.
+            - translation: The translation vector applied to the structure.
+            - rotation: The rotation matrix applied to the structure.
+            - density_filter_id: The ID of the density filter applied to the structure, if stucture came from AlphaFold.
+            - af_id: The AlphaFold ID associated with the structure, if structure came from AlphaFold.
+            - pdb_id: The PDB ID of the structure, if structure came from PDBe.
+            - pdb_file: The path to the PDB file of the structure used as input structre for powerfit run.
+            - uniprot_acc: The UniProt accession number associated with the structure.
     """
     solutions_pattern = session_dir / "powerfit/*/*/solutions.out"
     if powerfit_run_id is not None:
@@ -399,7 +413,7 @@ def powerfit_solutions(session_dir: Path, con: DuckDBPyConnection, powerfit_run_
     con.execute(
         """
         SELECT
-            * EXCLUDE (pdb_file, single_chain_pdb_file, af_id, uniprot_acc),
+            * EXCLUDE (pdb_file, single_chain_pdb_file, uniprot_acc),
             ? || '/' || COALESCE(pdb_file, single_chain_pdb_file) AS pdb_file,
             COALESCE(uniprot_acc, af_id) AS uniprot_acc,
         FROM (
@@ -429,5 +443,6 @@ def powerfit_solutions(session_dir: Path, con: DuckDBPyConnection, powerfit_run_
         ),
     )
     return con.df()
+
 
 # TODO add function to return Local Cross Validation files aka powerfit/10/AF-A8MT65-F1-model_v4/lcc.mrc

@@ -13,6 +13,7 @@ theme:
 
 plugins:
   - search
+  - autorefs  
   - mkdocs-jupyter
   - mkdocs-autoapi:
       autoapi_dir: src
@@ -25,6 +26,9 @@ plugins:
           inventories:
             - https://docs.python.org/3/objects.inv
             - https://duckdb.org/docs/stable/clients/python/reference/objects.inv
+            - https://pandas.pydata.org/docs/objects.inv
+            - https://numpy.org/doc/stable/objects.inv
+            - https://atomium.bio/objects.inv
           options:
             docstring_style: google
             show_source: false

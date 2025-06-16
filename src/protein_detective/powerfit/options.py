@@ -11,6 +11,8 @@ from shlex import join
 
 @dataclass
 class PowerfitOptions:
+    """Options for the Powerfit command."""
+
     target: Path
     resolution: float
     angle: float = 10
@@ -25,6 +27,14 @@ class PowerfitOptions:
 
     @staticmethod
     def from_args(parsed_args: Namespace) -> "PowerfitOptions":
+        """Create PowerfitOptions from parsed command line arguments.
+
+        Args:
+            parsed_args: Parsed command line arguments.
+
+        Returns:
+            PowerfitOptions: An instance of PowerfitOptions populated with the parsed arguments.
+        """
         target = parsed_args.target
         if isinstance(target, BufferedReader):
             target = target.name
@@ -43,6 +53,17 @@ class PowerfitOptions:
         )
 
     def to_command(self, density_map: Path, template: Path, out_dir: Path, powerfit_cmd: str = "powerfit") -> str:
+        """Generate command from options and given arguments.
+
+        Args:
+            density_map: Path to the density map file.
+            template: Path to the template PDB file.
+            out_dir: Directory to save the output files.
+            powerfit_cmd: Command to run Powerfit (default is "powerfit").
+
+        Returns:
+            A string representing the command to run Powerfit.
+        """
         args = [
             powerfit_cmd,
             str(density_map.absolute()),
