@@ -48,7 +48,7 @@ jobs:
       - name: Install the project
         run: uv sync --locked --dev        
       - name: Run type checkers
-        run: uv run pyrefly check
+        run: uv run pyrefly check src tests
   typing-docs:
     name: typing-docs
     runs-on: ubuntu-latest

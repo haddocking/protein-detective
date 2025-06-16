@@ -1,5 +1,6 @@
 import asyncio
 import concurrent
+from concurrent.futures import ThreadPoolExecutor
 import logging
 from asyncio import Semaphore
 from collections.abc import AsyncGenerator, Iterable
@@ -176,8 +177,7 @@ def fetch_many(ids: Iterable[str], save_dir: Path, what: set[DownloadableFormat]
     def run_async_task():
         return asyncio.run(gather_entries())
 
-    # pyrefly: ignore  # noqa: ERA001
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+    with ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(run_async_task)
         return future.result()
 
