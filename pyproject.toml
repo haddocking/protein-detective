@@ -40,6 +40,7 @@ docs = [
     "duckdb-engine>=0.17.0",
     "ipykernel>=6.29.5",
     "jupysql>=0.11.1",
+    "matplotlib>=3.10.3",
     "mkdocs>=1.6.1",
     "mkdocs-autoapi>=0.4.1",
     "mkdocs-jupyter>=0.25.1",

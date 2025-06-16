@@ -428,5 +428,6 @@ def powerfit_solutions(session_dir: Path, con: DuckDBPyConnection, powerfit_run_
             str(solutions_pattern),
         ),
     )
-    # TODO also add lcc.mrc path to db aka powerfit/10/AF-A8MT65-F1-model_v4/lcc.mrc, these are per run/structure combi
     return con.df()
+
+# TODO add function to return Local Cross Validation files aka powerfit/10/AF-A8MT65-F1-model_v4/lcc.mrc
