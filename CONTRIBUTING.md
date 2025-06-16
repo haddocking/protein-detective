@@ -88,11 +88,9 @@ python3 -m http.server -d site
 [Pyrefly](https://pyrefly.org/) does not support notebooks yet, so we need to convert them to python scripts and then run pyrefly on them.
 
 ```shell
-uv run --group docs jupyter nbconvert --to python docs/*.ipynb
-# Comment out magic commands
-sed -i 's/^get_ipython/# get_ipython/' docs/*.py
-uv run pyrefly check docs/*.py
-rm docs/*.py
+find docs/ -name "*.ipynb" -exec uv run --group docs-type marimo convert {} -o {}.py \;
+uv run --group docs-type pyrefly check docs/*.ipynb.py
+rm docs/*.ipynb.py
 ```
 
 </details>
