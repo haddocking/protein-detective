@@ -1791,8 +1791,21 @@ docs = [
     { name = "toml" },
 ]
 docs-type = [
+    { name = "duckdb-engine" },
+    { name = "ipykernel" },
+    { name = "ipymolstar" },
+    { name = "ipywidgets" },
+    { name = "jupysql" },
     { name = "marimo", extra = ["sql"] },
+    { name = "matplotlib" },
+    { name = "mkdocs" },
+    { name = "mkdocs-autoapi" },
+    { name = "mkdocs-jupyter" },
+    { name = "mkdocstrings", extra = ["python"] },
+    { name = "molviewspec" },
+    { name = "nbconvert" },
     { name = "pyrefly" },
+    { name = "toml" },
 ]
 
 [package.metadata]
@@ -1835,8 +1848,21 @@ docs = [
     { name = "toml", specifier = ">=0.10.2" },
 ]
 docs-type = [
+    { name = "duckdb-engine", specifier = ">=0.17.0" },
+    { name = "ipykernel", specifier = ">=6.29.5" },
+    { name = "ipymolstar", specifier = ">=0.1.0" },
+    { name = "ipywidgets", specifier = ">=8.1.7" },
+    { name = "jupysql", specifier = ">=0.11.1" },
     { name = "marimo", extras = ["sql"], specifier = ">=0.13.15" },
+    { name = "matplotlib", specifier = ">=3.10.3" },
+    { name = "mkdocs", specifier = ">=1.6.1" },
+    { name = "mkdocs-autoapi", specifier = ">=0.4.1" },
+    { name = "mkdocs-jupyter", specifier = ">=0.25.1" },
+    { name = "mkdocstrings", extras = ["python"], specifier = ">=0.29.1" },
+    { name = "molviewspec", specifier = ">=1.6.0" },
+    { name = "nbconvert", specifier = ">=7.16.6" },
     { name = "pyrefly", specifier = ">=0.15.1" },
+    { name = "toml", specifier = ">=0.10.2" },
 ]
 
 [[package]]
