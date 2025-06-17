@@ -43,7 +43,9 @@ def test_fit_pdb(solution: dict[str, np.ndarray], tmp_path: Path) -> None:
     expected_structure = Structure.fromfile(str(expected_pdb_file))
 
     assert_array_almost_equal(
+        # type: ignore[bad-argument-type]
         result_structure.coor,
+        # type: ignore[bad-argument-type]
         expected_structure.coor,
         decimal=1,  # TODO check why so low
     )
