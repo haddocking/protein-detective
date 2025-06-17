@@ -39,6 +39,7 @@ markdown_extensions:
       base_path: [!relative $config_dir]
       check_paths: true
 
+
 nav:
   - Home: index.md
   - CLI Reference: cli.md
@@ -47,5 +48,6 @@ nav:
     - AlphaFold: alphafold.ipynb
     - PDBe: pdbe.ipynb
     - Workflow: workflow.ipynb
+    - Powerfit: powerfit.ipynb
   - Contributing guidelines: CONTRIBUTING.md
   - API Reference: autoapi/summary.md

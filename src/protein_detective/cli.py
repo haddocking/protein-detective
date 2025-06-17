@@ -15,6 +15,7 @@ from protein_detective.workflow import (
     density_filter,
     powerfit_commands,
     powerfit_report,
+    powerfit_runs,
     prune_pdbs,
     retrieve_structures,
     search_structures_in_uniprot,
@@ -141,6 +142,42 @@ def add_powerfit_commands_parser(subparsers):
     )
 
 
+def add_powerfit_run_parser(subparsers):
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Run PowerFit on PDB files in the session directory",
+        description="Run PowerFit on PDB files in the session directory and store results.",
+    )
+
+    # Add all arguments from PowerFit options
+    borrowed_arguments = {
+        "target",
+        "resolution",
+        "angle",
+        "laplace",
+        "core_weighted",
+        "no_resampling",
+        "resampling_rate",
+        "no_trimming",
+        "trimming_cutoff",
+        "nproc",
+    }
+    powerfit_parser = make_powerfit_parser()
+
+    for powerfit_argument in powerfit_parser._actions:
+        if powerfit_argument.dest in borrowed_arguments:
+            run_parser._add_action(powerfit_argument)
+
+    run_parser.add_argument("session_dir", help="Session directory containing PDB files")
+    run_parser.add_argument(
+        "-g",
+        "--gpu",
+        dest="gpu",
+        action="store_true",
+        help="Off-load the intensive calculations to the GPU. ",
+    )
+
+
 def add_powerfit_report_parser(subparsers):
     report_parser = subparsers.add_parser(
         "report",
@@ -169,6 +206,7 @@ def add_powerfit_parser(subparsers):
     powerfit_parser = subparsers.add_parser("powerfit", help="PowerFit related commands")
     powerfit_subparsers = powerfit_parser.add_subparsers(dest="powerfit_command", required=True)
     add_powerfit_commands_parser(powerfit_subparsers)
+    add_powerfit_run_parser(powerfit_subparsers)
     add_powerfit_report_parser(powerfit_subparsers)
     add_powerfit_fit_pdb_parser(powerfit_subparsers)
 
@@ -222,9 +260,17 @@ def handle_prune_pdbs(args):
     rprint(f"Written {nr_files} PDB files to {single_chain_dir} directory.")
 
 
+def handler_powerfit_run(args):
+    session_dir = Path(args.session_dir)
+    powerfit_run_id = powerfit_runs(session_dir, PowerfitOptions.from_args(args))
+    rprint(f"PowerFit run completed with ID: {powerfit_run_id}. Use this ID for reporting or fitting PDBs.")
+
+
 def handle_powerfit(args):
     if args.powerfit_command == "commands":
         handle_powerfit_commands(args)
+    elif args.powerfit_command == "run":
+        handler_powerfit_run(args)
     elif args.powerfit_command == "report":
         handler_powerfit_report(args)
     elif args.powerfit_command == "fit-pdb":

@@ -1,28 +1,56 @@
+import logging
 from pathlib import Path
+from typing import BinaryIO
 
 from powerfit_em.powerfit import powerfit
 
-# TODO make run in parallel/distributed instead of sequentially
-# with some distributed computing framework such as
-# multiprocessing, joblib, dask, snakemake, airflow, cwl, prefect, ray, asyncio-subprocess
+from protein_detective.db import PowerfitOptions
 
-# TODO make run available as a command line tool
+logger = logging.getLogger(__name__)
 
 
-def run():
-    # TODO read files from arguments, instead of hardcoding example values
-    # TODO when given gpu=None arg then also call powerfit with gpu=None
-    nr_devices = 4
-    device_id = 0  # This would be set dynamically in a real batch job
-    pdb_files = ["bla.pdb"]
-    with Path("density_map.mrc").open("rb") as density_map:
-        for pdb_file in pdb_files:
-            with Path(pdb_file).open() as template_structure:
-                powerfit(
-                    target_volume=density_map,
-                    resolution=20,
-                    template_structure=template_structure,
-                    gpu=f"0:{device_id}",
-                    directory=str(Path("out") / Path(pdb_file).name),
-                )
-            device_id = (device_id + 1) % nr_devices
+def run(density_map: BinaryIO, structure: Path, result_dir: Path, options: PowerfitOptions):
+    """Run powerfit on the given density map and structure, saving results to result_dir.
+
+    If resuls_dir / solutions.out already exists, it skips the run.
+
+    Args:
+        density_map: The density map file to fit the structure into.
+        structure: The path to the prepared PDB structure file.
+        result_dir: The directory where results will be saved.
+        options: Options for running powerfit, including resolution, angle, etc.
+
+    """
+    solutions = result_dir / "solutions.out"
+    if solutions.exists():
+        # For example session1/powerfit/11/A8MT69_pdb4ne5.ent_B2A/solutions.out
+        # The 11 is the powerfit_run_id which maps to values in to options
+        # So if exists then powerfit was already run with same options
+        logger.info(f"Skipping powerfit run, solutions file already exists: {solutions}")
+        return
+
+    gpu: str | None = None
+    if options.gpu:
+        gpu = "0:0"
+
+    with structure.open() as template_structure:
+        powerfit(
+            target_volume=density_map,
+            resolution=options.resolution,
+            template_structure=template_structure,
+            angle=options.angle,
+            laplace=options.laplace,
+            core_weighted=options.core_weighted,
+            no_resampling=options.no_resampling,
+            resampling_rate=options.resampling_rate,
+            no_trimming=options.no_trimming,
+            trimming_cutoff=options.trimming_cutoff,
+            # No chain specified as prepared pdb has single A chain
+            chain=None,
+            directory=str(result_dir),
+            # No num, use `protein-detective powerfit fit-pdb` command to generate fitted PDBs
+            num=0,
+            gpu=gpu,
+            nproc=options.nproc,
+            delimiter=",",
+        )

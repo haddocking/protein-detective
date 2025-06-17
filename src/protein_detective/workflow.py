@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 import pandas as pd
+from tqdm.auto import tqdm
 
 from protein_detective.alphafold import DownloadableFormat
 from protein_detective.alphafold import fetch_many as af_fetch
@@ -34,6 +35,7 @@ from protein_detective.db import (
 from protein_detective.pdbe.fetch import fetch as pdbe_fetch
 from protein_detective.pdbe.io import write_single_chain_pdb_files
 from protein_detective.powerfit.options import PowerfitOptions
+from protein_detective.powerfit.run import run as powerfit_run
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
 
 logger = logging.getLogger(__name__)
@@ -217,6 +219,26 @@ def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list
             - A list of PowerFit command strings.
             - The ID of the PowerFit run saved in the session database.
     """
+    powerfit_run_id, powerfit_run_root_dir, density_map_target, pdb_files = _initialize_powerfit_run(
+        session_dir, options
+    )
+
+    # Generate PowerFit commands for each PDB file
+    commands = []
+    for pdb_file in pdb_files:
+        result_dir = powerfit_run_root_dir / pdb_file.stem
+        real_pdb_file = session_dir / pdb_file
+        command = options.to_command(
+            density_map=density_map_target,
+            template=real_pdb_file,
+            out_dir=result_dir,
+        )
+        commands.append(command)
+
+    return commands, powerfit_run_id
+
+
+def _initialize_powerfit_run(session_dir, options):
     session_dir.mkdir(parents=True, exist_ok=True)
     with connect(session_dir) as con:
         powerfit_run_id = save_powerfit_options(options, con)
@@ -235,20 +257,35 @@ def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list
         pdbe_files = load_single_chain_pdb_files(con)
         af_files = load_density_filtered_alphafolds_files(con)
         pdb_files = pdbe_files + af_files
+    return powerfit_run_id, powerfit_run_dir, density_map_target, pdb_files
 
-    # Generate PowerFit commands for each PDB file
-    commands = []
-    for pdb_file in pdb_files:
-        powerfit_dir = powerfit_run_dir / pdb_file.stem
-        real_pdb_file = session_dir / pdb_file
-        command = options.to_command(
-            density_map=density_map_target,
-            template=real_pdb_file,
-            out_dir=powerfit_dir,
-        )
-        commands.append(command)
 
-    return commands, powerfit_run_id
+def powerfit_runs(session_dir: Path, options: PowerfitOptions) -> int:
+    """Run PowerFit on the PDB files in the session directory.
+
+    Args:
+        session_dir: Directory containing the session data, including PDB files.
+        options: Options for running PowerFit.
+
+    Returns:
+        The ID of the PowerFit run saved in the session.
+    """
+    session_dir.mkdir(parents=True, exist_ok=True)
+    powerfit_run_id, powerfit_run_root_dir, density_map_target, pdb_files = _initialize_powerfit_run(
+        session_dir, options
+    )
+
+    with density_map_target.open("rb") as density_map:
+        # TODO make run in parallel/distributed instead of sequentially
+        # with some distributed computing framework such as
+        # multiprocessing, joblib, dask, snakemake, airflow, cwl, prefect, ray, asyncio-subprocess
+        # TODO if options.gpu is truthy then make sure parallel runs do not use the same gpu
+        for pdb_file in tqdm(pdb_files, desc="Running PowerFit", unit="structure"):
+            result_dir = powerfit_run_root_dir / pdb_file.stem
+            real_pdb_file = session_dir / pdb_file
+            powerfit_run(density_map, real_pdb_file, result_dir, options)
+
+    return powerfit_run_id
 
 
 def powerfit_report(session_dir: Path, powerfit_run_id: int | None = None) -> pd.DataFrame:

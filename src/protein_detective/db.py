@@ -1,10 +1,11 @@
+import logging
 from collections.abc import Iterable, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 
 from cattrs import unstructure
 from cattrs.preconf.json import make_converter
-from duckdb import DuckDBPyConnection
+from duckdb import ConstraintException, DuckDBPyConnection
 from duckdb import connect as duckdb_connect
 from pandas import DataFrame
 
@@ -15,6 +16,7 @@ from protein_detective.pdbe.io import ProteinPdbRow, SingleChainResult
 from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.uniprot import PdbResult, Query
 
+logger = logging.getLogger(__name__)
 converter = make_converter()
 
 ddl = """\
@@ -364,16 +366,29 @@ def load_density_filtered_alphafolds_files(
 
 
 def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> int:
-    result = con.execute(
-        """INSERT INTO powerfit_runs (options)
-        VALUES (?) RETURNING powerfit_run_id""",
-        (converter.dumps(options, PowerfitOptions),),
-    ).fetchone()
-    # TODO reuse existing options if they are the same
-    if result is None or len(result) != 1:
-        msg = "Failed to insert powerfit options"
-        raise ValueError(msg)
-    return result[0]
+    try:
+        result = con.execute(
+            """INSERT INTO powerfit_runs (options)
+            VALUES (?) RETURNING powerfit_run_id""",
+            (converter.dumps(options, PowerfitOptions),),
+        ).fetchone()
+        # TODO reuse existing options if they are the same
+        if result is None or len(result) != 1:
+            msg = "Failed to insert powerfit options"
+            raise ValueError(msg)
+        return result[0]
+    except ConstraintException as e:
+        # If the options already exist, we can retrieve the existing run ID
+        result = con.execute(
+            """SELECT powerfit_run_id FROM powerfit_runs
+            WHERE options = ?""",
+            (converter.dumps(options, PowerfitOptions),),
+        ).fetchone()
+        if result is None or len(result) != 1:
+            msg = "Failed to retrieve existing powerfit run ID"
+            raise ValueError(msg) from e
+        logger.info("Reusing existing powerfit run with ID %d", result[0])
+        return result[0]
 
 
 def powerfit_solutions(session_dir: Path, con: DuckDBPyConnection, powerfit_run_id: int | None = None) -> DataFrame:
