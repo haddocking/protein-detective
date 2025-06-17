@@ -3,6 +3,8 @@ from pathlib import Path
 import duckdb
 import numpy as np
 import pytest
+from numpy.testing import assert_array_almost_equal
+from powerfit_em.structure import Structure
 
 from protein_detective.powerfit.solution import fit_pdb
 
@@ -36,9 +38,12 @@ def test_fit_pdb(solution: dict[str, np.ndarray], tmp_path: Path) -> None:
 
     fit_pdb(input_pdb_file, translation, rotation, result_pdb_file)
 
+    result_structure = Structure.fromfile(str(result_pdb_file))
     expected_pdb_file = Path(__file__).parent / "fixtures" / "fit_1.pdb"
-    with result_pdb_file.open() as rfh, expected_pdb_file.open() as efh:
-        result = rfh.readlines()
-        expected = efh.readlines()
-        # TODO assert whole file, not just one line
-        assert result[42] == expected[42]
+    expected_structure = Structure.fromfile(str(expected_pdb_file))
+
+    assert_array_almost_equal(
+        result_structure.coor,
+        expected_structure.coor,
+        decimal=1,  # TODO check why so low
+    )

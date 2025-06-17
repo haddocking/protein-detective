@@ -1,53 +1,26 @@
 from pathlib import Path
 
-import atomium
 import numpy as np
 import pandas as pd
+from powerfit_em.structure import Structure
 from tqdm import tqdm
 
 
 def fit_pdb(pdb_file: Path, translation: np.ndarray, rotation: np.ndarray, out_file: Path):
-    """Translate and rotate a PDB file and save the result to a new PDB file.
+    """Fit a PDB file according to the given translation and rotation.
 
     Args:
-        pdb_file: path to the PDB file to fit
-        translation: x, y, z translation vector
-        rotation: 3x3 rotation matrix
-        out_file: path to the output PDB file
-
+        pdb_file: Path to the input PDB file
+        translation: Translation vector (numpy array of shape (3,))
+        rotation: Rotation matrix (3x3 numpy array)
+        out_file: Path to save the fitted PDB file
     """
-    # Reimplementation of powerfit_em.helper:write_fits_to_pdb()
-    # using atomium
-    file = atomium.open(str(pdb_file))
-    # type: ignore[missing-attribute]
-    model: atomium.Model = file.model
-
-    # TODO verify atomium and powerfit give same resulting PDB file
-    center = geometric_center(model)
-    ncenter = -center
-    model.translate(ncenter[0], ncenter[1], ncenter[2])
-
-    model.transform(rotation)
-    model.translate(translation[0], translation[1], translation[2])
-
-    model.save(str(out_file))
-
-
-def geometric_center(model: atomium.Model) -> np.ndarray:
-    """Calculate the geometric center of the model.
-
-    Args:
-        model: The atomium model to calculate the center of.
-
-    Returns:
-        The geometric center of the model.
-    """
-    # Code from atomium.structure:AtomStructure.center_of_mass()
-    atoms = model.atoms()
-    # type: ignore[not-iterable]
-    locations = np.array([a._location for a in atoms])
-    # type: ignore[no-matching-overload,bad-argument-type]
-    return np.mean(locations, axis=0)
+    structure = Structure.fromfile(str(pdb_file))
+    center = structure.coor.mean(axis=1)
+    structure.translate(-center)
+    structure.rotate(rotation)
+    structure.translate(translation)
+    structure.tofile(str(out_file))
 
 
 def fit_pdbs(solutions: pd.DataFrame, out_dir: Path) -> pd.DataFrame:
@@ -68,17 +41,22 @@ def fit_pdbs(solutions: pd.DataFrame, out_dir: Path) -> pd.DataFrame:
             msg = "raw_pdb_file should be a str"
             raise TypeError(msg)
         pdb_file = Path(raw_pdb_file)
+
         translation = row["translation"]
         rotation = row["rotation"].reshape(3, 3)
+
         if not isinstance(index, int):
             msg = "index should be an int"
             raise TypeError(msg)
         powerfit_run_id = row["powerfit_run_id"]
         out_file = out_dir / f"{index + 1}_{powerfit_run_id}_{pdb_file.name}"
+
         # type: ignore[bad-argument-type]
         fit_pdb(pdb_file, translation, rotation, out_file)
+
         fitted_files.append((index, powerfit_run_id, pdb_file, out_file))
-    # type: ignore[bad-argument-type
+
+    # type: ignore[bad-argument-type]
     return pd.DataFrame(fitted_files, columns=["index", "powerfit_run_id", "pdb_file", "fitted_file"]).set_index(
         "index"
     )
