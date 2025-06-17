@@ -15,6 +15,9 @@ def fit_pdb(pdb_file: Path, translation: np.ndarray, rotation: np.ndarray, out_f
         rotation: Rotation matrix (3x3 numpy array)
         out_file: Path to save the fitted PDB file
     """
+    # tried to use atomium to parse KsgA.pdb
+    # but it produced <Model (0 chains, 252 ligands)> not as <Model (1 chains, 0 ligands)>
+    # so we use powerfit_em.structure instead
     structure = Structure.fromfile(str(pdb_file))
     center = structure.coor.mean(axis=1)
     structure.translate(-center)

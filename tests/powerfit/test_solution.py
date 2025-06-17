@@ -29,8 +29,6 @@ def solution() -> dict[str, np.ndarray]:
 
 def test_fit_pdb(solution: dict[str, np.ndarray], tmp_path: Path) -> None:
     input_pdb_file = Path(__file__).parent / "fixtures" / "KsgA.pdb"
-    # TODO atomium parses KsgA.pdb as <Model (0 chains, 252 ligands)> not as <Model (1 chains, 0 ligands)>
-    # maybe switch from atomium to powerfit implementation?
     result_pdb_file = tmp_path / "fit_pd.pdb"
 
     translation = solution["translation"]
@@ -47,5 +45,5 @@ def test_fit_pdb(solution: dict[str, np.ndarray], tmp_path: Path) -> None:
         result_structure.coor,
         # type: ignore[bad-argument-type]
         expected_structure.coor,
-        decimal=1,  # TODO check why so low
+        decimal=1,  # TODO check why so low needed
     )
