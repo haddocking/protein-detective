@@ -87,6 +87,12 @@ CREATE TABLE IF NOT EXISTS powerfit_runs (
     UNIQUE (options)
 );
 
+CREATE TABLE IF NOT EXISTS fitted_pdbs (
+    powerfit_run_id INTEGER NOT NULL,
+    -- pdb_file is either foreign key of density_filtered_alphafolds.pdb_file or proteins_pdbs.single_chain_pdb_file
+    pdb_file TEXT NOT NULL,
+    fitted_file TEXT PRIMARY KEY,
+);
 """
 
 
@@ -372,7 +378,6 @@ def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> 
             VALUES (?) RETURNING powerfit_run_id""",
             (converter.dumps(options, PowerfitOptions),),
         ).fetchone()
-        # TODO reuse existing options if they are the same
         if result is None or len(result) != 1:
             msg = "Failed to insert powerfit options"
             raise ValueError(msg)
@@ -389,6 +394,27 @@ def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> 
             raise ValueError(msg) from e
         logger.info("Reusing existing powerfit run with ID %d", result[0])
         return result[0]
+
+
+def load_powerfit_run(powerfit_run_id: int, con: DuckDBPyConnection) -> tuple[PowerfitOptions, Path]:
+    con.execute(
+        """
+        SELECT
+            options,
+            parse_filename(json_extract_string(options, '$.target')) AS density_map,
+        FROM powerfit_runs
+        WHERE powerfit_run_id = ?
+    """,
+        (powerfit_run_id,),
+    )
+
+    row = con.fetchone()
+    if row is None:
+        msg = f"No PowerFit run found with ID {powerfit_run_id}"
+        raise ValueError(msg)
+    options_json, density_map = row
+    options = converter.loads(options_json, PowerfitOptions)
+    return options, Path(density_map)
 
 
 def powerfit_solutions(session_dir: Path, con: DuckDBPyConnection, powerfit_run_id: int | None = None) -> DataFrame:
@@ -457,6 +483,24 @@ def powerfit_solutions(session_dir: Path, con: DuckDBPyConnection, powerfit_run_
             str(solutions_pattern),
         ),
     )
+    return con.df()
+
+
+def save_fitted_pdbs(df: DataFrame, con: DuckDBPyConnection):  # noqa: ARG001
+    con.execute("INSERT OR IGNORE INTO fitted_pdbs BY NAME SELECT * FROM df")
+
+
+def load_fitted_pdbs(con: DuckDBPyConnection) -> DataFrame:
+    """Load fitted PDBs from the database.
+
+    Returns:
+        A DataFrame containing the fitted PDBs with columns:
+            - powerfit_run_id: The ID of the PowerFit run.
+            - pdb_file: The path to the original PDB file.
+            - fitted_file: The path to the fitted PDB file.
+    """
+    query = "SELECT * FROM fitted_pdbs"
+    con.execute(query)
     return con.df()
 
 

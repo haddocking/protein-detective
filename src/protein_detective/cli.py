@@ -9,11 +9,11 @@ from rich.logging import RichHandler
 from protein_detective.alphafold import downloadable_formats
 from protein_detective.alphafold.density import DensityFilterQuery
 from protein_detective.powerfit.options import PowerfitOptions
-from protein_detective.powerfit.solution import fit_pdbs
 from protein_detective.uniprot import Query
 from protein_detective.workflow import (
     density_filter,
     powerfit_commands,
+    powerfit_fit_pdbs,
     powerfit_report,
     powerfit_runs,
     prune_pdbs,
@@ -309,14 +309,13 @@ def handler_powerfit_report(args):
 
 
 def handler_powerfit_fit_pdb(args):
+    # TODO rename fit_pdb to fit_structures, also propagate renaming to other functions
     session_dir = Path(args.session_dir)
     powerfit_run_id = args.powerfit_run_id
+    top = args.top
 
-    all_solutions = powerfit_report(session_dir, powerfit_run_id)
-    solutions = all_solutions.head(args.top)
-    fit_dir = session_dir / "fitted_pdbs"
-    fit_pdbs(solutions, fit_dir)
-    rprint(f"Fitted PDB files written to {fit_dir} directory.")
+    df, fit_dir = powerfit_fit_pdbs(session_dir, powerfit_run_id, top)
+    rprint(f"{len(df)} fitted PDB files written to {fit_dir} directory.")
 
 
 def make_parser() -> argparse.ArgumentParser:
