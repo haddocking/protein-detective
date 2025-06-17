@@ -49,5 +49,6 @@ nav:
     - PDBe: pdbe.ipynb
     - Workflow: workflow.ipynb
     - Powerfit: powerfit.ipynb
+    - Visualization: visualization.ipynb
   - Contributing guidelines: CONTRIBUTING.md
   - API Reference: autoapi/summary.md

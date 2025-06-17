@@ -39,6 +39,7 @@ dev = [
 docs = [
     "duckdb-engine>=0.17.0",
     "ipykernel>=6.29.5",
+    "ipymolstar>=0.1.0",
     "ipywidgets>=8.1.7",
     "jupysql>=0.11.1",
     "matplotlib>=3.10.3",
@@ -46,6 +47,7 @@ docs = [
     "mkdocs-autoapi>=0.4.1",
     "mkdocs-jupyter>=0.25.1",
     "mkdocstrings[python]>=0.29.1",
+    "molviewspec>=1.6.0",
     "nbconvert>=7.16.6",
     "toml>=0.10.2",
 ]
