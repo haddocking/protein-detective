@@ -57,9 +57,12 @@ def fit_pdbs(solutions: pd.DataFrame, out_dir: Path) -> pd.DataFrame:
         # type: ignore[bad-argument-type]
         fit_pdb(pdb_file, translation, rotation, out_file)
 
-        fitted_files.append((index, powerfit_run_id, pdb_file, out_file))
+        structure = row["structure"]
+        rank = row["rank"]
 
-    # type: ignore[bad-argument-type]
-    return pd.DataFrame(fitted_files, columns=["index", "powerfit_run_id", "pdb_file", "fitted_file"]).set_index(
-        "index"
-    )
+        fitted_files.append((index, powerfit_run_id, structure, rank, pdb_file, out_file))
+
+    return pd.DataFrame(
+        # type: ignore[bad-argument-type]
+        fitted_files, columns=["index", "powerfit_run_id", "structure", "rank", "pdb_file", "fitted_file"]
+    ).set_index("index")

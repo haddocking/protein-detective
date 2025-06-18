@@ -303,7 +303,7 @@ def powerfit_report(session_dir: Path, powerfit_run_id: int | None = None) -> pd
         A DataFrame containing the PowerFit solutions. See [protein_detective.db.powerfit_solutions][] for details.
     """
     with connect(session_dir) as con:
-        return powerfit_solutions(session_dir, con, powerfit_run_id=powerfit_run_id)
+        return powerfit_solutions(con, powerfit_run_id=powerfit_run_id)
 
 
 def powerfit_fit_pdbs(
@@ -344,6 +344,5 @@ def report_fit(session_dir: Path, powerfit_run_id: int) -> tuple[pd.DataFrame, P
         # TODO allow powerfit_run_id to be None, then should use latest run
         _options, density_map = load_powerfit_run(powerfit_run_id, con)
         fitted_pdbs = load_fitted_pdbs(con)
-        fitted_pdbs["fitted_file"] = fitted_pdbs["fitted_file"].apply(lambda x: session_dir / x)
         adensity_map = session_dir / "powerfit" / str(powerfit_run_id) / density_map
         return fitted_pdbs, adensity_map

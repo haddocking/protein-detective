@@ -19,6 +19,9 @@ from protein_detective.uniprot import PdbResult, Query
 logger = logging.getLogger(__name__)
 converter = make_converter()
 
+# TODO make all file paths be relative to current session directory
+# By using raw_ table to store paths relative to session directory
+# and then a view which prepends the session directory to the paths
 ddl = """\
 CREATE TABLE IF NOT EXISTS uniprot_searches (
     query JSON,
@@ -87,12 +90,69 @@ CREATE TABLE IF NOT EXISTS powerfit_runs (
     UNIQUE (options)
 );
 
-CREATE TABLE IF NOT EXISTS fitted_pdbs (
+CREATE TABLE IF NOT EXISTS raw_solutions AS
+SELECT
+    parse_path(filename)[-3] AS powerfit_run_id,
+    parse_path(filename)[-2] AS structure,
+    rank, cc, fishz, relz,
+    [x,y,z]::FLOAT[3] AS translation,
+    [a11, a12, a13, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation,
+FROM
+    read_csv(getvariable('session_dir') || '/powerfit/*/*/solutions.out', filename=True, normalize_names=True)
+;
+
+CREATE VIEW IF NOT EXISTS solutions AS
+SELECT
+    powerfit_run_id,
+    structure,
+    rank,
+    cc,
+    fishz,
+    relz,
+    translation,
+    rotation,
+    density_filter_id,
+    af_id,
+    pdb_id,
+    getvariable('session_dir') || '/' || COALESCE(pdb_file, single_chain_pdb_file) AS pdb_file,
+    COALESCE(uniprot_acc, af_id) AS uniprot_acc,
+FROM raw_solutions
+LEFT JOIN (
+    SELECT density_filter_id, uniprot_acc AS af_id, pdb_file, parse_filename(pdb_file, true) AS structure
+    FROM density_filtered_alphafolds WHERE keep=True
+) AS a USING (structure)
+LEFT JOIN (
+    SELECT uniprot_acc, pdb_id, single_chain_pdb_file, parse_filename(single_chain_pdb_file, true) AS structure
+    FROM proteins_pdbs
+    WHERE single_chain_pdb_file IS NOT NULL
+) AS p USING (structure)
+ORDER BY cc DESC;
+
+CREATE TABLE IF NOT EXISTS raw_fitted_pdbs (
     powerfit_run_id INTEGER NOT NULL,
+    structure TEXT NOT NULL,
+    rank INTEGER NOT NULL,
     -- pdb_file is either foreign key of density_filtered_alphafolds.pdb_file or proteins_pdbs.single_chain_pdb_file
     pdb_file TEXT NOT NULL,
     fitted_file TEXT PRIMARY KEY,
 );
+
+CREATE VIEW IF NOT EXISTS fitted_pdbs AS
+SELECT
+    powerfit_run_id,
+    structure,
+    rank,
+    concat_ws(
+        '/',
+        getvariable('session_dir'),
+        pdb_file
+    ) AS pdb_file,
+    concat_ws(
+        '/',
+        getvariable('session_dir'),
+        fitted_file
+    ) AS fitted_file
+FROM raw_fitted_pdbs;
 """
 
 
@@ -108,12 +168,23 @@ def db_path(session_dir: Path) -> Path:
     return session_dir / "session.db"
 
 
+def initialize_db(session_dir: Path, con: DuckDBPyConnection):
+    """Initialize the DuckDB database by creating the necessary tables and variables.
+
+    Args:
+        session_dir: The directory where the session data is stored.
+        con: The DuckDB connection to use for executing the DDL statements.
+    """
+    con.execute("SET VARIABLE session_dir = ?", (str(session_dir),))
+    con.execute(ddl)
+
+
 @contextmanager
 def connect(session_dir: Path):
     # wrapper around duckdb.connect to create tables on connect
     database = db_path(session_dir)
     con = duckdb_connect(database)
-    con.sql(ddl)
+    initialize_db(session_dir, con)
     yield con
     con.close()
 
@@ -417,11 +488,10 @@ def load_powerfit_run(powerfit_run_id: int, con: DuckDBPyConnection) -> tuple[Po
     return options, Path(density_map)
 
 
-def powerfit_solutions(session_dir: Path, con: DuckDBPyConnection, powerfit_run_id: int | None = None) -> DataFrame:
+def powerfit_solutions(con: DuckDBPyConnection, powerfit_run_id: int | None = None) -> DataFrame:
     """Retrieve PowerFit solutions from the solutions.out files.
 
     Args:
-        session_dir: The directory where the session data is stored.
         con: The DuckDB connection to use for fetching the data.
         powerfit_run_id: Optional ID of a specific PowerFit run to filter results. If None, all runs are included.
 
@@ -442,52 +512,18 @@ def powerfit_solutions(session_dir: Path, con: DuckDBPyConnection, powerfit_run_
             - pdb_file: The path to the PDB file of the structure used as input structre for powerfit run.
             - uniprot_acc: The UniProt accession number associated with the structure.
     """
-    solutions_pattern = session_dir / "powerfit/*/*/solutions.out"
-    if powerfit_run_id is not None:
-        solutions_pattern = session_dir / f"powerfit/{powerfit_run_id}/*/solutions.out"
-
     # TODO check that cc is the column to sort on, to get best first? Or Fish-z	rel-z
     # TODO rank is for each powerfit run, make clearer that this is per run/structure combination
 
-    # In database file paths are relative to session_dir
-    # Query return files paths absolute by prepending session_dir
-    con.execute(
-        """
-        SELECT
-            * EXCLUDE (pdb_file, single_chain_pdb_file, uniprot_acc),
-            ? || '/' || COALESCE(pdb_file, single_chain_pdb_file) AS pdb_file,
-            COALESCE(uniprot_acc, af_id) AS uniprot_acc,
-        FROM (
-            SELECT
-            parse_path(filename)[-3] AS powerfit_run_id,
-            parse_path(filename)[-2] AS structure,
-            rank, cc, fishz, relz,
-            [x,y,z]::FLOAT[3] AS translation,
-            [a11, a12, a13, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation,
-        FROM
-            read_csv(?, filename=True, normalize_names=True)
-        )
-        LEFT JOIN (
-            SELECT density_filter_id, uniprot_acc AS af_id, pdb_file, parse_filename(pdb_file, true) AS structure
-            FROM density_filtered_alphafolds WHERE keep=True
-        ) AS a USING (structure)
-        LEFT JOIN (
-            SELECT uniprot_acc, pdb_id, single_chain_pdb_file, parse_filename(single_chain_pdb_file, true) AS structure
-            FROM proteins_pdbs
-            WHERE single_chain_pdb_file IS NOT NULL
-        ) AS p USING (structure)
-        ORDER BY cc DESC
-        """,
-        (
-            str(session_dir),
-            str(solutions_pattern),
-        ),
-    )
+    if powerfit_run_id is None:
+        con.execute("FROM solutions")
+    else:
+        con.execute("FROM solutions WHERE powerfit_run_id = ?", (powerfit_run_id,))
     return con.df()
 
 
 def save_fitted_pdbs(df: DataFrame, con: DuckDBPyConnection):  # noqa: ARG001
-    con.execute("INSERT OR IGNORE INTO fitted_pdbs BY NAME SELECT * FROM df")
+    con.execute("INSERT OR IGNORE INTO raw_fitted_pdbs BY NAME SELECT * FROM df")
 
 
 def load_fitted_pdbs(con: DuckDBPyConnection) -> DataFrame:
@@ -499,8 +535,14 @@ def load_fitted_pdbs(con: DuckDBPyConnection) -> DataFrame:
             - pdb_file: The path to the original PDB file.
             - fitted_file: The path to the fitted PDB file.
     """
-    query = "SELECT * FROM fitted_pdbs"
-    con.execute(query)
+    con.execute("""
+        SELECT
+            f.* EXCLUDE (pdb_file),
+            COALESCE(f.pdb_file, s.pdb_file) AS unfitted_pdb_file,
+            s.* EXCLUDE (pdb_file),
+        FROM fitted_pdbs AS f
+        JOIN solutions AS s USING (powerfit_run_id, structure,rank)
+    """)
     return con.df()
 
 
