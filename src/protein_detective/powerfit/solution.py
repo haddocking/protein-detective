@@ -64,5 +64,6 @@ def fit_pdbs(solutions: pd.DataFrame, out_dir: Path) -> pd.DataFrame:
 
     return pd.DataFrame(
         # type: ignore[bad-argument-type]
-        fitted_files, columns=["index", "powerfit_run_id", "structure", "rank", "pdb_file", "fitted_file"]
+        fitted_files,
+        columns=["index", "powerfit_run_id", "structure", "rank", "pdb_file", "fitted_file"],
     ).set_index("index")

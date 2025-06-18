@@ -60,6 +60,8 @@ requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 
 [tool.uv.sources]
+# TODO remove branch when 
+# https://github.com/haddocking/protein-detective/pull/13 is merged
 powerfit_em = {git = "https://github.com/haddocking/powerfit.git", branch = "more-lib-like"}
 
 [tool.ruff]

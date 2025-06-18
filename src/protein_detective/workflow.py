@@ -325,24 +325,3 @@ def powerfit_fit_pdbs(
 
         save_fitted_pdbs(df4db, con)
     return fitted_df, root_fit_dir
-
-
-def report_fit(session_dir: Path, powerfit_run_id: int) -> tuple[pd.DataFrame, Path]:
-    """Report fitted PDBs and the density map used for fitting.
-
-    Args:
-        session_dir: Directory containing the session data.
-        powerfit_run_id: ID of the PowerFit run to report.
-
-    Returns:
-        A tuple containing:
-            - A DataFrame with fitted PDBs.
-            - The path to the density map used for fitting.
-    """
-    # TODO use this function in visualization notebook
-    with connect(session_dir) as con:
-        # TODO allow powerfit_run_id to be None, then should use latest run
-        _options, density_map = load_powerfit_run(powerfit_run_id, con)
-        fitted_pdbs = load_fitted_pdbs(con)
-        adensity_map = session_dir / "powerfit" / str(powerfit_run_id) / density_map
-        return fitted_pdbs, adensity_map
