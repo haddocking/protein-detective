@@ -309,7 +309,7 @@ def handler_powerfit_report(args):
 
 
 def handler_powerfit_fit_pdb(args):
-    # TODO rename fit_pdb to fit_structures, also propagate renaming to other functions
+    # TODO rename fit_pdb to fit_models, also propagate renaming to other functions
     session_dir = Path(args.session_dir)
     powerfit_run_id = args.powerfit_run_id
     top = args.top
