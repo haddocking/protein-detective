@@ -100,20 +100,6 @@ wheels = [
 ]
 
 [[package]]
-name = "anywidget"
-version = "0.9.18"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "ipywidgets" },
-    { name = "psygnal" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ed/69/20423d6abd2a57d767d20a9dcf3f816bd4cbbe4813ac7c7158ba16e44c3f/anywidget-0.9.18.tar.gz", hash = "sha256:262cf459b517a7d044d6fbc84b953e9c83f026790b2dd3ce90f21a7f8eded00f", size = 9808509 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2b/f0/09a30ca0551af20c7cefa7464b7ccb6f5407a550b83c4dcb15c410814849/anywidget-0.9.18-py3-none-any.whl", hash = "sha256:944b82ef1dd17b8ff0fb6d1f199f613caf9111338e6e2857da478f6e73770cb8", size = 220671 },
-]
-
-[[package]]
 name = "appnope"
 version = "0.1.4"
 source = { registry = "https://pypi.org/simple" }
@@ -695,18 +681,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e9/5c/67594cb0c7055dc50814b21731c22a601101ea3b1b50a9a1b090e11f5d0f/ipykernel-6.29.5.tar.gz", hash = "sha256:f093a22c4a40f8828f8e330a9c297cb93dcab13bd9678ded6de8e5cf81c56215", size = 163367 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/94/5c/368ae6c01c7628438358e6d337c19b05425727fbb221d2a3c4303c372f42/ipykernel-6.29.5-py3-none-any.whl", hash = "sha256:afdb66ba5aa354b09b91379bac28ae4afebbb30e8b39510c9690afb7a10421b5", size = 117173 },
-]
-
-[[package]]
-name = "ipymolstar"
-version = "0.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "anywidget" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/7b/26/fad1d05042580e84eb26315d14cd0501887c7e6d77cb1da5f126c44d74c7/ipymolstar-0.1.0.tar.gz", hash = "sha256:39abe60c3a53d484c06b960871e9f9077201cd771f149c9f71ab138fb5fd6e71", size = 1516540 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b2/72/5907058da13cb4dbecb58e0d1035a5e1ca16cb69fed64f797b0cf205d1bf/ipymolstar-0.1.0-py2.py3-none-any.whl", hash = "sha256:1361541cd25927a0daa41de9647c6116266a4f1f7d31888bee02a308cb97f1d8", size = 1525112 },
 ]
 
 [[package]]
@@ -1760,6 +1734,7 @@ dependencies = [
     { name = "attrs" },
     { name = "cattrs" },
     { name = "duckdb" },
+    { name = "molviewspec" },
     { name = "pandas" },
     { name = "powerfit-em" },
     { name = "rich" },
@@ -1778,7 +1753,6 @@ dev = [
 docs = [
     { name = "duckdb-engine" },
     { name = "ipykernel" },
-    { name = "ipymolstar" },
     { name = "ipywidgets" },
     { name = "jupysql" },
     { name = "matplotlib" },
@@ -1786,14 +1760,12 @@ docs = [
     { name = "mkdocs-autoapi" },
     { name = "mkdocs-jupyter" },
     { name = "mkdocstrings", extra = ["python"] },
-    { name = "molviewspec" },
     { name = "nbconvert" },
     { name = "toml" },
 ]
 docs-type = [
     { name = "duckdb-engine" },
     { name = "ipykernel" },
-    { name = "ipymolstar" },
     { name = "ipywidgets" },
     { name = "jupysql" },
     { name = "marimo", extra = ["sql"] },
@@ -1802,7 +1774,6 @@ docs-type = [
     { name = "mkdocs-autoapi" },
     { name = "mkdocs-jupyter" },
     { name = "mkdocstrings", extra = ["python"] },
-    { name = "molviewspec" },
     { name = "nbconvert" },
     { name = "pyrefly" },
     { name = "toml" },
@@ -1817,6 +1788,7 @@ requires-dist = [
     { name = "attrs", specifier = ">=25.3.0" },
     { name = "cattrs", specifier = ">=24.1.3" },
     { name = "duckdb", specifier = ">=1.2.2" },
+    { name = "molviewspec", specifier = ">=1.6.0" },
     { name = "pandas", specifier = ">=2.3.0" },
     { name = "powerfit-em", git = "https://github.com/haddocking/powerfit.git?branch=more-lib-like" },
     { name = "rich", specifier = ">=14.0.0" },
@@ -1835,7 +1807,6 @@ dev = [
 docs = [
     { name = "duckdb-engine", specifier = ">=0.17.0" },
     { name = "ipykernel", specifier = ">=6.29.5" },
-    { name = "ipymolstar", specifier = ">=0.1.0" },
     { name = "ipywidgets", specifier = ">=8.1.7" },
     { name = "jupysql", specifier = ">=0.11.1" },
     { name = "matplotlib", specifier = ">=3.10.3" },
@@ -1843,14 +1814,12 @@ docs = [
     { name = "mkdocs-autoapi", specifier = ">=0.4.1" },
     { name = "mkdocs-jupyter", specifier = ">=0.25.1" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=0.29.1" },
-    { name = "molviewspec", specifier = ">=1.6.0" },
     { name = "nbconvert", specifier = ">=7.16.6" },
     { name = "toml", specifier = ">=0.10.2" },
 ]
 docs-type = [
     { name = "duckdb-engine", specifier = ">=0.17.0" },
     { name = "ipykernel", specifier = ">=6.29.5" },
-    { name = "ipymolstar", specifier = ">=0.1.0" },
     { name = "ipywidgets", specifier = ">=8.1.7" },
     { name = "jupysql", specifier = ">=0.11.1" },
     { name = "marimo", extras = ["sql"], specifier = ">=0.13.15" },
@@ -1859,7 +1828,6 @@ docs-type = [
     { name = "mkdocs-autoapi", specifier = ">=0.4.1" },
     { name = "mkdocs-jupyter", specifier = ">=0.25.1" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=0.29.1" },
-    { name = "molviewspec", specifier = ">=1.6.0" },
     { name = "nbconvert", specifier = ">=7.16.6" },
     { name = "pyrefly", specifier = ">=0.15.1" },
     { name = "toml", specifier = ">=0.10.2" },
@@ -1878,20 +1846,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/eb/a2/709e0fe2f093556c17fbafda93ac032257242cabcc7ff3369e2cb76a97aa/psutil-7.0.0-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a5f098451abc2828f7dc6b58d44b532b22f2088f4999a937557b603ce72b1993", size = 279544 },
     { url = "https://files.pythonhosted.org/packages/50/e6/eecf58810b9d12e6427369784efe814a1eec0f492084ce8eb8f4d89d6d61/psutil-7.0.0-cp37-abi3-win32.whl", hash = "sha256:ba3fcef7523064a6c9da440fc4d6bd07da93ac726b5733c29027d7dc95b39d99", size = 241053 },
     { url = "https://files.pythonhosted.org/packages/50/1b/6921afe68c74868b4c9fa424dad3be35b095e16687989ebbb50ce4fceb7c/psutil-7.0.0-cp37-abi3-win_amd64.whl", hash = "sha256:4cf3d4eb1aa9b348dec30105c55cd9b7d4629285735a102beb4441e38db90553", size = 244885 },
-]
-
-[[package]]
-name = "psygnal"
-version = "0.13.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/23/aa/e1484b0d6f311d3adad8f09166ab56cfb16ed2986f8b1c9a28e5ca2e13ef/psygnal-0.13.0.tar.gz", hash = "sha256:086cd929960713d7bf1e87242952b0d90330a1028827894dcb0cd174b331c1e4", size = 107299 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/74/bf/2dc3aeb32029b764877656f113a43993b6faa7b5514c04bcb7860fcd2a0c/psygnal-0.13.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:579653746e0a6f22e1fc2041c62110547ffcc71fbf78a555a93bce914689d7c0", size = 507751 },
-    { url = "https://files.pythonhosted.org/packages/3b/78/ee53a192c5884fb240ba70aaba6c952da97166856c36c131a37240ac2f10/psygnal-0.13.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:ffb04781db0fc11fc36805d64bcc4ac72b48111766f78f2e3bb286f0ec579587", size = 462782 },
-    { url = "https://files.pythonhosted.org/packages/a4/e2/3757e1547782a9f5afb34fc8e1b3de90f87207fc3f64b486af02c25d8c04/psygnal-0.13.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:313b53b2cac99ab35d7d72bf9d6f65235917c31cd8a49de9c455ab61d88eaf6f", size = 866975 },
-    { url = "https://files.pythonhosted.org/packages/69/02/946820d5796c58d221e0bf90065e9b3979bd2ba3bdb3d4972c2e2582c578/psygnal-0.13.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:28502286592431a66eedcbc25df3bd990b1ff5b56a923cf27776fc6003e6414d", size = 861217 },
-    { url = "https://files.pythonhosted.org/packages/0d/48/b1e32de11849c140ba44a63dddd2ac7a9052d12977f25c51e68220229fc6/psygnal-0.13.0-cp313-cp313-win_amd64.whl", hash = "sha256:11c71df54bcb4c08220ac1a2e4712d7eda823951c6767a485f76f7ccea15f579", size = 416449 },
-    { url = "https://files.pythonhosted.org/packages/77/0c/2c6287a3b85db24f81bcf2b32d14f7a0c57bfe538675efbf44a3c4733daf/psygnal-0.13.0-py3-none-any.whl", hash = "sha256:fb500bd5aaed9cee1123c3cd157747cd4ac2c9b023a6cb9c1b49c51215eedcfa", size = 80681 },
 ]
 
 [[package]]

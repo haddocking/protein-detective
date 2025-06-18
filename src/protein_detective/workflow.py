@@ -18,8 +18,10 @@ from protein_detective.db import (
     load_alphafold_ids,
     load_alphafolds,
     load_density_filtered_alphafolds_files,
+    load_fitted_pdbs,
     load_pdb_ids,
     load_pdbs,
+    load_powerfit_run,
     load_single_chain_pdb_files,
     powerfit_solutions,
     save_alphafolds,
@@ -323,3 +325,25 @@ def powerfit_fit_pdbs(
 
         save_fitted_pdbs(df4db, con)
     return fitted_df, root_fit_dir
+
+
+def report_fit(session_dir: Path, powerfit_run_id: int) -> tuple[pd.DataFrame, Path]:
+    """Report fitted PDBs and the density map used for fitting.
+
+    Args:
+        session_dir: Directory containing the session data.
+        powerfit_run_id: ID of the PowerFit run to report.
+
+    Returns:
+        A tuple containing:
+            - A DataFrame with fitted PDBs.
+            - The path to the density map used for fitting.
+    """
+    # TODO use this function in visualization notebook
+    with connect(session_dir) as con:
+        # TODO allow powerfit_run_id to be None, then should use latest run
+        _options, density_map = load_powerfit_run(powerfit_run_id, con)
+        fitted_pdbs = load_fitted_pdbs(con)
+        fitted_pdbs["fitted_file"] = fitted_pdbs["fitted_file"].apply(lambda x: session_dir / x)
+        adensity_map = session_dir / "powerfit" / str(powerfit_run_id) / density_map
+        return fitted_pdbs, adensity_map
