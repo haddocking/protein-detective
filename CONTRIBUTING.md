@@ -89,7 +89,7 @@ python3 -m http.server -d site
 
 ```shell
 find docs/ -name "*.ipynb" -exec uv run --group docs-type marimo convert {} -o {}.py \;
-uv run --group docs-type pyrefly check docs/*.ipynb.py
+uv run --group docs-type --group docs pyrefly check docs/*.ipynb.py
 rm docs/*.ipynb.py
 ```
 

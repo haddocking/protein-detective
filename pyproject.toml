@@ -53,9 +53,7 @@ docs = [
 docs-type = [
     "marimo[sql]>=0.13.15",
     "pyrefly>=0.15.1",
-     {include-group = "docs"}
 ]
-
 
 [build-system]
 requires = ["hatchling >= 1.26"]
