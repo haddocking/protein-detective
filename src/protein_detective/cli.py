@@ -5,9 +5,11 @@ from pathlib import Path
 from powerfit_em.powerfit import make_parser as make_powerfit_parser
 from rich import print as rprint
 from rich.logging import RichHandler
+from rich.table import Table
 
 from protein_detective.alphafold import downloadable_formats
 from protein_detective.alphafold.density import DensityFilterQuery
+from protein_detective.db import connect, load_powerfit_runs
 from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.uniprot import Query
 from protein_detective.workflow import (
@@ -121,10 +123,10 @@ def add_powerfit_commands_parser(subparsers):
     # Removed --chain, as protein-detective created single chain PDB files
     # Removed --directory argument as protein_detective will generate that argument
 
-    # Removed --num, as we can make fitted pdb from translation/rotation matrix
+    # Removed --num, as we can fit models later with `powerfit fit-pdb` command
 
     # Replaces --gpu, from [<platform>:<device>] to boolean flag
-    # When enabled and machine has multiple GPUs, then cycles through them
+    # When enabled and machine has multiple GPUs, then 0:0 is used
     commands_parser.add_argument(
         "-g",
         "--gpu",
@@ -202,6 +204,12 @@ def add_powerfit_fit_pdb_parser(subparsers):
     fit_pdb_parser.add_argument("--top", type=int, default=10, help="Number of top solutions to use for fitting")
 
 
+def add_powerfit_list_runs_parser(subparsers):
+    list_runs_parser = subparsers.add_parser("list-runs", help="List all PowerFit runs in the session directory")
+    list_runs_parser.add_argument("session_dir", help="Session directory containing PowerFit results")
+    return list_runs_parser
+
+
 def add_powerfit_parser(subparsers):
     powerfit_parser = subparsers.add_parser("powerfit", help="PowerFit related commands")
     powerfit_subparsers = powerfit_parser.add_subparsers(dest="powerfit_command", required=True)
@@ -209,6 +217,7 @@ def add_powerfit_parser(subparsers):
     add_powerfit_run_parser(powerfit_subparsers)
     add_powerfit_report_parser(powerfit_subparsers)
     add_powerfit_fit_pdb_parser(powerfit_subparsers)
+    add_powerfit_list_runs_parser(powerfit_subparsers)
 
     return powerfit_parser
 
@@ -275,6 +284,8 @@ def handle_powerfit(args):
         handler_powerfit_report(args)
     elif args.powerfit_command == "fit-pdb":
         handler_powerfit_fit_pdb(args)
+    elif args.powerfit_command == "list-runs":
+        handler_powerfit_list_runs(args)
 
 
 def handle_powerfit_commands(args):
@@ -316,6 +327,24 @@ def handler_powerfit_fit_pdb(args):
 
     df, fit_dir = powerfit_fit_pdbs(session_dir, powerfit_run_id, top)
     rprint(f"{len(df)} fitted PDB files written to {fit_dir} directory.")
+
+
+def handler_powerfit_list_runs(args):
+    session_dir = Path(args.session_dir)
+    with connect(session_dir) as con:
+        runs = load_powerfit_runs(con)
+
+    if len(runs) == 0:
+        rprint("No PowerFit runs found.")
+        return
+
+    table = Table(title="PowerFit runs")
+    table.add_column("ID", justify="right", style="cyan")
+    table.add_column("Options", style="magenta")
+    table.add_column("Density map (copy)", style="green")
+    for row in runs:
+        table.add_row(str(row[0]), str(row[1]), str(row[2]))
+    rprint(table)
 
 
 def make_parser() -> argparse.ArgumentParser:

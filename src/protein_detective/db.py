@@ -467,25 +467,57 @@ def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> 
         return result[0]
 
 
-def load_powerfit_run(powerfit_run_id: int, con: DuckDBPyConnection) -> tuple[PowerfitOptions, Path]:
+def load_powerfit_runs(con: DuckDBPyConnection) -> list[tuple[int, PowerfitOptions, Path]]:
+    """Load all PowerFit runs from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A list of tuples containing the PowerFit run ID, options, and density map path.
+    """
     con.execute(
         """
         SELECT
+            powerfit_run_id,
             options,
-            parse_filename(json_extract_string(options, '$.target')) AS density_map,
+            concat_ws(
+                '/',
+                getvariable('session_dir'),
+                'powerfit',
+                powerfit_run_id,
+                parse_filename(json_extract_string(options, '$.target'))
+            ) AS density_map,
         FROM powerfit_runs
-        WHERE powerfit_run_id = ?
-    """,
-        (powerfit_run_id,),
+    """
     )
+    rows = con.fetchall()
+    return [(row[0], converter.loads(row[1], PowerfitOptions), Path(row[2])) for row in rows]
 
-    row = con.fetchone()
-    if row is None:
-        msg = f"No PowerFit run found with ID {powerfit_run_id}"
-        raise ValueError(msg)
-    options_json, density_map = row
-    options = converter.loads(options_json, PowerfitOptions)
-    return options, Path(density_map)
+
+def load_powerfit_run(
+    powerfit_run_id: int,
+    con: DuckDBPyConnection,
+) -> tuple[PowerfitOptions, Path]:
+    """Load a specific PowerFit run by its ID.
+
+    Args:
+        powerfit_run_id: The ID of the PowerFit run to load.
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A tuple containing the PowerFit options and the path to the density map file.
+
+    Raises:
+        ValueError: If the PowerFit run with the specified ID does not exist.
+    """
+    all_runs = load_powerfit_runs(con)
+    for run in all_runs:
+        if run[0] == powerfit_run_id:
+            return run[1], run[2]
+
+    msg = f"PowerFit run with ID {powerfit_run_id} not found."
+    raise ValueError(msg)
 
 
 def powerfit_solutions(con: DuckDBPyConnection, powerfit_run_id: int | None = None) -> DataFrame:
