@@ -48,7 +48,9 @@ def run(density_map: BinaryIO, structure: Path, result_dir: Path, options: Power
             # No chain specified as prepared pdb has single A chain
             chain=None,
             directory=str(result_dir),
-            # No num, use `protein-detective powerfit fit-pdb` command to generate fitted PDBs
+            # Do not write any fitted models during powerfit run,
+            # to spare disk space and time,
+            # use `protein-detective powerfit fit-models` command to generate fitted model PDB files
             num=0,
             gpu=gpu,
             nproc=options.nproc,

@@ -96,12 +96,11 @@ powerfit_run_id,structure,rank,cc,fishz,relz,translation,rotation,density_filter
 ...
 ```
 
-To generate PDB files rotated/translated to PowerFit solutions, you can use:
+To generate model PDB files rotated/translated to PowerFit solutions, you can use:
 
 ```shell
-protein-detective powerfit fit-pdb docs/session1
+protein-detective powerfit fit-models docs/session1
 ```
-
 
 ## Contributing
 

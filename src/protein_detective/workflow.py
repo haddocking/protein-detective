@@ -25,7 +25,7 @@ from protein_detective.db import (
     save_alphafolds,
     save_alphafolds_files,
     save_density_filtered,
-    save_fitted_pdbs,
+    save_fitted_models,
     save_pdb_files,
     save_pdbs,
     save_powerfit_options,
@@ -37,7 +37,7 @@ from protein_detective.pdbe.fetch import fetch as pdbe_fetch
 from protein_detective.pdbe.io import write_single_chain_pdb_files
 from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.powerfit.run import run as powerfit_run
-from protein_detective.powerfit.solution import fit_pdbs
+from protein_detective.powerfit.solution import fit_models
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
 
 logger = logging.getLogger(__name__)
@@ -304,22 +304,30 @@ def powerfit_report(session_dir: Path, powerfit_run_id: int | None = None) -> pd
         return powerfit_solutions(con, powerfit_run_id=powerfit_run_id)
 
 
-def powerfit_fit_pdbs(
-    session_dir: Path, powerfit_run_id: int | None = None, top: int = 10
-) -> tuple[pd.DataFrame, Path]:
+def powerfit_fit_models(session_dir: Path, powerfit_run_id: int | None = None, top: int = 10) -> pd.DataFrame:
+    """Fit models using PowerFit solutions.
+
+    Args:
+        session_dir: Directory containing the session data.
+        powerfit_run_id: Optional ID of the PowerFit run to report. If None, reports over all runs.
+        top: Number of top solutions to fit.
+
+    Returns:
+        A DataFrame containing the fitted models. See [protein_detective.db.save_fitted_models][] for details.
+    """
     all_solutions = powerfit_report(session_dir, powerfit_run_id)
     solutions = all_solutions.head(top)
-    root_fit_dir = session_dir / "fitted_pdbs"
-    fitted_df = fit_pdbs(solutions, root_fit_dir)
+    powerfit_root_run_dir = session_dir / "powerfit"
+    fitted_df = fit_models(solutions, powerfit_root_run_dir)
     with connect(session_dir) as con:
         df4db = fitted_df.copy()
 
-        # make pdb_file fitted_file columns relative to session_dir
+        # make *_file columns relative to session_dir
         def fn(x):
             return x.relative_to(session_dir)
 
-        df4db["pdb_file"] = df4db["pdb_file"].apply(fn)
-        df4db["fitted_file"] = df4db["fitted_file"].apply(fn)
+        df4db["fitted_model_file"] = df4db["fitted_model_file"].apply(fn)
+        df4db["unfitted_model_file"] = df4db["unfitted_model_file"].apply(fn)
 
-        save_fitted_pdbs(df4db, con)
-    return fitted_df, root_fit_dir
+        save_fitted_models(df4db, con)
+    return fitted_df

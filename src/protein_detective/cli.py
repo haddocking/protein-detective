@@ -15,7 +15,7 @@ from protein_detective.uniprot import Query
 from protein_detective.workflow import (
     density_filter,
     powerfit_commands,
-    powerfit_fit_pdbs,
+    powerfit_fit_models,
     powerfit_report,
     powerfit_runs,
     prune_pdbs,
@@ -26,79 +26,65 @@ from protein_detective.workflow import (
 
 
 def add_search_parser(subparsers):
-    search_parser = subparsers.add_parser("search", help="Search UniProt for structures")
-    search_parser.add_argument("session_dir", help="Session directory to store results")
-    search_parser.add_argument("--taxon-id", type=str, help="NCBI Taxon ID")
-    search_parser.add_argument(
+    parser = subparsers.add_parser("search", help="Search UniProt for structures")
+    parser.add_argument("session_dir", help="Session directory to store results")
+    parser.add_argument("--taxon-id", type=str, help="NCBI Taxon ID")
+    parser.add_argument(
         "--reviewed",
         action=argparse.BooleanOptionalAction,
         help="Reviewed=swissprot, no-reviewed=trembl. Default is uniprot=swissprot+trembl.",
         default=None,
     )
-    search_parser.add_argument("--subcellular-location-uniprot", type=str, help="Subcellular location (UniProt)")
-    search_parser.add_argument(
-        "--subcellular-location-go", type=str, help="Subcellular location (GO term, e.g. GO:0005737)"
-    )
-    search_parser.add_argument(
-        "--molecular-function-go", type=str, help="Molecular function (GO term, e.g. GO:0003677)"
-    )
-    search_parser.add_argument("--limit", type=int, default=10_000, help="Limit number of results")
-    return search_parser
+    parser.add_argument("--subcellular-location-uniprot", type=str, help="Subcellular location (UniProt)")
+    parser.add_argument("--subcellular-location-go", type=str, help="Subcellular location (GO term, e.g. GO:0005737)")
+    parser.add_argument("--molecular-function-go", type=str, help="Molecular function (GO term, e.g. GO:0003677)")
+    parser.add_argument("--limit", type=int, default=10_000, help="Limit number of results")
 
 
 def add_retrieve_parser(subparsers):
-    retrieve_parser = subparsers.add_parser("retrieve", help="Retrieve structures")
-    retrieve_parser.add_argument("session_dir", help="Session directory to store results")
-    retrieve_parser.add_argument(
+    parser = subparsers.add_parser("retrieve", help="Retrieve structures")
+    parser.add_argument("session_dir", help="Session directory to store results")
+    parser.add_argument(
         "--what",
         type=str,
         action="append",
         choices=sorted(what_retrieve_choices),
         help="What to retrieve. Can be specified multiple times. Default is pdbe and alphafold.",
     )
-    retrieve_parser.add_argument(
+    parser.add_argument(
         "--what-af-formats",
         type=str,
         action="append",
         choices=sorted(downloadable_formats),
         help="AlphaFold formats to retrieve. Can be specified multiple times. Default is 'pdb'.",
     )
-    return retrieve_parser
 
 
 def add_density_filter_parser(subparsers):
-    density_filter_parser = subparsers.add_parser(
-        "density-filter", help="Filter AlphaFoldDB structures based on density confidence"
-    )
-    density_filter_parser.add_argument("session_dir", help="Session directory for input and output")
-    density_filter_parser.add_argument(
-        "--confidence-threshold", type=float, default=70.0, help="pLDDT confidence threshold (0-100)"
-    )
-    density_filter_parser.add_argument(
+    parser = subparsers.add_parser("density-filter", help="Filter AlphaFoldDB structures based on density confidence")
+    parser.add_argument("session_dir", help="Session directory for input and output")
+    parser.add_argument("--confidence-threshold", type=float, default=70.0, help="pLDDT confidence threshold (0-100)")
+    parser.add_argument(
         "--min-residues", type=int, default=0, help="Minimum number of residues above confidence threshold"
     )
-    density_filter_parser.add_argument(
+    parser.add_argument(
         "--max-residues",
         type=int,
         default=1_000_000,
         help="Maximum number of residues above confidence threshold.",
     )
-    return density_filter_parser
 
 
 def add_prune_pdbs_parser(subparsers):
-    prune_pdbs_parser = subparsers.add_parser(
+    parser = subparsers.add_parser(
         "prune-pdbs", help="Prune PDBe files to keep only the first chain and rename it to A"
     )
-    prune_pdbs_parser.add_argument("session_dir", help="Session directory containing PDB files")
-    return prune_pdbs_parser
+    parser.add_argument("session_dir", help="Session directory containing PDB files")
 
 
 def add_powerfit_commands_parser(subparsers):
     # Add the commands sub-command
-    commands_parser = subparsers.add_parser(
-        "commands", help="Generate PowerFit commands for PDB files in the session directory"
-    )
+    parser = subparsers.add_parser("commands", help="Generate PowerFit commands for PDB files in the session directory")
     borrowed_arguments = {
         "target",
         "resolution",
@@ -115,19 +101,19 @@ def add_powerfit_commands_parser(subparsers):
 
     for powerfit_argument in powerfit_parser._actions:
         if powerfit_argument.dest in borrowed_arguments:
-            commands_parser._add_action(powerfit_argument)
+            parser._add_action(powerfit_argument)
 
     # Replaces template argument
-    commands_parser.add_argument("session_dir", help="Session directory for input and output")
+    parser.add_argument("session_dir", help="Session directory for input and output")
 
     # Removed --chain, as protein-detective created single chain PDB files
     # Removed --directory argument as protein_detective will generate that argument
 
-    # Removed --num, as we can fit models later with `powerfit fit-pdb` command
+    # Removed --num, as we can fit models later with `powerfit fit-models` command
 
     # Replaces --gpu, from [<platform>:<device>] to boolean flag
     # When enabled and machine has multiple GPUs, then 0:0 is used
-    commands_parser.add_argument(
+    parser.add_argument(
         "-g",
         "--gpu",
         dest="gpu",
@@ -135,7 +121,7 @@ def add_powerfit_commands_parser(subparsers):
         help="Off-load the intensive calculations to the GPU. ",
     )
 
-    commands_parser.add_argument(
+    parser.add_argument(
         "--output",
         dest="output",
         type=argparse.FileType("w", encoding="UTF-8"),
@@ -145,7 +131,7 @@ def add_powerfit_commands_parser(subparsers):
 
 
 def add_powerfit_run_parser(subparsers):
-    run_parser = subparsers.add_parser(
+    parser = subparsers.add_parser(
         "run",
         help="Run PowerFit on PDB files in the session directory",
         description="Run PowerFit on PDB files in the session directory and store results.",
@@ -168,10 +154,10 @@ def add_powerfit_run_parser(subparsers):
 
     for powerfit_argument in powerfit_parser._actions:
         if powerfit_argument.dest in borrowed_arguments:
-            run_parser._add_action(powerfit_argument)
+            parser._add_action(powerfit_argument)
 
-    run_parser.add_argument("session_dir", help="Session directory containing PDB files")
-    run_parser.add_argument(
+    parser.add_argument("session_dir", help="Session directory containing PDB files")
+    parser.add_argument(
         "-g",
         "--gpu",
         dest="gpu",
@@ -181,45 +167,53 @@ def add_powerfit_run_parser(subparsers):
 
 
 def add_powerfit_report_parser(subparsers):
-    report_parser = subparsers.add_parser(
+    parser = subparsers.add_parser(
         "report",
         help="Generate a report of the best PowerFit solutions.",
-        description="Apply translation/rotation from solution to input PDB file and write",
     )
-    report_parser.add_argument("session_dir", help="Session directory containing PowerFit results")
-    report_parser.add_argument("--powerfit_run_id", type=int, default=None, help="ID of the PowerFit run to report on")
-    report_parser.add_argument("--top", type=int, default=10, help="Number of top solutions to report")
-    report_parser.add_argument(
+    parser.add_argument("session_dir", help="Session directory containing PowerFit results")
+    parser.add_argument("--powerfit_run_id", type=int, default=None, help="ID of the PowerFit run to report on")
+    parser.add_argument("--top", type=int, default=10, help="Number of top solutions to report")
+    parser.add_argument(
         "--output",
         type=argparse.FileType("w", encoding="UTF-8"),
         default="-",
-        help="Output file for fitted PDB commands. If set to '-' (default) will print to stdout.",
+        help="Output file for solutions table. If set to '-' (default) will print to stdout.",
     )
 
 
-def add_powerfit_fit_pdb_parser(subparsers):
-    fit_pdb_parser = subparsers.add_parser("fit-pdb", help="Fit PDB files based on PowerFit solutions")
-    fit_pdb_parser.add_argument("session_dir", help="Session directory containing PowerFit results")
-    fit_pdb_parser.add_argument("--powerfit_run_id", type=int, default=None, help="ID of the PowerFit run to report on")
-    fit_pdb_parser.add_argument("--top", type=int, default=10, help="Number of top solutions to use for fitting")
+def add_powerfit_fit_models_parser(subparsers):
+    # TODO be consistent in docs with PowerFit vs powerfit
+    parser = subparsers.add_parser("fit-models", help="Fit models based on PowerFit solutions")
+    parser.add_argument("session_dir", help="Session directory containing PowerFit results")
+    parser.add_argument(
+        "--powerfit_run_id",
+        type=int,
+        default=None,
+        help="ID of the PowerFit run to report on. If not provided, will use the all runs.",
+    )
+    parser.add_argument("--top", type=int, default=10, help="Number of top solutions to fit models for")
+    parser.add_argument(
+        "--output",
+        type=argparse.FileType("w", encoding="UTF-8"),
+        default="-",
+        help="Output file for fitted model table. If set to '-' (default) will print to stdout.",
+    )
 
 
 def add_powerfit_list_runs_parser(subparsers):
-    list_runs_parser = subparsers.add_parser("list-runs", help="List all PowerFit runs in the session directory")
-    list_runs_parser.add_argument("session_dir", help="Session directory containing PowerFit results")
-    return list_runs_parser
+    parser = subparsers.add_parser("list-runs", help="List all PowerFit runs in the session directory")
+    parser.add_argument("session_dir", help="Session directory containing PowerFit results")
 
 
 def add_powerfit_parser(subparsers):
-    powerfit_parser = subparsers.add_parser("powerfit", help="PowerFit related commands")
-    powerfit_subparsers = powerfit_parser.add_subparsers(dest="powerfit_command", required=True)
+    parser = subparsers.add_parser("powerfit", help="PowerFit related commands")
+    powerfit_subparsers = parser.add_subparsers(dest="powerfit_command", required=True)
     add_powerfit_commands_parser(powerfit_subparsers)
     add_powerfit_run_parser(powerfit_subparsers)
     add_powerfit_report_parser(powerfit_subparsers)
-    add_powerfit_fit_pdb_parser(powerfit_subparsers)
+    add_powerfit_fit_models_parser(powerfit_subparsers)
     add_powerfit_list_runs_parser(powerfit_subparsers)
-
-    return powerfit_parser
 
 
 def handle_search(args):
@@ -272,7 +266,7 @@ def handle_prune_pdbs(args):
 def handler_powerfit_run(args):
     session_dir = Path(args.session_dir)
     powerfit_run_id = powerfit_runs(session_dir, PowerfitOptions.from_args(args))
-    rprint(f"PowerFit run completed with ID: {powerfit_run_id}. Use this ID for reporting or fitting PDBs.")
+    rprint(f"PowerFit run completed with ID: {powerfit_run_id}. Use this ID for reporting or fitting models.")
 
 
 def handle_powerfit(args):
@@ -282,8 +276,8 @@ def handle_powerfit(args):
         handler_powerfit_run(args)
     elif args.powerfit_command == "report":
         handler_powerfit_report(args)
-    elif args.powerfit_command == "fit-pdb":
-        handler_powerfit_fit_pdb(args)
+    elif args.powerfit_command == "fit-models":
+        handler_powerfit_fit_models(args)
     elif args.powerfit_command == "list-runs":
         handler_powerfit_list_runs(args)
 
@@ -319,14 +313,13 @@ def handler_powerfit_report(args):
     solutions.to_csv(args.output, index=False)
 
 
-def handler_powerfit_fit_pdb(args):
-    # TODO rename fit_pdb to fit_models, also propagate renaming to other functions
+def handler_powerfit_fit_models(args):
     session_dir = Path(args.session_dir)
     powerfit_run_id = args.powerfit_run_id
     top = args.top
 
-    df, fit_dir = powerfit_fit_pdbs(session_dir, powerfit_run_id, top)
-    rprint(f"{len(df)} fitted PDB files written to {fit_dir} directory.")
+    fitted = powerfit_fit_models(session_dir, powerfit_run_id, top)
+    fitted.to_csv(args.output, index=False)
 
 
 def handler_powerfit_list_runs(args):

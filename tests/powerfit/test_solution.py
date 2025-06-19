@@ -6,7 +6,7 @@ import pytest
 from numpy.testing import assert_array_almost_equal
 from powerfit_em.structure import Structure
 
-from protein_detective.powerfit.solution import fit_pdb
+from protein_detective.powerfit.solution import fit_model
 
 
 @pytest.fixture
@@ -27,23 +27,23 @@ def solution() -> dict[str, np.ndarray]:
     return {"translation": row["translation"], "rotation": row["rotation"].reshape((3, 3))}
 
 
-def test_fit_pdb(solution: dict[str, np.ndarray], tmp_path: Path) -> None:
-    input_pdb_file = Path(__file__).parent / "fixtures" / "KsgA.pdb"
-    result_pdb_file = tmp_path / "fit_pd.pdb"
+def test_fit_model(solution: dict[str, np.ndarray], tmp_path: Path) -> None:
+    unfitted_model_file = Path(__file__).parent / "fixtures" / "KsgA.pdb"
+    fitted_model_file = tmp_path / "fit_pd.pdb"
 
     translation = solution["translation"]
     rotation = solution["rotation"]
 
-    fit_pdb(input_pdb_file, translation, rotation, result_pdb_file)
+    fit_model(unfitted_model_file, translation, rotation, fitted_model_file)
 
-    result_structure = Structure.fromfile(str(result_pdb_file))
-    expected_pdb_file = Path(__file__).parent / "fixtures" / "fit_1.pdb"
-    expected_structure = Structure.fromfile(str(expected_pdb_file))
+    fitted_model = Structure.fromfile(str(fitted_model_file))
+    expected_fitted_model_file = Path(__file__).parent / "fixtures" / "fit_1.pdb"
+    expected_model = Structure.fromfile(str(expected_fitted_model_file))
 
     assert_array_almost_equal(
         # type: ignore[bad-argument-type]
-        result_structure.coor,
+        fitted_model.coor,
         # type: ignore[bad-argument-type]
-        expected_structure.coor,
+        expected_model.coor,
         decimal=1,  # TODO check why so low needed
     )

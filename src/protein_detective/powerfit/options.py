@@ -76,7 +76,10 @@ class PowerfitOptions:
             str(self.resampling_rate),
             "--no-trimming" if self.no_trimming else "",
             "--num",
-            str(0),  # Use `protein-detective powerfit fit-pdb` command to generate fitted PDBs
+            # Do not write any fitted models during powerfit run,
+            # to spare disk space and time,
+            # use `protein-detective powerfit fit-models` command to generate fitted model PDB files
+            str(0),
             "--gpu" if self.gpu else "",
             "--nproc",
             str(self.nproc),

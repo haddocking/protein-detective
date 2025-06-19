@@ -1,3 +1,27 @@
+"""Module for managing the DuckDB database used in Protein Detective.
+
+## dll
+
+The DDL statements to create the database schema.
+The DDL (Data Definition Language) statements for the DuckDB database used in a Protein Detective session.
+
+Paths to files in the database are stored relative to the session directory.
+So you can move the session directory around without breaking the paths.
+
+Just after connection to the database, you need to set the session_dir as DuckDB variable
+with `con.execute("SET VARIABLE session_dir = ?", (str(session_dir),))`.
+This is done for you if you use [connect][] function.
+
+For example with cwd ~/ and session_dir session1 and
+file "~/session1/foo.pdb" then return to user as
+"session1/foo.pdb", but stored in the database as "foo.pdb"
+
+The databae uses tables prefixed with `raw_` to store file paths relative to the session directory.
+The views then prepend the session directory (using the DuckDB `session_dir` variable) to the paths,
+so the paths are pointing to the correct files.
+
+"""
+
 import logging
 from collections.abc import Iterable, Mapping
 from contextlib import contextmanager
@@ -19,10 +43,9 @@ from protein_detective.uniprot import PdbResult, Query
 logger = logging.getLogger(__name__)
 converter = make_converter()
 
+
 # TODO make all file paths be relative to current session directory
-# By using raw_ table to store paths relative to session directory
-# and then a view which prepends the session directory to the paths
-ddl = """\
+ddl = """
 CREATE TABLE IF NOT EXISTS uniprot_searches (
     query JSON,
 );
@@ -90,7 +113,8 @@ CREATE TABLE IF NOT EXISTS powerfit_runs (
     UNIQUE (options)
 );
 
-CREATE TABLE IF NOT EXISTS raw_solutions AS
+-- Need to use view, when using table then new runs will not be picked up by read_csv
+CREATE VIEW IF NOT EXISTS raw_solutions AS
 SELECT
     parse_path(filename)[-3] AS powerfit_run_id,
     parse_path(filename)[-2] AS structure,
@@ -98,7 +122,30 @@ SELECT
     [x,y,z]::FLOAT[3] AS translation,
     [a11, a12, a13, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation,
 FROM
-    read_csv(getvariable('session_dir') || '/powerfit/*/*/solutions.out', filename=True, normalize_names=True)
+    read_csv(
+        getvariable('session_dir') || '/powerfit/*/*/solutions.out',
+        filename=True, normalize_names=True,
+        -- Need to specify types as powerfit/0/dummy/solutions.out only has header
+        -- and sniffer_csv will type columns as VARCHAR
+        columns={
+            'rank': 'INTEGER',
+            'cc': 'FLOAT',
+            'fishz': 'FLOAT',
+            'relz': 'FLOAT',
+            'x': 'FLOAT',
+            'y': 'FLOAT',
+            'z': 'FLOAT',
+            'a11': 'FLOAT',
+            'a12': 'FLOAT',
+            'a13': 'FLOAT',
+            'a21': 'FLOAT',
+            'a22': 'FLOAT',
+            'a23': 'FLOAT',
+            'a31': 'FLOAT',
+            'a32': 'FLOAT',
+            'a33': 'FLOAT',
+        }
+    )
 ;
 
 CREATE VIEW IF NOT EXISTS solutions AS
@@ -128,16 +175,17 @@ LEFT JOIN (
 ) AS p USING (structure)
 ORDER BY cc DESC;
 
-CREATE TABLE IF NOT EXISTS raw_fitted_pdbs (
+CREATE TABLE IF NOT EXISTS raw_fitted_models (
     powerfit_run_id INTEGER NOT NULL,
     structure TEXT NOT NULL,
     rank INTEGER NOT NULL,
-    -- pdb_file is either foreign key of density_filtered_alphafolds.pdb_file or proteins_pdbs.single_chain_pdb_file
-    pdb_file TEXT NOT NULL,
-    fitted_file TEXT PRIMARY KEY,
+    -- unfitted_model_file is either foreign key of density_filtered_alphafolds.pdb_file
+    -- or proteins_pdbs.single_chain_pdb_file
+    unfitted_model_file TEXT NOT NULL,
+    fitted_model_file TEXT PRIMARY KEY,
 );
 
-CREATE VIEW IF NOT EXISTS fitted_pdbs AS
+CREATE VIEW IF NOT EXISTS fitted_models AS
 SELECT
     powerfit_run_id,
     structure,
@@ -145,14 +193,14 @@ SELECT
     concat_ws(
         '/',
         getvariable('session_dir'),
-        pdb_file
-    ) AS pdb_file,
+        unfitted_model_file
+    ) AS unfitted_model_file,
     concat_ws(
         '/',
         getvariable('session_dir'),
-        fitted_file
-    ) AS fitted_file
-FROM raw_fitted_pdbs;
+        fitted_model_file
+    ) AS fitted_model_file
+FROM raw_fitted_models;
 """
 
 
@@ -176,6 +224,15 @@ def initialize_db(session_dir: Path, con: DuckDBPyConnection):
         con: The DuckDB connection to use for executing the DDL statements.
     """
     con.execute("SET VARIABLE session_dir = ?", (str(session_dir),))
+
+    # read_csv in solutions table requires at least one solutions.out file to exist
+    # so we create an empty solutions.out file if it does not exist
+    solution_header_file = session_dir / "powerfit" / "0" / "dummy" / "solutions.out"
+    if not solution_header_file.exists():
+        solution_header_file.parent.mkdir(parents=True, exist_ok=True)
+        solutions_header = "rank,cc,Fish-z,rel-z,x,y,z,a11,a12,a13,a21,a22,a23,a31,a32,a33\n"
+        solution_header_file.write_text(solutions_header)
+
     con.execute(ddl)
 
 
@@ -554,27 +611,30 @@ def powerfit_solutions(con: DuckDBPyConnection, powerfit_run_id: int | None = No
     return con.df()
 
 
-def save_fitted_pdbs(df: DataFrame, con: DuckDBPyConnection):  # noqa: ARG001
-    con.execute("INSERT OR IGNORE INTO raw_fitted_pdbs BY NAME SELECT * FROM df")
+def save_fitted_models(df: DataFrame, con: DuckDBPyConnection):  # noqa: ARG001
+    con.execute("INSERT OR IGNORE INTO raw_fitted_models BY NAME SELECT * FROM df")
 
 
-def load_fitted_pdbs(con: DuckDBPyConnection) -> DataFrame:
-    """Load fitted PDBs from the database.
+def load_fitted_models(con: DuckDBPyConnection) -> DataFrame:
+    """Load fitted model PDB files from the database.
 
     Returns:
-        A DataFrame containing the fitted PDBs with columns:
+        A DataFrame containing the fitted model PDB file with columns:
             - powerfit_run_id: The ID of the PowerFit run.
-            - pdb_file: The path to the original PDB file.
-            - fitted_file: The path to the fitted PDB file.
+            - structure: The structure identifier.
+            - rank: The rank of the fitted model for that run and structure combination.
+            - unfitted_model_file: The path to the original model PDB file.
+            - fitted_model_file: The path to the fitted model PDB file.
     """
     con.execute("""
         SELECT
-            f.* EXCLUDE (pdb_file),
-            COALESCE(f.pdb_file, s.pdb_file) AS unfitted_pdb_file,
+            f.* EXCLUDE (unfitted_model_file),
+            COALESCE(f.unfitted_model_file, s.pdb_file) AS unfitted_model_file,
             s.* EXCLUDE (pdb_file),
-        FROM fitted_pdbs AS f
-        JOIN solutions AS s USING (powerfit_run_id, structure,rank)
+        FROM fitted_models AS f
+        JOIN solutions AS s USING (powerfit_run_id, structure, rank)
     """)
+
     return con.df()
 
 
