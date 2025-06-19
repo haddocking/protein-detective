@@ -15,6 +15,9 @@ def show_structure_and_density(
     builder.download(url=density.name).parse(format="map").volume().representation(
         type="isosurface", relative_isovalue=3, show_wireframe=True
     ).color(color="green").opacity(opacity=0.1)
+
+    # TODO use camera or focus to point camera to structure
+
     state = builder.get_state(indent=2)
     data = {}
     data[structure.name] = structure.read_bytes()
