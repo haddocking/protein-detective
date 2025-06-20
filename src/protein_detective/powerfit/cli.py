@@ -12,26 +12,32 @@ from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.powerfit.workflow import powerfit_commands, powerfit_fit_models, powerfit_report, powerfit_runs
 
 
-def add_powerfit_commands_parser(subparsers):
-    # Add the commands sub-command
-    parser = subparsers.add_parser("commands", help="Generate PowerFit commands for PDB files in the session directory")
-    borrowed_arguments = {
-        "target",
-        "resolution",
-        "angle",
-        "laplace",
-        "core_weighted",
-        "no_resampling",
-        "resampling_rate",
-        "no_trimming",
-        "trimming_cutoff",
-        "nproc",
-    }
+def _copy_powerfit_parser_arguments(parser: argparse.ArgumentParser, borrowed_arguments: None | set[str] = None):
+    if borrowed_arguments is None:
+        borrowed_arguments = {
+            "target",
+            "resolution",
+            "angle",
+            "laplace",
+            "core_weighted",
+            "no_resampling",
+            "resampling_rate",
+            "no_trimming",
+            "trimming_cutoff",
+            "nproc",
+        }
     powerfit_parser = make_powerfit_parser()
 
     for powerfit_argument in powerfit_parser._actions:
         if powerfit_argument.dest in borrowed_arguments:
             parser._add_action(powerfit_argument)
+
+
+def add_powerfit_commands_parser(subparsers):
+    # Add the commands sub-command
+    parser = subparsers.add_parser("commands", help="Generate PowerFit commands for PDB files in the session directory")
+
+    _copy_powerfit_parser_arguments(parser)
 
     # Replaces template argument
     parser.add_argument("session_dir", help="Session directory for input and output")
@@ -67,24 +73,7 @@ def add_powerfit_run_parser(subparsers):
         description="Run PowerFit on PDB files in the session directory and store results.",
     )
 
-    # Add all arguments from PowerFit options
-    borrowed_arguments = {
-        "target",
-        "resolution",
-        "angle",
-        "laplace",
-        "core_weighted",
-        "no_resampling",
-        "resampling_rate",
-        "no_trimming",
-        "trimming_cutoff",
-        "nproc",
-    }
-    powerfit_parser = make_powerfit_parser()
-
-    for powerfit_argument in powerfit_parser._actions:
-        if powerfit_argument.dest in borrowed_arguments:
-            parser._add_action(powerfit_argument)
+    _copy_powerfit_parser_arguments(parser)
 
     parser.add_argument("session_dir", help="Session directory containing PDB files")
     parser.add_argument(
