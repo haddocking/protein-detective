@@ -119,7 +119,7 @@ SELECT
     density_filter_id,
     af_id,
     pdb_id,
-    ws_concat(
+    concat_ws(
         '/',
         getvariable('session_dir'),
         coalesce(pdb_file, single_chain_pdb_file)
