@@ -7,31 +7,37 @@ from powerfit_em.powerfit import make_parser as make_powerfit_parser
 from rich import print as rprint
 from rich.table import Table
 
-from protein_detective.db import connect, load_powerfit_runs
+from protein_detective.db import connect, list_lcc_files, load_powerfit_runs
 from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.powerfit.workflow import powerfit_commands, powerfit_fit_models, powerfit_report, powerfit_runs
 
 
-def add_powerfit_commands_parser(subparsers):
-    # Add the commands sub-command
-    parser = subparsers.add_parser("commands", help="Generate PowerFit commands for PDB files in the session directory")
-    borrowed_arguments = {
-        "target",
-        "resolution",
-        "angle",
-        "laplace",
-        "core_weighted",
-        "no_resampling",
-        "resampling_rate",
-        "no_trimming",
-        "trimming_cutoff",
-        "nproc",
-    }
+def _copy_powerfit_parser_arguments(parser: argparse.ArgumentParser, borrowed_arguments: None | set[str] = None):
+    if borrowed_arguments is None:
+        borrowed_arguments = {
+            "target",
+            "resolution",
+            "angle",
+            "laplace",
+            "core_weighted",
+            "no_resampling",
+            "resampling_rate",
+            "no_trimming",
+            "trimming_cutoff",
+            "nproc",
+        }
     powerfit_parser = make_powerfit_parser()
 
     for powerfit_argument in powerfit_parser._actions:
         if powerfit_argument.dest in borrowed_arguments:
             parser._add_action(powerfit_argument)
+
+
+def add_powerfit_commands_parser(subparsers):
+    # Add the commands sub-command
+    parser = subparsers.add_parser("commands", help="Generate PowerFit commands for PDB files in the session directory")
+
+    _copy_powerfit_parser_arguments(parser)
 
     # Replaces template argument
     parser.add_argument("session_dir", help="Session directory for input and output")
@@ -67,24 +73,7 @@ def add_powerfit_run_parser(subparsers):
         description="Run PowerFit on PDB files in the session directory and store results.",
     )
 
-    # Add all arguments from PowerFit options
-    borrowed_arguments = {
-        "target",
-        "resolution",
-        "angle",
-        "laplace",
-        "core_weighted",
-        "no_resampling",
-        "resampling_rate",
-        "no_trimming",
-        "trimming_cutoff",
-        "nproc",
-    }
-    powerfit_parser = make_powerfit_parser()
-
-    for powerfit_argument in powerfit_parser._actions:
-        if powerfit_argument.dest in borrowed_arguments:
-            parser._add_action(powerfit_argument)
+    _copy_powerfit_parser_arguments(parser)
 
     parser.add_argument("session_dir", help="Session directory containing PDB files")
     parser.add_argument(
@@ -136,6 +125,11 @@ def add_powerfit_list_runs_parser(subparsers):
     parser.add_argument("session_dir", help="Session directory containing PowerFit results")
 
 
+def add_powerfit_list_lcc_parser(subparsers):
+    parser = subparsers.add_parser("list-lcc", help="List Local Cross Validation (lcc.mrc) files for PowerFit runs")
+    parser.add_argument("session_dir", help="Session directory containing PowerFit results")
+
+
 def add_powerfit_parser(subparsers):
     parser = subparsers.add_parser("powerfit", help="PowerFit related commands")
     powerfit_subparsers = parser.add_subparsers(dest="powerfit_command", required=True)
@@ -144,6 +138,7 @@ def add_powerfit_parser(subparsers):
     add_powerfit_report_parser(powerfit_subparsers)
     add_powerfit_fit_models_parser(powerfit_subparsers)
     add_powerfit_list_runs_parser(powerfit_subparsers)
+    add_powerfit_list_lcc_parser(powerfit_subparsers)
 
 
 def handler_powerfit_run(args):
@@ -163,6 +158,8 @@ def handle_powerfit(args):
         handler_powerfit_fit_models(args)
     elif args.powerfit_command == "list-runs":
         handler_powerfit_list_runs(args)
+    elif args.powerfit_command == "list-lcc":
+        handler_powerfit_list_lcc(args)
 
 
 def handle_powerfit_commands(args):
@@ -220,4 +217,22 @@ def handler_powerfit_list_runs(args):
     table.add_column("Density map (copy)", style="green")
     for row in runs:
         table.add_row(str(row[0]), str(row[1]), str(row[2]))
+    rprint(table)
+
+
+def handler_powerfit_list_lcc(args):
+    session_dir = Path(args.session_dir)
+    with connect(session_dir, read_only=True) as con:
+        lcc_files = list_lcc_files(con)
+
+    if not lcc_files:
+        rprint("[yellow]No lcc.mrc files found. Please run at least one powerfit.[/yellow]")
+        return
+
+    table = Table(title="PowerFit LCC files")
+    table.add_column("Run ID", justify="right", style="cyan")
+    table.add_column("Structure", style="magenta")
+    table.add_column("LCC file", style="green")
+    for run_id, structure, lcc_file in lcc_files:
+        table.add_row(str(run_id), structure, lcc_file)
     rprint(table)

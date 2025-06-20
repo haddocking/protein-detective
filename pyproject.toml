@@ -83,6 +83,7 @@ select = [
     "C",
     # TODO enable D and make code more descriptive
     # "D",
+    "D417",
     "DTZ",
     "E",
     "EM",
