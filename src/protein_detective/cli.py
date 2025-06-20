@@ -5,6 +5,7 @@ from pathlib import Path
 from rich import print as rprint
 from rich.logging import RichHandler
 
+from protein_detective.__version__ import __version__
 from protein_detective.alphafold import downloadable_formats
 from protein_detective.alphafold.density import DensityFilterQuery
 from protein_detective.powerfit.cli import (
@@ -128,6 +129,7 @@ def handle_prune_pdbs(args):
 def make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Protein Detective CLI", prog="protein-detective")
     parser.add_argument("--log-level", default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
     add_search_parser(subparsers)
