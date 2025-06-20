@@ -501,17 +501,16 @@ def load_fitted_models(con: DuckDBPyConnection) -> DataFrame:
 
     Returns:
         A DataFrame containing the fitted model PDB file with columns:
-            - powerfit_run_id: The ID of the PowerFit run.
-            - structure: The structure identifier.
-            - rank: The rank of the fitted model for that run and structure combination.
             - unfitted_model_file: The path to the original model PDB file.
             - fitted_model_file: The path to the fitted model PDB file.
+        and all columns returned by [powerfit_solutions][protein_detective.db.powerfit_solutions]
+        with `pdb_file` renamed to `unfitted_model_file` column..
     """
     con.execute("""
         SELECT
             f.* EXCLUDE (unfitted_model_file),
             COALESCE(f.unfitted_model_file, s.pdb_file) AS unfitted_model_file,
-            s.* EXCLUDE (pdb_file),
+            s.* EXCLUDE (powerfit_run_id, structure, rank, pdb_file),
         FROM fitted_models AS f
         JOIN solutions AS s USING (powerfit_run_id, structure, rank)
     """)
