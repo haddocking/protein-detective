@@ -492,7 +492,10 @@ def powerfit_solutions(con: DuckDBPyConnection, powerfit_run_id: int | None = No
     return con.df()
 
 
-def save_fitted_models(df: DataFrame, con: DuckDBPyConnection):  # noqa: ARG001
+def save_fitted_models(
+    df: DataFrame,  # noqa: ARG001
+    con: DuckDBPyConnection,
+):
     con.execute("INSERT OR IGNORE INTO raw_fitted_models BY NAME SELECT * FROM df")
 
 
