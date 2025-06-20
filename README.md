@@ -21,6 +21,10 @@ pip install git+https://github.com/haddocking/protein-detective.git
 
 ## Usage
 
+The main entry point is the `protein-detective` command line tool which has multiple subcommands to perform actions.
+
+To use programmaticly, see the [notebooks](docs/notebooks) and [API documentation](https://www.bonvinlab.org/protein-detective/autoapi/summary/).
+
 ### Search Uniprot for structures
 
 ```shell
