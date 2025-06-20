@@ -1,5 +1,6 @@
--- TODO make all file paths be relative to current session directory
+-- TODO be consitent with function lower or upper case
 
+-- If session_dir is not set, use current working directory
 SET VARIABLE session_dir = COALESCE(
     getvariable('session_dir'),
     '.'
@@ -120,7 +121,11 @@ SELECT
     density_filter_id,
     af_id,
     pdb_id,
-    getvariable('session_dir') || '/' || COALESCE(pdb_file, single_chain_pdb_file) AS pdb_file,
+    WS_CONCAT(
+        '/',
+        getvariable('session_dir'),
+        COALESCE(pdb_file, single_chain_pdb_file)
+    ) AS pdb_file,
     COALESCE(uniprot_acc, af_id) AS uniprot_acc,
 FROM raw_solutions
 LEFT JOIN (

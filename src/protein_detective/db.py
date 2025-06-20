@@ -179,7 +179,11 @@ def load_pdb_ids(con: DuckDBPyConnection) -> set[str]:
 
 def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
     query = """
-    SELECT uniprot_acc, pdb_id, mmcif_file, uniprot_chains
+    SELECT
+        uniprot_acc,
+        pdb_id,
+        IF(mmcif_file, CONCAT_WS('/', getvariable('session_dir'), mmcif_file), NULL) AS mmcif_file,
+        uniprot_chains
     FROM proteins_pdbs AS pp
     JOIN pdbs AS p USING (pdb_id)
     """
@@ -259,14 +263,26 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     SELECT
         uniprot_acc,
         summary,
-        bcif_file,
-        cif_file,
-        pdb_file,
-        pae_image_file,
-        pae_doc_file,
-        am_annotations_file,
-        am_annotations_hg19_file,
-        am_annotations_hg38_file
+        IF(bcif_file, CONCAT_WS('/', getvariable('session_dir'), bcif_file), NULL) AS bcif_file,
+        IF(cif_file, CONCAT_WS('/', getvariable('session_dir'), cif_file), NULL) AS cif_file,
+        IF(pdb_file, CONCAT_WS('/', getvariable('session_dir'), pdb_file), NULL) AS pdb_file,
+        IF(pae_image_file, CONCAT_WS('/', getvariable('session_dir'), pae_image_file), NULL) AS pae_image_file,
+        IF(pae_doc_file, CONCAT_WS('/', getvariable('session_dir'), pae_doc_file), NULL) AS pae_doc_file,
+        IF(
+            am_annotations_file,
+            CONCAT_WS('/', getvariable('session_dir'), am_annotations_file),
+            NULL
+        ) AS am_annotations_file,
+        IF(
+            am_annotations_hg19_file,
+            CONCAT_WS('/', getvariable('session_dir'), am_annotations_hg19_file),
+            NULL
+        ) AS am_annotations_hg19_file,
+        IF(
+            am_annotations_hg38_file,
+            CONCAT_WS('/', getvariable('session_dir'), am_annotations_hg38_file),
+            NULL
+        ) AS am_annotations_hg38_file
     FROM alphafolds
     """
     rows = con.execute(query).fetchall()
@@ -298,7 +314,8 @@ def save_single_chain_pdb_files(files: list[SingleChainResult], con: DuckDBPyCon
 
 def load_single_chain_pdb_files(con: DuckDBPyConnection) -> list[Path]:
     query = """
-    SELECT single_chain_pdb_file
+    SELECT
+        CONCAT_WS('/', getvariable('session_dir'), single_chain_pdb_file) AS single_chain_pdb_file,
     FROM proteins_pdbs
     WHERE single_chain_pdb_file IS NOT NULL
     """
@@ -354,9 +371,10 @@ def load_density_filtered_alphafolds_files(
     con: DuckDBPyConnection,
 ) -> list[Path]:
     query = """
-    SELECT pdb_file
+    SELECT
+        CONCAT_WS('/', getvariable('session_dir'), pdb_file) AS pdb_file
     FROM density_filtered_alphafolds
-    WHERE keep = TRUE
+    WHERE keep = TRUE AND pdb_file IS NOT NULL
     """
     rows = con.execute(query).fetchall()
     return [Path(row[0]) for row in rows]
@@ -401,7 +419,7 @@ def load_powerfit_runs(con: DuckDBPyConnection) -> list[tuple[int, PowerfitOptio
         SELECT
             powerfit_run_id,
             options,
-            concat_ws(
+            CONCAT_WS(
                 '/',
                 getvariable('session_dir'),
                 'powerfit',
