@@ -21,6 +21,10 @@ pip install git+https://github.com/haddocking/protein-detective.git
 
 ## Usage
 
+The main entry point is the `protein-detective` command line tool which has multiple subcommands to perform actions.
+
+To use programmaticly, see the [notebooks](docs/notebooks) and [API documentation](https://www.bonvinlab.org/protein-detective/autoapi/summary/).
+
 ### Search Uniprot for structures
 
 ```shell
@@ -43,7 +47,7 @@ In `./mysession` directory, you will find session.db file, which is a [DuckDB](h
 protein-detective retrieve ./mysession
 ```
 
-In `./mysession` directory, you will find PDB files from PDBe and AlphaFold DB.
+In `./mysession` directory, you will find mmCIF files from PDBe and PDB files and AlphaFold DB.
 
 ### To filter AlphaFold structures on confidence
 
@@ -65,6 +69,41 @@ Make PDBe files smaller by only keeping first chain of found uniprot entry and r
 
 ```shell
 protein-detective prune-pdbs ./mysession
+```
+
+### Powerfit
+
+Generate the powerfit commands for the filtered and pruned structures.
+
+```shell
+protein-detective powerfit commands ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1
+```
+This will print commands to the terminal, which you can then run in whatever way you prefer.
+Like just sequentially, or with [GNU parallel](https://www.gnu.org/software/parallel/) or as a [Slurm array job](https://slurm.schedmd.com/job_array.html).
+
+Alternatively, you can use the `protein-detective powerfit run ...` command to run powerfit commands sequentially, which is useful for small datasets with rough options.
+
+```shell
+
+To print top 10 solutions to the terminal, you can use:
+
+```shell
+protein-detective powerfit report docs/session1
+```
+
+Outputs something like:
+
+```
+powerfit_run_id,structure,rank,cc,fishz,relz,translation,rotation,density_filter_id,pdb_id,pdb_file,uniprot_acc
+10,A8MT69_pdb4e45.ent_B2A,1,0.432,0.463,10.091,227.18:242.53:211.83,0.0:1.0:1.0:0.0:0.0:1.0:1.0:0.0:0.0,,4E45,docs/session1/single_chain/A8MT69_pdb4e45.ent_B2A.pdb,A8MT69
+10,A8MT69_pdb4ne5.ent_B2A,1,0.423,0.452,10.053,227.18:242.53:214.9,0.0:-0.0:-0.0:-0.604:0.797:0.0:0.797:0.604:0.0,,4NE5,docs/session1/single_chain/A8MT69_pdb4ne5.ent_B2A.pdb,A8MT69
+...
+```
+
+To generate model PDB files rotated/translated to PowerFit solutions, you can use:
+
+```shell
+protein-detective powerfit fit-models docs/session1
 ```
 
 ## Contributing

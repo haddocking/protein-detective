@@ -1,80 +1,46 @@
-from collections.abc import Iterable, Mapping
+"""Module for managing the DuckDB database used for storing metadata for session."""
+
+import logging
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
+from importlib.resources import read_text
 from pathlib import Path
 
 from cattrs import unstructure
 from cattrs.preconf.json import make_converter
-from duckdb import DuckDBPyConnection
+from duckdb import ConstraintException, DuckDBPyConnection, InvalidInputException
 from duckdb import connect as duckdb_connect
+from pandas import DataFrame
 
 from protein_detective.alphafold import AlphaFoldEntry
 from protein_detective.alphafold.density import DensityFilterQuery, DensityFilterResult
 from protein_detective.alphafold.entry_summary import EntrySummary
 from protein_detective.pdbe.io import ProteinPdbRow, SingleChainResult
+from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.uniprot import PdbResult, Query
 
+logger = logging.getLogger(__name__)
 converter = make_converter()
 
-ddl = """\
-CREATE TABLE IF NOT EXISTS uniprot_searches (
-    query JSON,
-);
 
-CREATE TABLE IF NOT EXISTS proteins (
-    uniprot_acc TEXT PRIMARY KEY,
-);
+ddl: str = read_text("protein_detective", "ddl.sql")
+"""The DDL statements to create the database schema to hold session metadata.
 
-CREATE TABLE IF NOT EXISTS pdbs (
-    pdb_id TEXT PRIMARY KEY,
-    method TEXT NOT NULL,
-    resolution REAL,
-    mmcif_file TEXT,
-);
+Paths to files in the database are stored relative to the session directory.
+So you can move the session directory around without breaking the paths.
 
--- pdb could have multiple proteins so use many-to-many table
-CREATE TABLE IF NOT EXISTS proteins_pdbs (
-    uniprot_acc TEXT NOT NULL,
-    pdb_id TEXT NOT NULL,
-    uniprot_chains TEXT NOT NULL,
-    single_chain_pdb_file TEXT,
-    FOREIGN KEY (uniprot_acc) REFERENCES proteins (uniprot_acc),
-    FOREIGN KEY (pdb_id) REFERENCES pdbs (pdb_id),
-    PRIMARY KEY (uniprot_acc, pdb_id)
-);
+Just after connection to the database, you need to set the session_dir as DuckDB variable
+with `con.execute("SET VARIABLE session_dir = ?", (str(session_dir),))`.
+This is done for you if you use [connect()][protein_detective.db.connect] function.
 
-CREATE TABLE IF NOT EXISTS alphafolds (
-    uniprot_acc TEXT PRIMARY KEY,
-    summary JSON,
-    bcif_file TEXT,
-    cif_file TEXT,
-    pdb_file TEXT,
-    pae_image_file TEXT,
-    pae_doc_file TEXT,
-    am_annotations_file TEXT,
-    am_annotations_hg19_file TEXT,
-    am_annotations_hg38_file TEXT,
-    FOREIGN KEY (uniprot_acc) REFERENCES proteins (uniprot_acc)
-);
+For example with cwd ~/ and session_dir "session1" and
+file "~/session1/foo.pdb" then return to consumer as
+"session1/foo.pdb", but stored in the database as "foo.pdb"
 
-CREATE SEQUENCE IF NOT EXISTS id_density_filters START 1;
-CREATE TABLE IF NOT EXISTS density_filters (
-    density_filter_id INTEGER DEFAULT nextval('id_density_filters') PRIMARY KEY,
-    confidence REAL NOT NULL,
-    min_threshold INTEGER NOT NULL,
-    max_threshold INTEGER NOT NULL,
-    UNIQUE (confidence, min_threshold, max_threshold)
-);
-
-CREATE TABLE IF NOT EXISTS density_filtered_alphafolds (
-    density_filter_id INTEGER NOT NULL,
-    uniprot_acc TEXT NOT NULL,
-    nr_residues_above_confidence INTEGER NOT NULL,
-    keep BOOLEAN,
-    pdb_file TEXT,
-    PRIMARY KEY (density_filter_id, uniprot_acc),
-    FOREIGN KEY (density_filter_id) REFERENCES density_filters (density_filter_id),
-    FOREIGN KEY (uniprot_acc) REFERENCES alphafolds (uniprot_acc),
-);
+Some tables are prefixed with `raw_` to store file paths relative to the session directory.
+The views (table name without `raw_`) then prepend the session directory
+(using the DuckDB `session_dir` variable) to the paths,
+so the paths are pointing to the correct files.
 """
 
 
@@ -90,21 +56,79 @@ def db_path(session_dir: Path) -> Path:
     return session_dir / "session.db"
 
 
+def initialize_db(session_dir: Path, con: DuckDBPyConnection):
+    """Initialize the DuckDB database by creating the necessary tables and variables.
+
+    Args:
+        session_dir: The directory where the session data is stored.
+        con: The DuckDB connection to use for executing the DDL statements.
+    """
+    con.execute("SET VARIABLE session_dir = ?", (str(session_dir),))
+
+    # read_csv in solutions table requires at least one solutions.out file to exist
+    # so we create an header only solutions.out file so pattern always matches
+    solution_header_file = session_dir / "powerfit" / "0" / "dummy" / "solutions.out"
+    if not solution_header_file.exists():
+        solution_header_file.parent.mkdir(parents=True, exist_ok=True)
+        solutions_header = "rank,cc,Fish-z,rel-z,x,y,z,a11,a12,a13,a21,a22,a23,a31,a32,a33\n"
+        solution_header_file.write_text(solutions_header)
+
+    con.execute(ddl)
+
+
 @contextmanager
-def connect(session_dir: Path):
+def connect(session_dir: Path, read_only: bool = False) -> Iterator[DuckDBPyConnection]:
+    """Context manager to connect to the DuckDB database holding session metadata.
+
+    Examples:
+        To query in read only mode.
+
+        ```python
+        session_dir = Path("path/to/session")
+        with connect(session_dir, read_only=True) as con:
+            result = con.execute("SELECT * FROM proteins").fetchall()
+        ```
+
+    Args:
+        session_dir: The directory where the session data is stored.
+        read_only: If True, the connection will be read-only.
+            If read only then database can be read by multiple processes.
+            If not read only then database can be read and written to by a single process.
+
+    Yields:
+        DuckDBPyConnection: The connection to the DuckDB database.
+    """
     # wrapper around duckdb.connect to create tables on connect
     database = db_path(session_dir)
-    con = duckdb_connect(database)
-    con.sql(ddl)
+    con = duckdb_connect(database, read_only=read_only)
+    try:
+        initialize_db(session_dir, con)
+    except InvalidInputException as e:
+        if "read-only mode" in str(e):
+            logger.info("Database is in read-only mode, skipping initialization.")
+        else:
+            raise
     yield con
     con.close()
 
 
 def save_query(query: Query, con: DuckDBPyConnection):
+    """Save a UniProt search query to the database.
+
+    Args:
+        query: The UniProt search query to save.
+        con: The DuckDB connection to use for saving the data.
+    """
     con.execute("INSERT INTO uniprot_searches (query) VALUES (?)", (unstructure(query),))
 
 
 def save_uniprot_accessions(uniprot_accessions: Iterable[str], con: DuckDBPyConnection):
+    """Save UniProt accessions to the database.
+
+    Args:
+        uniprot_accessions: An iterable of UniProt accessions to save.
+        con: The DuckDB connection to use for saving the data.
+    """
     rows = [(uniprot_acc,) for uniprot_acc in uniprot_accessions]
     if len(rows) == 0:
         return
@@ -118,6 +142,12 @@ def save_pdbs(
     uniprot2pdbs: Mapping[str, Iterable[PdbResult]],
     con: DuckDBPyConnection,
 ):
+    """Save PDB entries and their associations with UniProt accessions to the database.
+
+    Args:
+        uniprot2pdbs: A mapping of UniProt accessions to their associated PDB.
+        con: The DuckDB connection to use for saving the data.
+    """
     save_uniprot_accessions(uniprot2pdbs.keys(), con)
     pdb_rows = []
     for pdb_results in uniprot2pdbs.values():
@@ -169,8 +199,20 @@ def load_pdb_ids(con: DuckDBPyConnection) -> set[str]:
 
 
 def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
+    """Load PDB entries from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A list of protein pdb rows.
+    """
     query = """
-    SELECT uniprot_acc, pdb_id, mmcif_file, uniprot_chains
+    SELECT
+        uniprot_acc,
+        pdb_id,
+        if(mmcif_file, concat_ws('/', getvariable('session_dir'), mmcif_file), NULL) AS mmcif_file,
+        uniprot_chains
     FROM proteins_pdbs AS pp
     JOIN pdbs AS p USING (pdb_id)
     """
@@ -187,6 +229,13 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
 
 
 def save_alphafolds(afs: dict[str, set[str]], con: DuckDBPyConnection):
+    """Save AlphaFold entries to the database.
+
+    Args:
+        afs: A dictionary mapping UniProt accessions to sets of AlphaFold IDs.
+        con: The DuckDB connection to use for saving the data.
+
+    """
     rows = []
     for af_ids_of_uniprot in afs.values():
         rows.extend([(af_id,) for af_id in af_ids_of_uniprot])
@@ -201,6 +250,13 @@ def save_alphafolds(afs: dict[str, set[str]], con: DuckDBPyConnection):
 
 
 def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
+    """Save AlphaFold files to the database.
+
+    Args:
+        afs: A list of AlphaFold entries.
+        con: The DuckDB connection to use for saving the data.
+
+    """
     rows = [
         (
             converter.dumps(af.summary, EntrySummary),
@@ -237,6 +293,14 @@ def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
 
 
 def load_alphafold_ids(con: DuckDBPyConnection) -> set[str]:
+    """Load AlphaFold IDs from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A set of AlphaFold IDs (UniProt accessions).
+    """
     query = """
     SELECT uniprot_acc
     FROM alphafolds
@@ -246,18 +310,38 @@ def load_alphafold_ids(con: DuckDBPyConnection) -> set[str]:
 
 
 def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
+    """Load AlphaFold entries from the database.
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A list of AlphaFold entries.
+
+    """
     query = """
     SELECT
         uniprot_acc,
         summary,
-        bcif_file,
-        cif_file,
-        pdb_file,
-        pae_image_file,
-        pae_doc_file,
-        am_annotations_file,
-        am_annotations_hg19_file,
-        am_annotations_hg38_file
+        if(bcif_file, concat_ws('/', getvariable('session_dir'), bcif_file), NULL) AS bcif_file,
+        if(cif_file, concat_ws('/', getvariable('session_dir'), cif_file), NULL) AS cif_file,
+        if(pdb_file, concat_ws('/', getvariable('session_dir'), pdb_file), NULL) AS pdb_file,
+        if(pae_image_file, concat_ws('/', getvariable('session_dir'), pae_image_file), NULL) AS pae_image_file,
+        if(pae_doc_file, concat_ws('/', getvariable('session_dir'), pae_doc_file), NULL) AS pae_doc_file,
+        if(
+            am_annotations_file,
+            concat_ws('/', getvariable('session_dir'), am_annotations_file),
+            NULL
+        ) AS am_annotations_file,
+        if(
+            am_annotations_hg19_file,
+            concat_ws('/', getvariable('session_dir'), am_annotations_hg19_file),
+            NULL
+        ) AS am_annotations_hg19_file,
+        if(
+            am_annotations_hg38_file,
+            concat_ws('/', getvariable('session_dir'), am_annotations_hg38_file),
+            NULL
+        ) AS am_annotations_hg38_file
     FROM alphafolds
     """
     rows = con.execute(query).fetchall()
@@ -279,6 +363,13 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
 
 
 def save_single_chain_pdb_files(files: list[SingleChainResult], con: DuckDBPyConnection):
+    """Save single chain PDB files to the database.
+
+    Args:
+        files: A list of objects containing the PDB file paths and metadata.
+        con: The DuckDB connection to use for saving the data.
+
+    """
     if len(files) == 0:
         return
     con.executemany(
@@ -287,12 +378,42 @@ def save_single_chain_pdb_files(files: list[SingleChainResult], con: DuckDBPyCon
     )
 
 
+def load_single_chain_pdb_files(con: DuckDBPyConnection) -> list[Path]:
+    """Load single chain PDB files from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A list of paths to the single chain PDB files.
+    """
+    query = """
+    SELECT
+        concat_ws('/', getvariable('session_dir'), single_chain_pdb_file) AS single_chain_pdb_file,
+    FROM proteins_pdbs
+    WHERE single_chain_pdb_file IS NOT NULL
+    """
+    rows = con.execute(query).fetchall()
+    return [Path(row[0]) for row in rows]
+
+
 def save_density_filtered(
     query: DensityFilterQuery,
     files: list[DensityFilterResult],
     uniprot_accessions: list[str],
     con: DuckDBPyConnection,
 ):
+    """Save density filtered AlphaFold results to the database.
+
+    Args:
+        query: The density filter query parameters.
+        files: A list of the results.
+        uniprot_accessions: A list of UniProt accessions corresponding to the results.
+        con: The DuckDB connection to use for saving the data.
+
+    Raises:
+        ValueError: If the density filter could not be inserted or retrieved.
+    """
     result = con.execute(
         """INSERT OR IGNORE INTO density_filters
         (confidence, min_threshold, max_threshold)
@@ -329,3 +450,210 @@ def save_density_filtered(
         VALUES (?, ?, ?, ?, ?)""",
         values,
     )
+
+
+def load_density_filtered_alphafolds_files(
+    con: DuckDBPyConnection,
+) -> list[Path]:
+    """Load density filtered AlphaFold PDB files from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A list of paths to the density filtered AlphaFold PDB files.
+    """
+    query = """
+    SELECT
+        concat_ws('/', getvariable('session_dir'), pdb_file) AS pdb_file
+    FROM density_filtered_alphafolds
+    WHERE keep = TRUE AND pdb_file IS NOT NULL
+    """
+    rows = con.execute(query).fetchall()
+    return [Path(row[0]) for row in rows]
+
+
+def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> int:
+    """Save PowerFit options of a powerfit run to the database.
+
+    Args:
+        options: The PowerFit options to save.
+        con: The DuckDB connection to use for saving the data.
+
+    Returns:
+        The ID of the PowerFit run created or reused.
+
+    Raises:
+        ValueError: If the options could not be saved or retrieved.
+    """
+    try:
+        result = con.execute(
+            """INSERT INTO powerfit_runs (options)
+            VALUES (?) RETURNING powerfit_run_id""",
+            (converter.dumps(options, PowerfitOptions),),
+        ).fetchone()
+        if result is None or len(result) != 1:
+            msg = "Failed to insert powerfit options"
+            raise ValueError(msg)
+        return result[0]
+    except ConstraintException as e:
+        # If the options already exist, we can retrieve the existing run ID
+        result = con.execute(
+            """SELECT powerfit_run_id FROM powerfit_runs
+            WHERE options = ?""",
+            (converter.dumps(options, PowerfitOptions),),
+        ).fetchone()
+        if result is None or len(result) != 1:
+            msg = "Failed to retrieve existing powerfit run ID"
+            raise ValueError(msg) from e
+        logger.info("Reusing existing powerfit run with ID %d", result[0])
+        return result[0]
+
+
+def load_powerfit_runs(con: DuckDBPyConnection) -> list[tuple[int, PowerfitOptions, Path]]:
+    """Load all PowerFit runs from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A list of tuples containing the PowerFit run ID, options, and density map path.
+    """
+    con.execute(
+        """
+        SELECT
+            powerfit_run_id,
+            options,
+            concat_ws(
+                '/',
+                getvariable('session_dir'),
+                'powerfit',
+                powerfit_run_id,
+                parse_filename(json_extract_string(options, '$.target'))
+            ) AS density_map,
+        FROM powerfit_runs
+    """
+    )
+    rows = con.fetchall()
+    return [(row[0], converter.loads(row[1], PowerfitOptions), Path(row[2])) for row in rows]
+
+
+def load_powerfit_run(
+    powerfit_run_id: int,
+    con: DuckDBPyConnection,
+) -> tuple[PowerfitOptions, Path]:
+    """Load a specific PowerFit run by its ID.
+
+    Args:
+        powerfit_run_id: The ID of the PowerFit run to load.
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A tuple containing the PowerFit options and the path to the density map file.
+
+    Raises:
+        ValueError: If the PowerFit run with the specified ID does not exist.
+    """
+    all_runs = load_powerfit_runs(con)
+    for run in all_runs:
+        if run[0] == powerfit_run_id:
+            return run[1], run[2]
+
+    msg = f"PowerFit run with ID {powerfit_run_id} not found."
+    raise ValueError(msg)
+
+
+def powerfit_solutions(con: DuckDBPyConnection, powerfit_run_id: int | None = None) -> DataFrame:
+    """Retrieve PowerFit solutions from the solutions.out files.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+        powerfit_run_id: Optional ID of a specific PowerFit run to filter results. If None, all runs are included.
+
+    Returns:
+        A DataFrame containing the PowerFit solutions with columns:
+
+            - powerfit_run_id: The ID of the PowerFit run.
+            - structure: The structure identifier.
+            - rank: The rank of the solution.
+            - cc: The correlation coefficient of the solution.
+            - fishz: The Fish-Z score of the solution.
+            - relz: The relative Z-score of the solution.
+            - translation: The translation vector applied to the structure.
+            - rotation: The rotation matrix applied to the structure.
+            - density_filter_id: The ID of the density filter applied to the structure, if stucture came from AlphaFold.
+            - af_id: The AlphaFold ID associated with the structure, if structure came from AlphaFold.
+            - pdb_id: The PDB ID of the structure, if structure came from PDBe.
+            - pdb_file: The path to the PDB file of the structure used as input structre for powerfit run.
+            - uniprot_acc: The UniProt accession number associated with the structure.
+    """
+    # TODO check that cc is the column to sort on, to get best first? Or Fish-z	rel-z
+    # TODO rank is for each powerfit run, make clearer that this is per run/structure combination
+
+    if powerfit_run_id is None:
+        con.execute("FROM solutions")
+    else:
+        con.execute("FROM solutions WHERE powerfit_run_id = ?", (powerfit_run_id,))
+    return con.df()
+
+
+def save_fitted_models(df: DataFrame, con: DuckDBPyConnection):  # noqa: ARG001
+    """Save fitted model PDB files to the database.
+
+    Args:
+        df: A DataFrame containing the fitted model data with columns:
+            - powerfit_run_id: The ID of the PowerFit run.
+            - structure: The structure identifier.
+            - rank: The rank of the solution.
+            - unfitted_model_file: The path to the original model PDB file.
+            - fitted_model_file: The path to the fitted model PDB file.
+        con: The DuckDB connection to use for saving the data.
+    """
+    con.execute("INSERT OR IGNORE INTO raw_fitted_models BY NAME SELECT * FROM df")
+
+
+def load_fitted_models(con: DuckDBPyConnection) -> DataFrame:
+    """Load fitted model PDB files from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A DataFrame containing the fitted model PDB file with columns:
+            - unfitted_model_file: The path to the original model PDB file.
+            - fitted_model_file: The path to the fitted model PDB file.
+        and all columns returned by [powerfit_solutions][protein_detective.db.powerfit_solutions]
+        with `pdb_file` renamed to `unfitted_model_file` column..
+    """
+    con.execute("""
+        SELECT
+            f.* EXCLUDE (unfitted_model_file),
+            coalesce(f.unfitted_model_file, s.pdb_file) AS unfitted_model_file,
+            s.* EXCLUDE (powerfit_run_id, structure, rank, pdb_file),
+        FROM fitted_models AS f
+        JOIN solutions AS s USING (powerfit_run_id, structure, rank)
+    """)
+
+    return con.df()
+
+
+def list_lcc_files(con: DuckDBPyConnection) -> list[tuple[int, str, str]]:
+    """List Local Cross Validation files (lcc.mrc).
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A list of tuples containing the PowerFit run ID, structure, and path to the lcc.mrc file.
+    """
+    con.execute("""
+        SELECT
+            parse_path(file)[-3]::integer AS powerfit_run_id,
+            parse_path(file)[-2] AS structure,
+            file as lcc_file,
+        FROM
+            -- <session_dir>/powerfit/10/AF-A8MT65-F1-model_v4/lcc.mrc
+            glob(concat_ws('/', getvariable('session_dir'), 'powerfit/*/*/lcc.mrc'))
+
+    """)
+    return con.fetchall()

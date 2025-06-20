@@ -3,9 +3,9 @@ site_url: https://bonvinlab.org/protein_detective
 repo_url: https://github.com/haddocking/protein-detective
 watch: [mkdocs.yml, README.md, src/protein_detective]
 exclude_docs: |
-  hooks.py
+  cli_doc_hook.py
 hooks:
-  - docs/hooks.py
+  - docs/cli_doc_hook.py
 theme: 
   name: mkdocs
   color_mode: auto
@@ -13,6 +13,7 @@ theme:
 
 plugins:
   - search
+  - autorefs  
   - mkdocs-jupyter
   - mkdocs-autoapi:
       autoapi_dir: src
@@ -25,6 +26,9 @@ plugins:
           inventories:
             - https://docs.python.org/3/objects.inv
             - https://duckdb.org/docs/stable/clients/python/reference/objects.inv
+            - https://pandas.pydata.org/docs/objects.inv
+            - https://numpy.org/doc/stable/objects.inv
+            - https://atomium.bio/objects.inv
           options:
             docstring_style: google
             show_source: false
@@ -35,6 +39,7 @@ markdown_extensions:
       base_path: [!relative $config_dir]
       check_paths: true
 
+
 nav:
   - Home: index.md
   - CLI Reference: cli.md
@@ -43,5 +48,7 @@ nav:
     - AlphaFold: alphafold.ipynb
     - PDBe: pdbe.ipynb
     - Workflow: workflow.ipynb
+    - Powerfit: powerfit.ipynb
+    - Visualization: visualization.ipynb
   - Contributing guidelines: CONTRIBUTING.md
   - API Reference: autoapi/summary.md

@@ -37,7 +37,7 @@ The sections below outline the steps in each case.
 1. add your own tests (if necessary);
 1. format your code with `uvx ruff format` and sort imports with `uvx ruff check --select I --fix`;
 1. lint your code with `uvx ruff check` (use `uvx ruff check --fix` to fix issues automatically);
-1. type check your code with `uv run pyrefly check`;
+1. type check your code with `uv run pyrefly check src tests`;
 1. update or expand the documentation (see [Contributing with documentation](#contributing-with-documentation) section below);
 1. [push](http://rogerdudler.github.io/git-guide/) your feature branch to (your fork of) the protein-detective repository on GitHub;
 1. create the pull request, e.g. following the instructions [here](https://help.github.com/articles/creating-a-pull-request/).
@@ -88,11 +88,9 @@ python3 -m http.server -d site
 [Pyrefly](https://pyrefly.org/) does not support notebooks yet, so we need to convert them to python scripts and then run pyrefly on them.
 
 ```shell
-uv run --group docs jupyter nbconvert --to python docs/*.ipynb
-# Comment out magic commands
-sed -i 's/^get_ipython/# get_ipython/' docs/*.py
-uv run pyrefly check docs/*.py
-rm docs/*.py
+find docs/ -name "*.ipynb" -exec uv run --group docs-type marimo convert {} -o {}.py \;
+uv run --group docs-type --group docs pyrefly check docs/*.ipynb.py
+rm docs/*.ipynb.py
 ```
 
 </details>

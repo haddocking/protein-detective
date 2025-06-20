@@ -109,7 +109,7 @@ def write_single_chain_pdb_files(
                 proteinpdb.id,
             )
             continue
-        mmcif_file = session_dir / proteinpdb.mmcif_file
+        mmcif_file = proteinpdb.mmcif_file
         uniprot_chains = proteinpdb.uniprot_chains
         chain2keep = first_chain_from_uniprot_chains(uniprot_chains)
         uniprot_acc = proteinpdb.uniprot_acc
