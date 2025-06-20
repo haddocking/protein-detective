@@ -13,6 +13,7 @@ theme:
     - navigation.instant
     - navigation.tabs
     - navigation.tabs.sticky
+    - content.code.copy
   palette:
     # Palette toggle for automatic mode
     - media: "(prefers-color-scheme)"
@@ -65,7 +66,8 @@ markdown_extensions:
   - pymdownx.snippets:
       base_path: [!relative $config_dir]
       check_paths: true
-
+  - pymdownx.highlight
+  - pymdownx.superfences
 
 nav:
   - Home: index.md
@@ -77,4 +79,5 @@ nav:
     - Workflow: workflow.ipynb
     - Powerfit: powerfit.ipynb
     - Visualization: visualization.ipynb
+    - Database: database.ipynb
   - Contributing guidelines: CONTRIBUTING.md
