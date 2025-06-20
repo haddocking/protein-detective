@@ -1,7 +1,5 @@
--- TODO be consitent with function lower or upper case
-
 -- If session_dir is not set, use current working directory
-SET VARIABLE session_dir = COALESCE(
+SET VARIABLE session_dir = coalesce(
     getvariable('session_dir'),
     '.'
 );
@@ -121,12 +119,12 @@ SELECT
     density_filter_id,
     af_id,
     pdb_id,
-    WS_CONCAT(
+    ws_concat(
         '/',
         getvariable('session_dir'),
-        COALESCE(pdb_file, single_chain_pdb_file)
+        coalesce(pdb_file, single_chain_pdb_file)
     ) AS pdb_file,
-    COALESCE(uniprot_acc, af_id) AS uniprot_acc,
+    coalesce(uniprot_acc, af_id) AS uniprot_acc,
 FROM raw_solutions
 LEFT JOIN (
     SELECT density_filter_id, uniprot_acc AS af_id, pdb_file, parse_filename(pdb_file, true) AS structure

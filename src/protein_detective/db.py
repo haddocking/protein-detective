@@ -185,7 +185,7 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
     SELECT
         uniprot_acc,
         pdb_id,
-        IF(mmcif_file, CONCAT_WS('/', getvariable('session_dir'), mmcif_file), NULL) AS mmcif_file,
+        if(mmcif_file, concat_ws('/', getvariable('session_dir'), mmcif_file), NULL) AS mmcif_file,
         uniprot_chains
     FROM proteins_pdbs AS pp
     JOIN pdbs AS p USING (pdb_id)
@@ -266,24 +266,24 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     SELECT
         uniprot_acc,
         summary,
-        IF(bcif_file, CONCAT_WS('/', getvariable('session_dir'), bcif_file), NULL) AS bcif_file,
-        IF(cif_file, CONCAT_WS('/', getvariable('session_dir'), cif_file), NULL) AS cif_file,
-        IF(pdb_file, CONCAT_WS('/', getvariable('session_dir'), pdb_file), NULL) AS pdb_file,
-        IF(pae_image_file, CONCAT_WS('/', getvariable('session_dir'), pae_image_file), NULL) AS pae_image_file,
-        IF(pae_doc_file, CONCAT_WS('/', getvariable('session_dir'), pae_doc_file), NULL) AS pae_doc_file,
-        IF(
+        if(bcif_file, concat_ws('/', getvariable('session_dir'), bcif_file), NULL) AS bcif_file,
+        if(cif_file, concat_ws('/', getvariable('session_dir'), cif_file), NULL) AS cif_file,
+        if(pdb_file, concat_ws('/', getvariable('session_dir'), pdb_file), NULL) AS pdb_file,
+        if(pae_image_file, concat_ws('/', getvariable('session_dir'), pae_image_file), NULL) AS pae_image_file,
+        if(pae_doc_file, concat_ws('/', getvariable('session_dir'), pae_doc_file), NULL) AS pae_doc_file,
+        if(
             am_annotations_file,
-            CONCAT_WS('/', getvariable('session_dir'), am_annotations_file),
+            concat_ws('/', getvariable('session_dir'), am_annotations_file),
             NULL
         ) AS am_annotations_file,
-        IF(
+        if(
             am_annotations_hg19_file,
-            CONCAT_WS('/', getvariable('session_dir'), am_annotations_hg19_file),
+            concat_ws('/', getvariable('session_dir'), am_annotations_hg19_file),
             NULL
         ) AS am_annotations_hg19_file,
-        IF(
+        if(
             am_annotations_hg38_file,
-            CONCAT_WS('/', getvariable('session_dir'), am_annotations_hg38_file),
+            concat_ws('/', getvariable('session_dir'), am_annotations_hg38_file),
             NULL
         ) AS am_annotations_hg38_file
     FROM alphafolds
@@ -318,7 +318,7 @@ def save_single_chain_pdb_files(files: list[SingleChainResult], con: DuckDBPyCon
 def load_single_chain_pdb_files(con: DuckDBPyConnection) -> list[Path]:
     query = """
     SELECT
-        CONCAT_WS('/', getvariable('session_dir'), single_chain_pdb_file) AS single_chain_pdb_file,
+        concat_ws('/', getvariable('session_dir'), single_chain_pdb_file) AS single_chain_pdb_file,
     FROM proteins_pdbs
     WHERE single_chain_pdb_file IS NOT NULL
     """
@@ -375,7 +375,7 @@ def load_density_filtered_alphafolds_files(
 ) -> list[Path]:
     query = """
     SELECT
-        CONCAT_WS('/', getvariable('session_dir'), pdb_file) AS pdb_file
+        concat_ws('/', getvariable('session_dir'), pdb_file) AS pdb_file
     FROM density_filtered_alphafolds
     WHERE keep = TRUE AND pdb_file IS NOT NULL
     """
@@ -422,7 +422,7 @@ def load_powerfit_runs(con: DuckDBPyConnection) -> list[tuple[int, PowerfitOptio
         SELECT
             powerfit_run_id,
             options,
-            CONCAT_WS(
+            concat_ws(
                 '/',
                 getvariable('session_dir'),
                 'powerfit',
@@ -512,7 +512,7 @@ def load_fitted_models(con: DuckDBPyConnection) -> DataFrame:
     con.execute("""
         SELECT
             f.* EXCLUDE (unfitted_model_file),
-            COALESCE(f.unfitted_model_file, s.pdb_file) AS unfitted_model_file,
+            coalesce(f.unfitted_model_file, s.pdb_file) AS unfitted_model_file,
             s.* EXCLUDE (powerfit_run_id, structure, rank, pdb_file),
         FROM fitted_models AS f
         JOIN solutions AS s USING (powerfit_run_id, structure, rank)
@@ -534,7 +534,7 @@ def list_lcc_files(con: DuckDBPyConnection) -> list[tuple[int, str, str]]:
             file as lcc_file,
         FROM
             -- <session_dir>/powerfit/10/AF-A8MT65-F1-model_v4/lcc.mrc
-            GLOB(CONCAT_WS('/', getvariable('session_dir'), 'powerfit/*/*/lcc.mrc'))
+            glob(concat_ws('/', getvariable('session_dir'), 'powerfit/*/*/lcc.mrc'))
 
     """)
     return con.fetchall()
