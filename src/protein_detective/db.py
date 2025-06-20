@@ -113,10 +113,22 @@ def connect(session_dir: Path, read_only: bool = False) -> Iterator[DuckDBPyConn
 
 
 def save_query(query: Query, con: DuckDBPyConnection):
+    """Save a UniProt search query to the database.
+
+    Args:
+        query: The UniProt search query to save.
+        con: The DuckDB connection to use for saving the data.
+    """
     con.execute("INSERT INTO uniprot_searches (query) VALUES (?)", (unstructure(query),))
 
 
 def save_uniprot_accessions(uniprot_accessions: Iterable[str], con: DuckDBPyConnection):
+    """Save UniProt accessions to the database.
+
+    Args:
+        uniprot_accessions: An iterable of UniProt accessions to save.
+        con: The DuckDB connection to use for saving the data.
+    """
     rows = [(uniprot_acc,) for uniprot_acc in uniprot_accessions]
     if len(rows) == 0:
         return
@@ -130,6 +142,12 @@ def save_pdbs(
     uniprot2pdbs: Mapping[str, Iterable[PdbResult]],
     con: DuckDBPyConnection,
 ):
+    """Save PDB entries and their associations with UniProt accessions to the database.
+
+    Args:
+        uniprot2pdbs: A mapping of UniProt accessions to their associated PDB.
+        con: The DuckDB connection to use for saving the data.
+    """
     save_uniprot_accessions(uniprot2pdbs.keys(), con)
     pdb_rows = []
     for pdb_results in uniprot2pdbs.values():
@@ -181,6 +199,14 @@ def load_pdb_ids(con: DuckDBPyConnection) -> set[str]:
 
 
 def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
+    """Load PDB entries from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A list of protein pdb rows.
+    """
     query = """
     SELECT
         uniprot_acc,
@@ -203,6 +229,13 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
 
 
 def save_alphafolds(afs: dict[str, set[str]], con: DuckDBPyConnection):
+    """Save AlphaFold entries to the database.
+
+    Args:
+        afs: A dictionary mapping UniProt accessions to sets of AlphaFold IDs.
+        con: The DuckDB connection to use for saving the data.
+
+    """
     rows = []
     for af_ids_of_uniprot in afs.values():
         rows.extend([(af_id,) for af_id in af_ids_of_uniprot])
@@ -217,6 +250,13 @@ def save_alphafolds(afs: dict[str, set[str]], con: DuckDBPyConnection):
 
 
 def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
+    """Save AlphaFold files to the database.
+
+    Args:
+        afs: A list of AlphaFold entries.
+        con: The DuckDB connection to use for saving the data.
+
+    """
     rows = [
         (
             converter.dumps(af.summary, EntrySummary),
@@ -253,6 +293,14 @@ def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
 
 
 def load_alphafold_ids(con: DuckDBPyConnection) -> set[str]:
+    """Load AlphaFold IDs from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A set of AlphaFold IDs (UniProt accessions).
+    """
     query = """
     SELECT uniprot_acc
     FROM alphafolds
@@ -262,6 +310,14 @@ def load_alphafold_ids(con: DuckDBPyConnection) -> set[str]:
 
 
 def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
+    """Load AlphaFold entries from the database.
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A list of AlphaFold entries.
+
+    """
     query = """
     SELECT
         uniprot_acc,
@@ -307,6 +363,13 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
 
 
 def save_single_chain_pdb_files(files: list[SingleChainResult], con: DuckDBPyConnection):
+    """Save single chain PDB files to the database.
+
+    Args:
+        files: A list of objects containing the PDB file paths and metadata.
+        con: The DuckDB connection to use for saving the data.
+
+    """
     if len(files) == 0:
         return
     con.executemany(
@@ -316,6 +379,14 @@ def save_single_chain_pdb_files(files: list[SingleChainResult], con: DuckDBPyCon
 
 
 def load_single_chain_pdb_files(con: DuckDBPyConnection) -> list[Path]:
+    """Load single chain PDB files from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A list of paths to the single chain PDB files.
+    """
     query = """
     SELECT
         concat_ws('/', getvariable('session_dir'), single_chain_pdb_file) AS single_chain_pdb_file,
@@ -332,6 +403,17 @@ def save_density_filtered(
     uniprot_accessions: list[str],
     con: DuckDBPyConnection,
 ):
+    """Save density filtered AlphaFold results to the database.
+
+    Args:
+        query: The density filter query parameters.
+        files: A list of the results.
+        uniprot_accessions: A list of UniProt accessions corresponding to the results.
+        con: The DuckDB connection to use for saving the data.
+
+    Raises:
+        ValueError: If the density filter could not be inserted or retrieved.
+    """
     result = con.execute(
         """INSERT OR IGNORE INTO density_filters
         (confidence, min_threshold, max_threshold)
@@ -373,6 +455,14 @@ def save_density_filtered(
 def load_density_filtered_alphafolds_files(
     con: DuckDBPyConnection,
 ) -> list[Path]:
+    """Load density filtered AlphaFold PDB files from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A list of paths to the density filtered AlphaFold PDB files.
+    """
     query = """
     SELECT
         concat_ws('/', getvariable('session_dir'), pdb_file) AS pdb_file
@@ -384,6 +474,18 @@ def load_density_filtered_alphafolds_files(
 
 
 def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> int:
+    """Save PowerFit options of a powerfit run to the database.
+
+    Args:
+        options: The PowerFit options to save.
+        con: The DuckDB connection to use for saving the data.
+
+    Returns:
+        The ID of the PowerFit run created or reused.
+
+    Raises:
+        ValueError: If the options could not be saved or retrieved.
+    """
     try:
         result = con.execute(
             """INSERT INTO powerfit_runs (options)
@@ -496,11 +598,25 @@ def powerfit_solutions(con: DuckDBPyConnection, powerfit_run_id: int | None = No
 
 
 def save_fitted_models(df: DataFrame, con: DuckDBPyConnection):  # noqa: ARG001
+    """Save fitted model PDB files to the database.
+
+    Args:
+        df: A DataFrame containing the fitted model data with columns:
+            - powerfit_run_id: The ID of the PowerFit run.
+            - structure: The structure identifier.
+            - rank: The rank of the solution.
+            - unfitted_model_file: The path to the original model PDB file.
+            - fitted_model_file: The path to the fitted model PDB file.
+        con: The DuckDB connection to use for saving the data.
+    """
     con.execute("INSERT OR IGNORE INTO raw_fitted_models BY NAME SELECT * FROM df")
 
 
 def load_fitted_models(con: DuckDBPyConnection) -> DataFrame:
     """Load fitted model PDB files from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
 
     Returns:
         A DataFrame containing the fitted model PDB file with columns:
@@ -523,6 +639,9 @@ def load_fitted_models(con: DuckDBPyConnection) -> DataFrame:
 
 def list_lcc_files(con: DuckDBPyConnection) -> list[tuple[int, str, str]]:
     """List Local Cross Validation files (lcc.mrc).
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
 
     Returns:
         A list of tuples containing the PowerFit run ID, structure, and path to the lcc.mrc file.
