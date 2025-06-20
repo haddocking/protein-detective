@@ -33,12 +33,13 @@ Just after connection to the database, you need to set the session_dir as DuckDB
 with `con.execute("SET VARIABLE session_dir = ?", (str(session_dir),))`.
 This is done for you if you use [connect()][protein_detective.db.connect] function.
 
-For example with cwd ~/ and session_dir session1 and
-file "~/session1/foo.pdb" then return to user as
+For example with cwd ~/ and session_dir "session1" and
+file "~/session1/foo.pdb" then return to consumer as
 "session1/foo.pdb", but stored in the database as "foo.pdb"
 
-The databae uses tables prefixed with `raw_` to store file paths relative to the session directory.
-The views then prepend the session directory (using the DuckDB `session_dir` variable) to the paths,
+Some tables are prefixed with `raw_` to store file paths relative to the session directory.
+The views (table name without `raw_`) then prepend the session directory
+(using the DuckDB `session_dir` variable) to the paths,
 so the paths are pointing to the correct files.
 """
 
@@ -65,7 +66,7 @@ def initialize_db(session_dir: Path, con: DuckDBPyConnection):
     con.execute("SET VARIABLE session_dir = ?", (str(session_dir),))
 
     # read_csv in solutions table requires at least one solutions.out file to exist
-    # so we create an empty solutions.out file if it does not exist
+    # so we create an header only solutions.out file so pattern always matches
     solution_header_file = session_dir / "powerfit" / "0" / "dummy" / "solutions.out"
     if not solution_header_file.exists():
         solution_header_file.parent.mkdir(parents=True, exist_ok=True)
@@ -77,12 +78,13 @@ def initialize_db(session_dir: Path, con: DuckDBPyConnection):
 
 @contextmanager
 def connect(session_dir: Path, read_only: bool = False) -> Iterator[DuckDBPyConnection]:
-    """Context manager to connect to the DuckDB database.
+    """Context manager to connect to the DuckDB database holding session metadata.
 
     Examples:
-        To query in read only mode..
+        To query in read only mode.
 
         ```python
+        session_dir = Path("path/to/session")
         with connect(session_dir, read_only=True) as con:
             result = con.execute("SELECT * FROM proteins").fetchall()
         ```
@@ -90,7 +92,8 @@ def connect(session_dir: Path, read_only: bool = False) -> Iterator[DuckDBPyConn
     Args:
         session_dir: The directory where the session data is stored.
         read_only: If True, the connection will be read-only.
-            If read only database can be read by multiple processes.
+            If read only then database can be read by multiple processes.
+            If not read only then database can be read and written to by a single process.
 
     Yields:
         DuckDBPyConnection: The connection to the DuckDB database.
@@ -518,4 +521,20 @@ def load_fitted_models(con: DuckDBPyConnection) -> DataFrame:
     return con.df()
 
 
-# TODO add function to return Local Cross Validation files aka powerfit/10/AF-A8MT65-F1-model_v4/lcc.mrc
+def list_lcc_files(con: DuckDBPyConnection) -> list[tuple[int, str, str]]:
+    """List Local Cross Validation files (lcc.mrc).
+
+    Returns:
+        A list of tuples containing the PowerFit run ID, structure, and path to the lcc.mrc file.
+    """
+    con.execute("""
+        SELECT
+            parse_path(file)[-3]::integer AS powerfit_run_id,
+            parse_path(file)[-2] AS structure,
+            file as lcc_file,
+        FROM
+            -- <session_dir>/powerfit/10/AF-A8MT65-F1-model_v4/lcc.mrc
+            GLOB(CONCAT_WS('/', getvariable('session_dir'), 'powerfit/*/*/lcc.mrc'))
+
+    """)
+    return con.fetchall()
