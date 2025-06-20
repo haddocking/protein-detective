@@ -109,11 +109,10 @@ def retrieve_structures(
         with connect(session_dir) as con:
             pdb_ids = load_pdb_ids(con)
 
-        mmcif_files = pdbe_fetch(pdb_ids, download_dir)
+            mmcif_files = pdbe_fetch(pdb_ids, download_dir)
 
-        # make paths relative to session_dir, so db stores paths relative to session_dir
-        sr_mmcif_files = {pdb_id: mmcif_file.relative_to(session_dir) for pdb_id, mmcif_file in mmcif_files.items()}
-        with connect(session_dir) as con:
+            # make paths relative to session_dir, so db stores paths relative to session_dir
+            sr_mmcif_files = {pdb_id: mmcif_file.relative_to(session_dir) for pdb_id, mmcif_file in mmcif_files.items()}
             save_pdb_files(sr_mmcif_files, con)
 
     afs = []
@@ -123,10 +122,9 @@ def retrieve_structures(
         with connect(session_dir) as con:
             af_ids = load_alphafold_ids(con)
 
-        afs = af_fetch(af_ids, download_dir, what=what_af_formats)
+            afs = af_fetch(af_ids, download_dir, what=what_af_formats)
 
-        sr_afs = [af_relative_to(af, session_dir) for af in afs]
-        with connect(session_dir) as con:
+            sr_afs = [af_relative_to(af, session_dir) for af in afs]
             save_alphafolds_files(sr_afs, con)
 
     return download_dir, len(sr_mmcif_files), len(afs)
@@ -167,8 +165,8 @@ def density_filter(session_dir: Path, query: DensityFilterQuery) -> DensityFilte
     density_filtered_dir = session_dir / "density_filtered"
     density_filtered_dir.mkdir(parents=True, exist_ok=True)
 
-    with connect(session_dir) as conn:
-        afs = load_alphafolds(conn)
+    with connect(session_dir) as con:
+        afs = load_alphafolds(con)
         alphafold_pdb_files = [session_dir / e.pdb_file for e in afs if e.pdb_file is not None]
         uniproc_accs = [e.uniprot_acc for e in afs]
 
@@ -181,7 +179,7 @@ def density_filter(session_dir: Path, query: DensityFilterQuery) -> DensityFilte
             query,
             density_filtered,
             uniproc_accs,
-            conn,
+            con,
         )
         nr_kept = len([e for e in density_filtered if e.density_filtered_file is not None])
         nr_discarded = len(density_filtered) - nr_kept
@@ -200,10 +198,10 @@ def prune_pdbs(session_dir: Path) -> tuple[Path, int]:
     single_chain_dir = session_dir / "single_chain"
     single_chain_dir.mkdir(parents=True, exist_ok=True)
 
-    with connect(session_dir) as conn:
-        proteinpdbs = load_pdbs(conn)
+    with connect(session_dir) as con:
+        proteinpdbs = load_pdbs(con)
         new_files = list(write_single_chain_pdb_files(proteinpdbs, session_dir, single_chain_dir))
-        save_single_chain_pdb_files(new_files, conn)
+        save_single_chain_pdb_files(new_files, con)
 
         return single_chain_dir, len(new_files)
 
@@ -255,7 +253,7 @@ def _initialize_powerfit_run(session_dir, options):
 
     # Load the PDB files from the session directory
     pdb_files = []
-    with connect(session_dir) as con:
+    with connect(session_dir, read_only=True) as con:
         pdbe_files = load_single_chain_pdb_files(con)
         af_files = load_density_filtered_alphafolds_files(con)
         pdb_files = pdbe_files + af_files
@@ -300,7 +298,7 @@ def powerfit_report(session_dir: Path, powerfit_run_id: int | None = None) -> pd
     Returns:
         A DataFrame containing the PowerFit solutions. See [protein_detective.db.powerfit_solutions][] for details.
     """
-    with connect(session_dir) as con:
+    with connect(session_dir, read_only=True) as con:
         return powerfit_solutions(con, powerfit_run_id=powerfit_run_id)
 
 

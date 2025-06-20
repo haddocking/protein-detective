@@ -324,7 +324,7 @@ def handler_powerfit_fit_models(args):
 
 def handler_powerfit_list_runs(args):
     session_dir = Path(args.session_dir)
-    with connect(session_dir) as con:
+    with connect(session_dir, read_only=True) as con:
         runs = load_powerfit_runs(con)
 
     if len(runs) == 0:

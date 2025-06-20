@@ -1,14 +1,14 @@
 """Module for managing the DuckDB database used for storing metadata for session."""
 
 import logging
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from importlib.resources import read_text
 from pathlib import Path
 
 from cattrs import unstructure
 from cattrs.preconf.json import make_converter
-from duckdb import ConstraintException, DuckDBPyConnection
+from duckdb import ConstraintException, DuckDBPyConnection, InvalidInputException
 from duckdb import connect as duckdb_connect
 from pandas import DataFrame
 
@@ -76,11 +76,35 @@ def initialize_db(session_dir: Path, con: DuckDBPyConnection):
 
 
 @contextmanager
-def connect(session_dir: Path):
+def connect(session_dir: Path, read_only: bool = False) -> Iterator[DuckDBPyConnection]:
+    """Context manager to connect to the DuckDB database.
+
+    Examples:
+        To query in read only mode..
+
+        ```python
+        with connect(session_dir, read_only=True) as con:
+            result = con.execute("SELECT * FROM proteins").fetchall()
+        ```
+
+    Args:
+        session_dir: The directory where the session data is stored.
+        read_only: If True, the connection will be read-only.
+            If read only database can be read by multiple processes.
+
+    Yields:
+        DuckDBPyConnection: The connection to the DuckDB database.
+    """
     # wrapper around duckdb.connect to create tables on connect
     database = db_path(session_dir)
-    con = duckdb_connect(database)
-    initialize_db(session_dir, con)
+    con = duckdb_connect(database, read_only=read_only)
+    try:
+        initialize_db(session_dir, con)
+    except InvalidInputException as e:
+        if "read-only mode" in str(e):
+            logger.info("Database is in read-only mode, skipping initialization.")
+        else:
+            raise
     yield con
     con.close()
 
