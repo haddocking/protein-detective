@@ -1,30 +1,9 @@
-"""Module for managing the DuckDB database used in Protein Detective.
-
-## dll
-
-The DDL statements to create the database schema.
-The DDL (Data Definition Language) statements for the DuckDB database used in a Protein Detective session.
-
-Paths to files in the database are stored relative to the session directory.
-So you can move the session directory around without breaking the paths.
-
-Just after connection to the database, you need to set the session_dir as DuckDB variable
-with `con.execute("SET VARIABLE session_dir = ?", (str(session_dir),))`.
-This is done for you if you use [connect][] function.
-
-For example with cwd ~/ and session_dir session1 and
-file "~/session1/foo.pdb" then return to user as
-"session1/foo.pdb", but stored in the database as "foo.pdb"
-
-The databae uses tables prefixed with `raw_` to store file paths relative to the session directory.
-The views then prepend the session directory (using the DuckDB `session_dir` variable) to the paths,
-so the paths are pointing to the correct files.
-
-"""
+"""Module for managing the DuckDB database used for storing metadata for session."""
 
 import logging
 from collections.abc import Iterable, Mapping
 from contextlib import contextmanager
+from importlib.resources import read_text
 from pathlib import Path
 
 from cattrs import unstructure
@@ -44,163 +23,23 @@ logger = logging.getLogger(__name__)
 converter = make_converter()
 
 
-# TODO make all file paths be relative to current session directory
-ddl = """
-CREATE TABLE IF NOT EXISTS uniprot_searches (
-    query JSON,
-);
+ddl: str = read_text("protein_detective", "ddl.sql")
+"""The DDL statements to create the database schema to hold session metadata.
 
-CREATE TABLE IF NOT EXISTS proteins (
-    uniprot_acc TEXT PRIMARY KEY,
-);
+Paths to files in the database are stored relative to the session directory.
+So you can move the session directory around without breaking the paths.
 
-CREATE TABLE IF NOT EXISTS pdbs (
-    pdb_id TEXT PRIMARY KEY,
-    method TEXT NOT NULL,
-    resolution REAL,
-    mmcif_file TEXT,
-);
+Just after connection to the database, you need to set the session_dir as DuckDB variable
+with `con.execute("SET VARIABLE session_dir = ?", (str(session_dir),))`.
+This is done for you if you use [connect()][protein_detective.db.connect] function.
 
--- pdb could have multiple proteins so use many-to-many table
-CREATE TABLE IF NOT EXISTS proteins_pdbs (
-    uniprot_acc TEXT NOT NULL,
-    pdb_id TEXT NOT NULL,
-    uniprot_chains TEXT NOT NULL,
-    single_chain_pdb_file TEXT,
-    FOREIGN KEY (uniprot_acc) REFERENCES proteins (uniprot_acc),
-    FOREIGN KEY (pdb_id) REFERENCES pdbs (pdb_id),
-    PRIMARY KEY (uniprot_acc, pdb_id)
-);
+For example with cwd ~/ and session_dir session1 and
+file "~/session1/foo.pdb" then return to user as
+"session1/foo.pdb", but stored in the database as "foo.pdb"
 
-CREATE TABLE IF NOT EXISTS alphafolds (
-    uniprot_acc TEXT PRIMARY KEY,
-    summary JSON,
-    bcif_file TEXT,
-    cif_file TEXT,
-    pdb_file TEXT,
-    pae_image_file TEXT,
-    pae_doc_file TEXT,
-    am_annotations_file TEXT,
-    am_annotations_hg19_file TEXT,
-    am_annotations_hg38_file TEXT,
-    FOREIGN KEY (uniprot_acc) REFERENCES proteins (uniprot_acc)
-);
-
-CREATE SEQUENCE IF NOT EXISTS id_density_filters START 1;
-CREATE TABLE IF NOT EXISTS density_filters (
-    density_filter_id INTEGER DEFAULT nextval('id_density_filters') PRIMARY KEY,
-    confidence REAL NOT NULL,
-    min_threshold INTEGER NOT NULL,
-    max_threshold INTEGER NOT NULL,
-    UNIQUE (confidence, min_threshold, max_threshold)
-);
-
-CREATE TABLE IF NOT EXISTS density_filtered_alphafolds (
-    density_filter_id INTEGER NOT NULL,
-    uniprot_acc TEXT NOT NULL,
-    nr_residues_above_confidence INTEGER NOT NULL,
-    keep BOOLEAN,
-    pdb_file TEXT,
-    PRIMARY KEY (density_filter_id, uniprot_acc),
-    FOREIGN KEY (density_filter_id) REFERENCES density_filters (density_filter_id),
-    FOREIGN KEY (uniprot_acc) REFERENCES alphafolds (uniprot_acc),
-);
-
-CREATE SEQUENCE IF NOT EXISTS id_powerfit_runs START 1;
-CREATE TABLE IF NOT EXISTS powerfit_runs (
-    powerfit_run_id INTEGER DEFAULT nextval('id_powerfit_runs') PRIMARY KEY,
-    options JSON NOT NULL,
-    UNIQUE (options)
-);
-
--- Need to use view, when using table then new runs will not be picked up by read_csv
-CREATE VIEW IF NOT EXISTS raw_solutions AS
-SELECT
-    parse_path(filename)[-3] AS powerfit_run_id,
-    parse_path(filename)[-2] AS structure,
-    rank, cc, fishz, relz,
-    [x,y,z]::FLOAT[3] AS translation,
-    [a11, a12, a13, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation,
-FROM
-    read_csv(
-        getvariable('session_dir') || '/powerfit/*/*/solutions.out',
-        filename=True, normalize_names=True,
-        -- Need to specify types as powerfit/0/dummy/solutions.out only has header
-        -- and sniffer_csv will type columns as VARCHAR
-        columns={
-            'rank': 'INTEGER',
-            'cc': 'FLOAT',
-            'fishz': 'FLOAT',
-            'relz': 'FLOAT',
-            'x': 'FLOAT',
-            'y': 'FLOAT',
-            'z': 'FLOAT',
-            'a11': 'FLOAT',
-            'a12': 'FLOAT',
-            'a13': 'FLOAT',
-            'a21': 'FLOAT',
-            'a22': 'FLOAT',
-            'a23': 'FLOAT',
-            'a31': 'FLOAT',
-            'a32': 'FLOAT',
-            'a33': 'FLOAT',
-        }
-    )
-;
-
-CREATE VIEW IF NOT EXISTS solutions AS
-SELECT
-    powerfit_run_id,
-    structure,
-    rank,
-    cc,
-    fishz,
-    relz,
-    translation,
-    rotation,
-    density_filter_id,
-    af_id,
-    pdb_id,
-    getvariable('session_dir') || '/' || COALESCE(pdb_file, single_chain_pdb_file) AS pdb_file,
-    COALESCE(uniprot_acc, af_id) AS uniprot_acc,
-FROM raw_solutions
-LEFT JOIN (
-    SELECT density_filter_id, uniprot_acc AS af_id, pdb_file, parse_filename(pdb_file, true) AS structure
-    FROM density_filtered_alphafolds WHERE keep=True
-) AS a USING (structure)
-LEFT JOIN (
-    SELECT uniprot_acc, pdb_id, single_chain_pdb_file, parse_filename(single_chain_pdb_file, true) AS structure
-    FROM proteins_pdbs
-    WHERE single_chain_pdb_file IS NOT NULL
-) AS p USING (structure)
-ORDER BY cc DESC;
-
-CREATE TABLE IF NOT EXISTS raw_fitted_models (
-    powerfit_run_id INTEGER NOT NULL,
-    structure TEXT NOT NULL,
-    rank INTEGER NOT NULL,
-    -- unfitted_model_file is either foreign key of density_filtered_alphafolds.pdb_file
-    -- or proteins_pdbs.single_chain_pdb_file
-    unfitted_model_file TEXT NOT NULL,
-    fitted_model_file TEXT PRIMARY KEY,
-);
-
-CREATE VIEW IF NOT EXISTS fitted_models AS
-SELECT
-    powerfit_run_id,
-    structure,
-    rank,
-    concat_ws(
-        '/',
-        getvariable('session_dir'),
-        unfitted_model_file
-    ) AS unfitted_model_file,
-    concat_ws(
-        '/',
-        getvariable('session_dir'),
-        fitted_model_file
-    ) AS fitted_model_file
-FROM raw_fitted_models;
+The databae uses tables prefixed with `raw_` to store file paths relative to the session directory.
+The views then prepend the session directory (using the DuckDB `session_dir` variable) to the paths,
+so the paths are pointing to the correct files.
 """
 
 
