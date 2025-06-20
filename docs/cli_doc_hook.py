@@ -27,7 +27,7 @@ def argparser_to_markdown(parser: argparse.ArgumentParser, heading="CLI Referenc
     lines = [
         f"# {heading}",
         f"Documentation for the `{prog}` script.",
-        "```shell",
+        "```console",
         f"$ {prog} --help",
         main_help,
         "```",
@@ -42,7 +42,7 @@ def argparser_to_markdown(parser: argparse.ArgumentParser, heading="CLI Referenc
         lines.extend(
             [
                 f"## {sub_cmd_name}",
-                "```shell",
+                "```console",
                 f"$ {prog} {sub_cmd_name} --help",
                 sub_cmd_help_text,
                 "```",
@@ -61,7 +61,7 @@ def argparser_to_markdown(parser: argparse.ArgumentParser, heading="CLI Referenc
                 lines.extend(
                     [
                         f"## {sub_cmd_name} {sub_sub_cmd_name}",
-                        "```shell",
+                        "```console",
                         f"$ {prog} {sub_cmd_name} {sub_sub_cmd_name} --help",
                         sub_sub_cmd_help_text,
                         "```",

@@ -620,10 +620,12 @@ def load_fitted_models(con: DuckDBPyConnection) -> DataFrame:
 
     Returns:
         A DataFrame containing the fitted model PDB file with columns:
+
             - unfitted_model_file: The path to the original model PDB file.
             - fitted_model_file: The path to the fitted model PDB file.
-        and all columns returned by [powerfit_solutions][protein_detective.db.powerfit_solutions]
-        with `pdb_file` renamed to `unfitted_model_file` column..
+
+            and all columns returned by [powerfit_solutions][protein_detective.db.powerfit_solutions]
+            with `pdb_file` renamed to `unfitted_model_file` column..
     """
     con.execute("""
         SELECT

@@ -1,5 +1,6 @@
 site_name: Protein Detective
 site_url: https://bonvinlab.org/protein_detective
+repo_name: haddocking/protein-detective
 repo_url: https://github.com/haddocking/protein-detective
 watch: [mkdocs.yml, README.md, src/protein_detective]
 exclude_docs: |
@@ -7,17 +8,44 @@ exclude_docs: |
 hooks:
   - docs/cli_doc_hook.py
 theme: 
-  name: mkdocs
-  color_mode: auto
-  user_color_mode_toggle: true
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - content.code.copy
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default 
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
 
 plugins:
   - search
-  - autorefs  
-  - mkdocs-jupyter
+  - autorefs
+  - mkdocs-jupyter:
+        remove_tag_config:
+            remove_input_tags:
+                - hide_code
   - mkdocs-autoapi:
       autoapi_dir: src
-      autoapi_add_nav_entry: False
   - mkdocstrings:
       handlers:
         python:
@@ -38,7 +66,8 @@ markdown_extensions:
   - pymdownx.snippets:
       base_path: [!relative $config_dir]
       check_paths: true
-
+  - pymdownx.highlight
+  - pymdownx.superfences
 
 nav:
   - Home: index.md
@@ -50,5 +79,5 @@ nav:
     - Workflow: workflow.ipynb
     - Powerfit: powerfit.ipynb
     - Visualization: visualization.ipynb
+    - Database: database.ipynb
   - Contributing guidelines: CONTRIBUTING.md
-  - API Reference: autoapi/summary.md

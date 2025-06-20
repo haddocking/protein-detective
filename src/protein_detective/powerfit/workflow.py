@@ -123,7 +123,8 @@ def powerfit_fit_models(session_dir: Path, powerfit_run_id: int | None = None, t
         top: Number of top solutions to fit.
 
     Returns:
-        A DataFrame containing the fitted models. See [protein_detective.db.save_fitted_models][] for details.
+        A DataFrame containing the fitted models. See protein_detective.db.save_fitted_models function
+            for details.
     """
     all_solutions = powerfit_report(session_dir, powerfit_run_id)
     solutions = all_solutions.head(top)
