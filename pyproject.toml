@@ -1,6 +1,6 @@
 [project]
 name = "protein_detective"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Deduce the protein from a EM density"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -58,6 +58,9 @@ docs-type = [
 [build-system]
 requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/protein_detective/__version__.py"
 
 [tool.uv.sources]
 # TODO remove branch when 
