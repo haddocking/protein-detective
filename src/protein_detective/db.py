@@ -211,7 +211,7 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
     SELECT
         uniprot_acc,
         pdb_id,
-        if(mmcif_file, concat_ws('/', getvariable('session_dir'), mmcif_file), NULL) AS mmcif_file,
+        if(length(mmcif_file), concat_ws('/', getvariable('session_dir'), mmcif_file), NULL) AS mmcif_file,
         uniprot_chains
     FROM proteins_pdbs AS pp
     JOIN pdbs AS p USING (pdb_id)
@@ -322,23 +322,23 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     SELECT
         uniprot_acc,
         summary,
-        if(bcif_file, concat_ws('/', getvariable('session_dir'), bcif_file), NULL) AS bcif_file,
-        if(cif_file, concat_ws('/', getvariable('session_dir'), cif_file), NULL) AS cif_file,
-        if(pdb_file, concat_ws('/', getvariable('session_dir'), pdb_file), NULL) AS pdb_file,
-        if(pae_image_file, concat_ws('/', getvariable('session_dir'), pae_image_file), NULL) AS pae_image_file,
-        if(pae_doc_file, concat_ws('/', getvariable('session_dir'), pae_doc_file), NULL) AS pae_doc_file,
+        if(length(bcif_file), concat_ws('/', getvariable('session_dir'), bcif_file), NULL) AS bcif_file,
+        if(length(cif_file), concat_ws('/', getvariable('session_dir'), cif_file), NULL) AS cif_file,
+        if(length(pdb_file), concat_ws('/', getvariable('session_dir'), pdb_file), NULL) AS pdb_file,
+        if(length(pae_image_file), concat_ws('/', getvariable('session_dir'), pae_image_file), NULL) AS pae_image_file,
+        if(length(pae_doc_file), concat_ws('/', getvariable('session_dir'), pae_doc_file), NULL) AS pae_doc_file,
         if(
-            am_annotations_file,
+            length(am_annotations_file),
             concat_ws('/', getvariable('session_dir'), am_annotations_file),
             NULL
         ) AS am_annotations_file,
         if(
-            am_annotations_hg19_file,
+            length(am_annotations_hg19_file),
             concat_ws('/', getvariable('session_dir'), am_annotations_hg19_file),
             NULL
         ) AS am_annotations_hg19_file,
         if(
-            am_annotations_hg38_file,
+            length(am_annotations_hg38_file),
             concat_ws('/', getvariable('session_dir'), am_annotations_hg38_file),
             NULL
         ) AS am_annotations_hg38_file
