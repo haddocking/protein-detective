@@ -178,17 +178,33 @@ def density_filter(session_dir: Path, query: DensityFilterQuery) -> DensityFilte
         )
 
 
-def prune_pdbs(session_dir: Path) -> tuple[Path, int]:
+def prune_pdbs(session_dir: Path, min_residues: int, max_residues: int) -> tuple[Path, int]:
     """Prune the PDB files to only keep the first chain of the found Uniprot entries.
 
+    Only writes PDB files that have a single chain with a number of residues
+    between `min_residues` and `max_residues` (inclusive).
     And rename that chain to A.
+
+    Args:
+        session_dir: The directory where the session database is stored.
+        min_residues: Minimum number of residues in the chain to keep.
+        max_residues: Maximum number of residues in the chain to keep.
     """
     single_chain_dir = session_dir / "single_chain"
     single_chain_dir.mkdir(parents=True, exist_ok=True)
 
     with connect(session_dir) as con:
         proteinpdbs = load_pdbs(con)
-        new_files = list(write_single_chain_pdb_files(proteinpdbs, session_dir, single_chain_dir))
+        new_files = list(
+            write_single_chain_pdb_files(
+                proteinpdbs,
+                session_dir,
+                single_chain_dir=single_chain_dir,
+                min_residues=min_residues,
+                max_residues=max_residues,
+            )
+        )
+        # TODO save residue range in the database
         save_single_chain_pdb_files(new_files, con)
 
         return single_chain_dir, len(new_files)

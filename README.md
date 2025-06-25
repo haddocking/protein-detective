@@ -68,7 +68,10 @@ protein-detective density-filter \
 Make PDBe files smaller by only keeping first chain of found uniprot entry and renaming to chain A.
 
 ```shell
-protein-detective prune-pdbs ./mysession
+protein-detective prune-pdbs \
+    --min-residues 100 \
+    --max-residues 1000 \
+    ./mysession
 ```
 
 ### Powerfit
