@@ -39,23 +39,23 @@ def write_single_chain_pdb_file(
     min_residues: int,
     max_residues: int,
     out_chain: str = "A",
-) -> bool:
+) -> tuple[bool, int]:
     """Saves a specific protein chain from a mmCIF file to a new PDB file.
 
     Args:
         mmcif_file: Path to the input mmCIF file.
         chain2keep: Chain to keep.
         output_file: Path to the output PDB file.
-        min_residues: Minimum number of residues in the chain to keep.
-        max_residues: Maximum number of residues in the chain to keep.
+        min_residues: Minimum number of residues in the chain to write.
+        max_residues: Maximum number of residues in the chain to write.
         out_chain: Chain identifier for the saved chain in the output file.
 
     Returns:
-        True if the chain was saved successfully, False if the number of residues
-            in the chain is outside the specified range.
+        A tuple containing a boolean indicating whether the file was written successfully,
+        and the number of residues in the chain.
     """
     pdb = atomium.open(str(mmcif_file))
-    chain: atomium.Chain = pdb.model.chain(chain2keep)
+    chain: atomium.Chain = pdb.model.chain(chain2keep)  # type: ignore[missing-attribute]
     nr_residues = len(chain)
     if nr_residues < min_residues:
         logger.info(
@@ -65,7 +65,7 @@ def write_single_chain_pdb_file(
             nr_residues,
             min_residues,
         )
-        return False
+        return False, nr_residues
     if nr_residues > max_residues:
         logger.info(
             "Skipping %s, because it has too many residues in chain %s: %d > %d.",
@@ -74,7 +74,7 @@ def write_single_chain_pdb_file(
             nr_residues,
             max_residues,
         )
-        return False
+        return False, nr_residues
     logger.info(
         'From %s taking chain "%s", with %d residues and saving as "%s" with chain %s.',
         mmcif_file,
@@ -88,7 +88,7 @@ def write_single_chain_pdb_file(
         str(output_file),
     )
     # TODO use less diskspace, save gzipped and make powerfit work with it
-    return True
+    return True, nr_residues
 
 
 @dataclass(frozen=True)
@@ -109,6 +109,19 @@ class ProteinPdbRow:
 
 
 @dataclass(frozen=True)
+class SingleChainQuery:
+    """Query for writing single chain PDB files.
+
+    Parameters:
+        min_residues: Minimum number of residues that must be in chain.
+        max_residues: Maximum number of residues that must be in chain.
+    """
+
+    min_residues: int
+    max_residues: int
+
+
+@dataclass(frozen=True)
 class SingleChainResult:
     """Result of writing a single chain PDB file.
 
@@ -117,15 +130,34 @@ class SingleChainResult:
         pdb_id: The PDB ID of the entry.
         output_file: The path to the output PDB file with
             just the first chain (renamed to A) belonging to given Uniprot accession.
+        nr_residues: The number of residues in the chain that was written.
+        passed: Whether the chain passed the number of residue filter.
     """
 
     uniprot_acc: str
     pdb_id: str
     output_file: Path
+    nr_residues: int
+    passed: bool
+
+
+def nr_residues_in_chain(file: Path | str, chain: str = "A") -> int:
+    """Returns the number of residues in a specific chain from a mmCIF/pdb file.
+
+    Args:
+        file: Path to the input mmCIF/pdb file.
+        chain: Chain to keep.
+
+    Returns:
+        The number of residues in the specified chain.
+    """
+    pdb = atomium.open(str(file))
+    chain: atomium.Chain = pdb.model.chain(chain)  # type: ignore[missing-attribute]
+    return len(chain)
 
 
 def write_single_chain_pdb_files(
-    proteinpdbs: list[ProteinPdbRow], session_dir: Path, single_chain_dir: Path, min_residues: int, max_residues: int
+    proteinpdbs: list[ProteinPdbRow], session_dir: Path, single_chain_dir: Path, query: SingleChainQuery
 ) -> Generator[SingleChainResult]:
     """Writes single chain PDB files from the provided protein PDB rows.
 
@@ -133,8 +165,7 @@ def write_single_chain_pdb_files(
         proteinpdbs: A list of ProteinPdbRow objects.
         session_dir: The directory where the session files are stored.
         single_chain_dir: The directory where the single chain PDB files will be saved.
-        min_residues: Minimum number of residues in the chain to keep.
-        max_residues: Maximum number of residues in the chain to keep.
+        query: The query containing the minimum and maximum number of residues.
 
     Yields:
         SingleChainResult objects containing the UniProt accession, PDB ID, and output file path.
@@ -157,20 +188,26 @@ def write_single_chain_pdb_files(
             logger.info(
                 f"Output file {output_file} already exists. Skipping saving single chain PDB file for {mmcif_file}.",
             )
+            nr_residues = nr_residues_in_chain(output_file)
             yield SingleChainResult(
                 uniprot_acc=uniprot_acc,
                 pdb_id=proteinpdb.id,
                 output_file=output_file.relative_to(session_dir),
+                nr_residues=nr_residues,
+                passed=True,
             )
             continue
-        was_written = write_single_chain_pdb_file(mmcif_file, chain2keep, output_file, min_residues, max_residues)
-        if was_written:
-            yield SingleChainResult(
-                uniprot_acc=uniprot_acc,
-                pdb_id=proteinpdb.id,
-                output_file=output_file.relative_to(session_dir),
-            )
-        else:
-            logger.info(
-                f"Skipping {proteinpdb.id}, because it has too few or too many residues in chain {chain2keep}.",
-            )
+        passed, nr_residues = write_single_chain_pdb_file(
+            mmcif_file=mmcif_file,
+            chain2keep=chain2keep,
+            output_file=output_file,
+            min_residues=query.min_residues,
+            max_residues=query.max_residues,
+        )
+        yield SingleChainResult(
+            uniprot_acc=uniprot_acc,
+            pdb_id=proteinpdb.id,
+            output_file=output_file.relative_to(session_dir),
+            nr_residues=nr_residues,
+            passed=passed,
+        )

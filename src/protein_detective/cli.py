@@ -8,6 +8,7 @@ from rich.logging import RichHandler
 from protein_detective.__version__ import __version__
 from protein_detective.alphafold import downloadable_formats
 from protein_detective.alphafold.density import DensityFilterQuery
+from protein_detective.pdbe.io import SingleChainQuery
 from protein_detective.powerfit.cli import (
     add_powerfit_parser,
     handle_powerfit,
@@ -134,10 +135,13 @@ def handle_density_filter(args):
 
 def handle_prune_pdbs(args):
     session_dir = Path(args.session_dir)
-    single_chain_dir, nr_files = prune_pdbs(
-        session_dir,
+    query = SingleChainQuery(
         min_residues=args.min_residues,
         max_residues=args.max_residues,
+    )
+    single_chain_dir, nr_files = prune_pdbs(
+        session_dir,
+        query,
     )
     rprint(f"Written {nr_files} PDB files to {single_chain_dir} directory.")
 

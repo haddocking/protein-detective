@@ -15,7 +15,7 @@ from pandas import DataFrame
 from protein_detective.alphafold import AlphaFoldEntry
 from protein_detective.alphafold.density import DensityFilterQuery, DensityFilterResult
 from protein_detective.alphafold.entry_summary import EntrySummary
-from protein_detective.pdbe.io import ProteinPdbRow, SingleChainResult
+from protein_detective.pdbe.io import ProteinPdbRow, SingleChainQuery, SingleChainResult
 from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.uniprot import PdbResult, Query
 
@@ -362,19 +362,54 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     ]
 
 
-def save_single_chain_pdb_files(files: list[SingleChainResult], con: DuckDBPyConnection):
+def save_filter(filter_options: dict, con: DuckDBPyConnection) -> int:
+    result = con.execute(
+        """
+        INSERT OR IGNORE INTO filters (filter_options) VALUES (?) RETURNING filter_id
+                         """,
+        (filter_options,),
+    ).fetchone()
+    if result is None:
+        # Already exists, so just fetch the id
+        result = con.execute(
+            """
+            SELECT filter_id FROM filters WHERE filter_options = ?
+            """,
+            (filter_options,),
+        ).fetchone()
+    if result is None or len(result) != 1:
+        msg = "Failed to insert or retrieve filter"
+        raise ValueError(msg)
+    return result[0]
+
+
+def save_single_chain_pdb_files(files: list[SingleChainResult], query: SingleChainQuery, con: DuckDBPyConnection):
     """Save single chain PDB files to the database.
 
     Args:
         files: A list of objects containing the PDB file paths and metadata.
+        query: The single chain query parameters.
         con: The DuckDB connection to use for saving the data.
 
     """
+    filter_options = unstructure(query)
+    filter_id = save_filter(filter_options, con)
+
     if len(files) == 0:
         return
+    rows = []
+    for file in files:
+        output_file = None
+        if file.passed:
+            output_file = str(file.output_file)
+        rows.append(
+            (filter_id, file.uniprot_acc, file.pdb_id, {"nr_residues": file.nr_residues}, file.passed, output_file)
+        )
     con.executemany(
-        "UPDATE proteins_pdbs SET single_chain_pdb_file = ? WHERE uniprot_acc = ? AND pdb_id = ?",
-        [(str(file.output_file), file.uniprot_acc, file.pdb_id) for file in files],
+        """INSERT OR IGNORE INTO filtered_pdbs
+        (filter_id, uniprot_acc, pdb_id, filter_stats, passed, output_file)
+        VALUES (?, ?, ?, ?, ?, ?)""",
+        rows,
     )
 
 
@@ -387,11 +422,12 @@ def load_single_chain_pdb_files(con: DuckDBPyConnection) -> list[Path]:
     Returns:
         A list of paths to the single chain PDB files.
     """
+    # TODO do not ignore filter_id column
     query = """
     SELECT
-        concat_ws('/', getvariable('session_dir'), single_chain_pdb_file) AS single_chain_pdb_file,
-    FROM proteins_pdbs
-    WHERE single_chain_pdb_file IS NOT NULL
+        concat_ws('/', getvariable('session_dir'), output_file),
+    FROM filtered_pdbs
+    WHERE output_file IS NOT NULL
     """
     rows = con.execute(query).fetchall()
     return [Path(row[0]) for row in rows]

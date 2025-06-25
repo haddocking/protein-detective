@@ -25,7 +25,7 @@ from protein_detective.db import (
     save_uniprot_accessions,
 )
 from protein_detective.pdbe.fetch import fetch as pdbe_fetch
-from protein_detective.pdbe.io import write_single_chain_pdb_files
+from protein_detective.pdbe.io import SingleChainQuery, write_single_chain_pdb_files
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
 
 logger = logging.getLogger(__name__)
@@ -178,17 +178,21 @@ def density_filter(session_dir: Path, query: DensityFilterQuery) -> DensityFilte
         )
 
 
-def prune_pdbs(session_dir: Path, min_residues: int, max_residues: int) -> tuple[Path, int]:
+def prune_pdbs(session_dir: Path, query: SingleChainQuery) -> tuple[Path, int]:
     """Prune the PDB files to only keep the first chain of the found Uniprot entries.
 
     Only writes PDB files that have a single chain with a number of residues
     between `min_residues` and `max_residues` (inclusive).
-    And rename that chain to A.
+
+    Also rename that chain to A.
 
     Args:
         session_dir: The directory where the session database is stored.
-        min_residues: Minimum number of residues in the chain to keep.
-        max_residues: Maximum number of residues in the chain to keep.
+        query: The single chain query containing the minimum and maximum number of residues.
+
+    Returns:
+        A tuple containing the directory where the single chain PDB files are stored,
+        and the number of PDB files that passed the residue filter and where written.
     """
     single_chain_dir = session_dir / "single_chain"
     single_chain_dir.mkdir(parents=True, exist_ok=True)
@@ -200,11 +204,9 @@ def prune_pdbs(session_dir: Path, min_residues: int, max_residues: int) -> tuple
                 proteinpdbs,
                 session_dir,
                 single_chain_dir=single_chain_dir,
-                min_residues=min_residues,
-                max_residues=max_residues,
+                query=query,
             )
         )
-        # TODO save residue range in the database
-        save_single_chain_pdb_files(new_files, con)
+        save_single_chain_pdb_files(new_files, query, con)
 
-        return single_chain_dir, len(new_files)
+        return single_chain_dir, len([f for f in new_files if f.passed])
