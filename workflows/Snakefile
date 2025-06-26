@@ -1,0 +1,75 @@
+# Snakemake workflow for minimal protein-detective workflow
+#
+# Prep
+# uv sync --group snakemake
+# cd workflows/
+# Run
+# snakemake --cores 1
+
+rule all:
+    input:
+        "powerfit_report.csv",
+        "powerfit_fit_models.csv"
+
+rule search:
+    output:
+        "session.db"
+    shell:
+        "protein-detective search --taxon-id 9606 --reviewed --subcellular-location-uniprot nucleus --subcellular-location-go GO:0005634 --molecular-function-go GO:0003677 --limit 100 ."
+
+rule retrieve:
+    input:
+        "session.db"
+    output:
+        directory("downloads")
+        # "downloads/{af_id}.pdb"
+        # "downloads/{pdb_id}.cif"
+    shell:
+        "protein-detective retrieve ."
+
+rule density_filter:
+    input:
+        directory("downloads")
+    output:
+        directory("density_filtered")
+    shell:
+        "protein-detective density-filter --confidence-threshold 70 --min-residues 100 --max-residues 500 ."
+
+rule prune_pdbs:
+    input:
+        directory("downloads")
+    output:
+        directory("single_chain")
+    shell:
+        "protein-detective prune-pdbs --min-residues 100 --max-residues 1000 ."
+
+rule powerfit_run:
+    input:
+        directory("density_filtered"),
+        directory("single_chain")
+    params:
+        target = workflow.source_path('../../powerfit-tutorial/ribosome-KsgA.map')
+    output:
+        directory("powerfit/1")
+    shell:
+        "protein-detective powerfit run {params.target} 13 -a 20 --laplace --nproc 1 ."
+
+rule powerfit_report:
+    input:
+        directory("powerfit/1")
+    output:
+        "powerfit_report.csv"
+    shell:
+        "protein-detective powerfit report --output {output} ."
+
+rule powerfit_fit_models:
+    input:
+        # the rotation/translation matrices
+        directory("powerfit/1"),
+        # The models
+        # directory("density_filtered"),
+        # directory("single_chain")
+    output:
+        "powerfit_fit_models.csv"
+    shell:
+        "protein-detective powerfit fit-models --top 5 --output {output} ."
