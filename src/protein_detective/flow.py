@@ -4,8 +4,11 @@
 To run
 
 ```shell
+uv sync --group prefect
 uv run prefect server start
 # In another terminal
+uv run prefect config set PREFECT_RESULTS_PERSIST_BY_DEFAULT=true
+uv run prefect config set PREFECT_TASK_RUNNER_THREAD_POOL_MAX_WORKERS = 6
 uv run python3 src/protein_detective/flow.py
 ```
 
@@ -15,16 +18,14 @@ Rich.LiveError: only one live display may be active at once
 """
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 import duckdb
 import pandas as pd
 from prefect import flow, get_run_logger, task
-from prefect.artifacts import create_table_artifact
 from prefect.assets import materialize
-from prefect.cache_policies import TASK_SOURCE
-from prefect.futures import wait
 from prefect.task_runners import ThreadPoolTaskRunner
-from prefect_dask import DaskTaskRunner
+from prefect_dask.task_runners import DaskTaskRunner
 
 from protein_detective.alphafold import AlphaFoldEntry, Path
 from protein_detective.alphafold.density import DensityFilterQuery, filter_on_density
@@ -35,11 +36,6 @@ from protein_detective.powerfit.run import run
 from protein_detective.powerfit.solution import fit_model
 from protein_detective.uniprot import PdbResult, Query, search4af, search4pdb, search4uniprot
 from protein_detective.workflow import af_fetch
-
-runner = None
-if __name__ == "__main__":
-    # runner = DaskTaskRunner(cluster_kwargs={"n_workers": 6, "threads_per_worker": 1})
-    runner = ThreadPoolTaskRunner(max_workers=6)
 
 
 @task
@@ -116,7 +112,7 @@ def filter_pdbs_task(
 def filter_af_task(
     af_entries: list[AlphaFoldEntry],
     query: DensityFilterQuery,
-) -> list[Path]:
+):
     density_filtered_dir = Path("filtered_afs")
     density_filtered_dir.mkdir(parents=True, exist_ok=True)
 
@@ -138,19 +134,29 @@ def fetch_and_filter_pdb_files(pdb_query, uniprot_accessions, limit: int):
     return filter_pdbs_task(pdb_results, pdb_files, pdb_query)
 
 
+@dataclass
+class PowerfitRun:
+    model_file: Path
+    options: PowerfitOptions
+    result_dir: Path
+
+
 @task
 def powerfit_run_task(
-    model_file: Path,
-    options: PowerfitOptions,
-    result_dir: Path,
+    arg: PowerfitRun,
 ):
+    model_file = arg.model_file
+    options = arg.options
+    result_dir = arg.result_dir
     logger = get_run_logger()
-    if result_dir.exists():
+    if (result_dir).exists():
         logger.info(f"Skipping PowerFit run for {model_file}, result directory already exists: {result_dir}")
-        return
+        return (model_file, result_dir)
     logger.info(f"Running PowerFit on {model_file} in {result_dir}")
     with options.target.open("rb") as density_map:
         run(density_map, model_file, result_dir, options)
+    logger.info(f"PowerFit run completed for {model_file}, results saved in {result_dir}")
+    return (model_file, result_dir)
 
 
 @materialize("file://./powerfit_results")
@@ -162,15 +168,20 @@ def run_powerfit_on_models(powerfit_options: PowerfitOptions, filtered_pdb_files
     logger.info(f"Running PowerFit on {len(model_files)} models with options: {powerfit_options}")
     root_result_dir = Path("powerfit_results")
     root_result_dir.mkdir(parents=True, exist_ok=True)
-    result_dirs = {}
-    tasks = []
+
+    runs = []
     for model_file in model_files:
         result_dir = root_result_dir / model_file.stem
-        task = powerfit_run_task.submit(model_file, powerfit_options, result_dir)
-        tasks.append(task)
-        result_dirs[model_file] = result_dir
-    wait(tasks)
-    return result_dirs
+        runs.append(
+            PowerfitRun(
+                model_file=model_file,
+                result_dir=result_dir,
+                options=powerfit_options,
+            )
+        )
+    result_dirs = powerfit_run_task.map(runs).result()
+
+    return dict(result_dirs)
 
 
 @task
@@ -239,9 +250,28 @@ def fit_models_task(solutions: pd.DataFrame, top: int) -> pd.DataFrame:
     )
 
 
-@flow(task_runner=runner)
+@materialize("file://./powerfit_results/solutions.duckdb")
+def save_powerfit_results(solutions: pd.DataFrame, fitted_solutions: pd.DataFrame):
+    fn = Path("powerfit_results/solutions.duckdb")
+    with duckdb.connect(fn) as con:
+        con.execute("CREATE TABLE IF NOT EXISTS solutions AS SELECT * FROM solutions")
+        con.execute("CREATE TABLE IF NOT EXISTS fitted_solutions AS SELECT * FROM fitted_solutions")
+
+
+# runner = DaskTaskRunner(cluster_kwargs={"n_workers": 6, "threads_per_worker": 1})
+#runner = ThreadPoolTaskRunner(max_workers=6)
+# Use default runner, will run all tasks in parallel, overloading CPU
+runner = None
+
+
+@flow(task_runner=runner)  # type: ignore[arg-type]
 def my_workflow(
-    query: Query, limit: int, pdb_query: SingleChainQuery, dquery: DensityFilterQuery, powerfit_options: PowerfitOptions
+    query: Query,
+    limit: int,
+    pdb_query: SingleChainQuery,
+    dquery: DensityFilterQuery,
+    powerfit_options: PowerfitOptions,
+    top: int,
 ):
     uniprot_accessions = search_uniprot(query, limit)
 
@@ -251,12 +281,9 @@ def my_workflow(
     powerfit_result_dirs = run_powerfit_on_models(powerfit_options, filtered_pdb_files, filtered_af_files)
 
     solutions = powerfit_report_task(powerfit_result_dirs)
-    fitted_solutions = fit_models_task(solutions, top=10)
+    fitted_solutions = fit_models_task(solutions, top=top)
 
-    logger = get_run_logger()
-    logger.info(solutions.head(10))
-    logger.info(fitted_solutions)
-    return solutions, fitted_solutions
+    save_powerfit_results(solutions, fitted_solutions)
 
 
 if __name__ == "__main__":
@@ -281,5 +308,7 @@ if __name__ == "__main__":
         resolution=13,
         angle=20,
         laplace=True,
+        nproc=1,
     )
-    my_workflow(query, 100, pdb_query, dquery, powerfit_options)
+    top = 10
+    my_workflow(query, 100, pdb_query, dquery, powerfit_options, top=top)

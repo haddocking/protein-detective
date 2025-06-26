@@ -15,7 +15,6 @@ dependencies = [
     "molviewspec>=1.6.0",
     "pandas>=2.3.0",
     "powerfit-em>=3.0.2",
-    "prefect[dask]>=3.4.6",
     "rich>=14.0.0",
     "sparqlwrapper>=2.0.0",
     "tqdm>=4.67.1",
@@ -55,6 +54,9 @@ docs = [
 docs-type = [
     "marimo[sql]>=0.13.15",
     "pyrefly>=0.15.1",
+]
+prefect = [
+    "prefect[dask]>=3.4.6",    
 ]
 
 [build-system]
