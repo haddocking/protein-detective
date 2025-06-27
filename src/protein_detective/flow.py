@@ -8,7 +8,7 @@ uv sync --group prefect
 uv run prefect server start
 # In another terminal
 uv run prefect config set PREFECT_RESULTS_PERSIST_BY_DEFAULT=true
-uv run prefect config set PREFECT_TASK_RUNNER_THREAD_POOL_MAX_WORKERS = 6
+uv run prefect config set PREFECT_TASK_RUNNER_THREAD_POOL_MAX_WORKERS=6
 uv run python3 src/protein_detective/flow.py
 ```
 
