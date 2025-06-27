@@ -1648,7 +1648,7 @@ wheels = [
 [[package]]
 name = "powerfit-em"
 version = "3.0.2"
-source = { git = "https://github.com/haddocking/powerfit.git?branch=more-lib-like#c4fe0fb69ae9b7ae4f5e997d5a780181a1d30b19" }
+source = { git = "https://github.com/haddocking/powerfit.git?branch=more-lib-like#75fe752038a43aeb96c1d513fbf7eecb2098e7b2" }
 dependencies = [
     { name = "numpy" },
     { name = "pyfftw", marker = "platform_machine != 'wasm32' and sys_platform != 'darwin'" },

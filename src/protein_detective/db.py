@@ -77,7 +77,7 @@ def initialize_db(session_dir: Path, con: DuckDBPyConnection):
 
 
 @contextmanager
-def connect(session_dir: Path, read_only: bool = False) -> Iterator[DuckDBPyConnection]:
+def connect(session_dir: Path, read_only: bool = False, database: Path | None = None) -> Iterator[DuckDBPyConnection]:
     """Context manager to connect to the DuckDB database holding session metadata.
 
     Examples:
@@ -94,12 +94,14 @@ def connect(session_dir: Path, read_only: bool = False) -> Iterator[DuckDBPyConn
         read_only: If True, the connection will be read-only.
             If read only then database can be read by multiple processes.
             If not read only then database can be read and written to by a single process.
+        database: Optional path to the DuckDB database file.
 
     Yields:
         DuckDBPyConnection: The connection to the DuckDB database.
     """
     # wrapper around duckdb.connect to create tables on connect
-    database = db_path(session_dir)
+    if database is None:
+        database = db_path(session_dir)
     con = duckdb_connect(database, read_only=read_only)
     try:
         initialize_db(session_dir, con)

@@ -1,0 +1,146 @@
+# Run with
+# snakemake --cores 1
+rule all:
+    input:
+        "powerfit_report.csv",
+        # "search_results.db"
+        #"downloads_pdbe"
+        # "downloads_af/"
+        # "downloads_pdbe/8wap.cif",
+        # "downloads_af/AF-A6NK53-F1-model_v4.pdb"
+        # "filtered/O00255_7o9z_A2A.pdb",
+        # "filtered/AF-A6NJL1-F1-model_v4.pdb"
+        # "powerfits/O00268_7egj_D2A/solutions.out",
+        # "powerfits/AF-O00327-F1-model_v4/solutions.out",
+
+rule search:
+    output:
+        "search_results.db"
+    params:
+        taxon_id = 9606,
+        reviewed = True,
+        subcellular_location_uniprot = "nucleus",
+        subcellular_location_go = "GO:0005634",
+        molecular_function_go = "GO:0003677",
+        limit = 100,
+    run:
+        from protein_detective.snakemake_rules import search_rule, Query
+        query = Query(
+            taxon_id=params.taxon_id,
+            reviewed=params.reviewed,
+            subcellular_location_uniprot=params.subcellular_location_uniprot,
+            subcellular_location_go=params.subcellular_location_go,
+            molecular_function_go=params.molecular_function_go,
+        )
+        search_rule(
+            query,
+            params.limit,
+            output[0],
+        )
+
+rule retrieve_pdbe:
+    input:
+        "search_results.db"
+    output:
+        "downloads_pdbe/{structure}.cif"
+    params:
+        download="downloads_pdbe"
+    run:
+        from protein_detective.snakemake_rules import retrieve_pdbe_rule
+        retrieve_pdbe_rule(input[0], params.download)
+
+rule retrieve_af:
+    input:
+        "search_results.db"
+    output:
+        download=directory("downloads_af"),
+        summaries="af_summaries.db"
+    run:
+        from protein_detective.snakemake_rules import retrieve_af_rule
+        retrieve_af_rule(input[0], output.download, output.summaries)
+
+
+rule filter_pdbe:
+    input:
+        cifs="downloads_pdbe/{structure}.cif",
+        db="search_results.db"
+    output:
+        "filtered/{uniprot_acc}_{structure}_{chain}.pdb"
+    params:
+        min_residues=100,
+        max_residues=1000,
+        downloads="downloads_pdbe",
+        filtered="filtered"
+    run:
+        from protein_detective.snakemake_rules import filter_pdbe_rule, SingleChainQuery
+        query = SingleChainQuery(
+            min_residues=params.min_residues,
+            max_residues=params.max_residues,
+        )
+        filter_pdbe_rule(params.downloads, input.db, query, params.filtered)
+
+rule filter_af:
+    input:
+        "downloads_af/{af}.pdb"
+    output:
+        "filtered/{af}.pdb"
+    params:
+        confidence=70.0,
+        min_threshold=100,
+        max_threshold=1000,
+        downloads="downloads_af",
+        filtered="filtered"
+    run:
+        from protein_detective.snakemake_rules import filter_af_rule, DensityFilterQuery
+        query = DensityFilterQuery(
+            confidence=params.confidence,
+            min_threshold=params.min_threshold,
+            max_threshold=params.max_threshold,
+        )
+        filter_af_rule(params.downloads, query, params.filtered)
+
+rule powerfits:
+    input:
+        "filtered/{model}.pdb"
+    output:
+        "powerfits/{model}/solutions.out",
+        "powerfits/{model}/lcc.mrc",
+        "powerfits/{model}/powerfit.log"
+    params:
+        root="powerfits",
+        target=workflow.source_path("../../powerfit-tutorial/ribosome-KsgA.map"),
+        angle=20,
+        resolution=13,
+    shell:    
+        "mkdir -p {params.root};"
+        "powerfit {params.target} {params.resolution} {input} -a {params.angle} -d {params.root}/{wildcards.model} -n 0 --delimiter ,"
+
+rule powerfit_report:
+    input:
+        # TODO report does cause all powerfits to be run
+        directory("powerfits")
+    output:
+        report = "powerfit_report.csv"
+    params:
+        root="powerfits"
+    run:
+        from protein_detective.snakemake_rules import powerfit_report_rule
+        powerfit_report_rule(params.root, output.report)
+
+
+# rule powerfit_report:
+#     input:
+#         done = "{session}/powerfit/.done"
+#     output:
+#         report = "{session}/powerfit_report.txt"
+#     shell:
+#         "protein-detective powerfit report {session} > {output.report}"
+
+# rule powerfit_fit_models:
+#     input:
+#         report = "{session}/powerfit_report.txt"
+#     output:
+#         touch("{session}/powerfit_fit_models/.done")
+#     shell:
+#         "protein-detective powerfit fit-models {session} && touch {output}"
+
