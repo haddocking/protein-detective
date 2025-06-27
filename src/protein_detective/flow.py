@@ -12,9 +12,6 @@ uv run prefect config set PREFECT_TASK_RUNNER_THREAD_POOL_MAX_WORKERS = 6
 uv run python3 src/protein_detective/flow.py
 ```
 
-In powerfitter.py had to change tqdm.rich to tqdm.auto
-otherwise:
-Rich.LiveError: only one live display may be active at once
 """
 
 from collections.abc import Mapping
