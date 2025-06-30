@@ -112,3 +112,24 @@ protein-detective powerfit fit-models docs/session1
 ## Contributing
 
 For development information and contribution guidelines, please see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+# Workflow
+
+To run protein detective workflows using Apache Airflow, you have to install and setup the database with
+
+```shell
+uv sync --group airflow airflow[celery] flask_appbuilder
+cd workflows
+export AIRFLOW_HOME=$(pwd)
+# In workflow.cfg edit
+# load_examples = False
+# parallelism = 12 # or how many cores you have
+# allowed_deserialization_classes = airflow.* protein_detective.*
+uv run airflow db migrate
+uv run airflow standalone
+# It will print the admin passwword in the log or read it from simple_auth_manager_passwords.json.generated
+# In another terminal
+cd workflows
+export AIRFLOW_HOME=$(pwd)
+uv run python3 dags/minimal.py
+```

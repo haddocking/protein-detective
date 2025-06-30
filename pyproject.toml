@@ -31,6 +31,10 @@ Source = "https://github.com/haddocking/protein-detective"
 protein-detective = "protein_detective.cli:main"
 
 [dependency-groups]
+airflow = [
+    "apache-airflow[celery]>=3.0.2",
+    "pyarrow>=20.0.0",
+]
 dev = [
     "pyrefly>=0.15.1",
     "pytest>=8.3.5",
