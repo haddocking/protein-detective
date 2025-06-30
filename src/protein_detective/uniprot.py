@@ -14,7 +14,8 @@ class Query:
 
     Parameters:
         taxon_id: Taxon ID to filter results by organism (e.g., "9606" for human).
-        reviewed: Whether to filter results by reviewed status (True for reviewed, False for unreviewed).
+        reviewed: Whether to filter results by reviewed status
+            (True for reviewed, False for unreviewed, None for either).
         subcellular_location_uniprot: Subcellular location in UniProt format (e.g., "nucleus").
         subcellular_location_go: Subcellular location in GO format (e.g., "GO:0005634" for nucleus).
         molecular_function_go: Molecular function in GO format (e.g., "GO:0003674" for molecular_function).
