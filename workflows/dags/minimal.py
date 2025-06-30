@@ -144,7 +144,7 @@ def powerfit(options: dict, template: str, session_dir: str) -> tuple[str, str]:
 
 
 @task
-def score_report(solutions: list[tuple[str, str]], top: int) -> pd.DataFrame:
+def score_report(solutions: list[tuple[str, str]], top: int) -> list[dict]:
     solutions = list(solutions)
     solutions_files = [s[1] for s in solutions]
 
@@ -209,13 +209,14 @@ def fit_model_task(row: dict[str, Any], *, outlet_events):
 @task(outlets=[AssetAlias("save-results-outputs")])
 def save_results(scores, fitted_models, session_dir: str, *, outlet_events):
     session_path = Path(session_dir)
-    scores_df = pd.DataFrame(scores)
-    scores_df.to_csv(session_path / "scores.csv", index=False)
-    fitted_models_df = pd.DataFrame(fitted_models)
-    fitted_models_df.to_csv(session_path / "fitted_models.csv", index=False)
+    db_path = session_path / "results.duckdb"
+    with duckdb.connect(str(db_path)) as con:
+        scores_df = pd.DataFrame(scores)  # noqa: F841
+        fitted_models_df = pd.DataFrame(fitted_models)  # noqa: F841
+        con.execute("CREATE TABLE IF NOT EXISTS solutions AS SELECT * FROM scores_df")
+        con.execute("CREATE TABLE IF NOT EXISTS fitted_solutions AS SELECT * FROM fitted_models_df")
 
-    outlet_events[AssetAlias("save-results-outputs")].add(Asset(f"file://{session_path / 'scores.csv'}"))
-    outlet_events[AssetAlias("save-results-outputs")].add(Asset(f"file://{session_path / 'fitted_models.csv'}"))
+    outlet_events[AssetAlias("save-results-outputs")].add(Asset(f"file://{db_path}"))
 
 
 default_uniprot_query = {
