@@ -34,8 +34,18 @@ def add_search_parser(subparsers):
         default=None,
     )
     parser.add_argument("--subcellular-location-uniprot", type=str, help="Subcellular location (UniProt)")
-    parser.add_argument("--subcellular-location-go", type=str, help="Subcellular location (GO term, e.g. GO:0005737)")
-    parser.add_argument("--molecular-function-go", type=str, help="Molecular function (GO term, e.g. GO:0003677)")
+    parser.add_argument(
+        "--subcellular-location-go",
+        type=str,
+        action="append",
+        help="Subcellular location (GO term, e.g. GO:0005737). Can be specified multiple times."
+    )
+    parser.add_argument(
+        "--molecular-function-go",
+        type=str,
+        action="append",
+        help="Molecular function (GO term, e.g. GO:0003677). Can be specified multiple times."
+    )
     parser.add_argument("--limit", type=int, default=10_000, help="Limit number of results")
 
 
