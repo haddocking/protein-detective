@@ -1647,14 +1647,22 @@ wheels = [
 
 [[package]]
 name = "powerfit-em"
-version = "3.0.2"
-source = { git = "https://github.com/haddocking/powerfit.git?branch=more-lib-like#c4fe0fb69ae9b7ae4f5e997d5a780181a1d30b19" }
+version = "3.0.3"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "pyfftw", marker = "platform_machine != 'wasm32' and sys_platform != 'darwin'" },
     { name = "rich" },
     { name = "scipy" },
     { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/08/a3/9d1468db9d2e2f9a35731fc6e8b7ae87b9b16b18163b63c4c3c6d721ffe1/powerfit_em-3.0.3.tar.gz", hash = "sha256:1c849db904151a636a3b26c025e9a9163cf65e50886b48f8889c38c05766e999", size = 5753243 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ee/d9/f586fdf7a1ff72ee24ae8a4ed08bcb8e5c5df5b904762f8643ecc90d1269/powerfit_em-3.0.3-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:0df37dbe473399c74823f8991174c80c4f5a5831b467231d5203d94c30c0ec91", size = 5870658 },
+    { url = "https://files.pythonhosted.org/packages/92/27/270cdd905130b7068fc9ec1afc1fd3e38ebb4ea4cd82c2446277f6599f72/powerfit_em-3.0.3-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:fdeaaff8c441e060b640a59caf1a646687eb5c4f4ee501799b52c51c4c100386", size = 6031854 },
+    { url = "https://files.pythonhosted.org/packages/47/0c/e184bd69ff4f53fb79e3ad0506817a8bab1661cf3695640422f5f0e98e84/powerfit_em-3.0.3-cp313-cp313-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1d20a1117808457d01e1aa040bb58b827c3fe755a443a19f38db4de4cc3af5a5", size = 6033183 },
+    { url = "https://files.pythonhosted.org/packages/ad/39/514beb5dbc1d7bbee35f399d468494665314c1536b865b8e928b1b39f203/powerfit_em-3.0.3-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:e0d855ba307a4b2dbcc15cd19aa4438cf18565b009982e187d54c564c07b2615", size = 6034833 },
+    { url = "https://files.pythonhosted.org/packages/c9/c1/58c8adc3cb2a02337fcbc85f847833cca01558fdb829e550937d8d3ea697/powerfit_em-3.0.3-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:48375274583b83854885bf2d5d006050e061309e01b6bb055da39d5e9066df11", size = 6039892 },
 ]
 
 [[package]]
@@ -1779,7 +1787,7 @@ requires-dist = [
     { name = "duckdb", specifier = ">=1.2.2" },
     { name = "molviewspec", specifier = ">=1.6.0" },
     { name = "pandas", specifier = ">=2.3.0" },
-    { name = "powerfit-em", git = "https://github.com/haddocking/powerfit.git?branch=more-lib-like" },
+    { name = "powerfit-em", specifier = ">=3.0.3" },
     { name = "rich", specifier = ">=14.0.0" },
     { name = "sparqlwrapper", specifier = ">=2.0.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
