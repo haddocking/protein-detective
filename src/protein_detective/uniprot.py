@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from textwrap import dedent
 
@@ -16,15 +16,17 @@ class Query:
         taxon_id: Taxon ID to filter results by organism (e.g., "9606" for human).
         reviewed: Whether to filter results by reviewed status (True for reviewed, False for unreviewed).
         subcellular_location_uniprot: Subcellular location in UniProt format (e.g., "nucleus").
-        subcellular_location_go: Subcellular location in GO format (e.g., "GO:0005634" for nucleus).
-        molecular_function_go: Molecular function in GO format (e.g., "GO:0003674" for molecular_function).
+        subcellular_location_go: Subcellular location in GO format. Can be a single GO term
+            (e.g., "GO:0005634") or a collection of GO terms (e.g., ["GO:0005634", "GO:0005737"]).
+        molecular_function_go: Molecular function in GO format. Can be a single GO term
+            (e.g., "GO:0003674") or a collection of GO terms (e.g., ["GO:0003674", "GO:0008150"]).
     """
 
     taxon_id: str | None
     reviewed: bool | None
     subcellular_location_uniprot: str | None
-    subcellular_location_go: str | None
-    molecular_function_go: str | None
+    subcellular_location_go: str | Collection[str] | None
+    molecular_function_go: str | Collection[str] | None
 
 
 @dataclass(frozen=True)
@@ -57,35 +59,72 @@ def _query2dynamic_sparql_triples(query: Query):
     parts.append(_append_subcellular_location_filters(query))
 
     if query.molecular_function_go:
-        if not query.molecular_function_go.startswith("GO:"):
-            msg = "Molecular function GO term must start with 'GO:'."
-            raise ValueError(msg)
-        parts.append(
-            dedent(f"""
-            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) {query.molecular_function_go} .
-        """)
-        )
+        # Handle both single GO term (string) and multiple GO terms (list)
+        if isinstance(query.molecular_function_go, str):
+            go_terms = [query.molecular_function_go]
+        else:
+            go_terms = query.molecular_function_go
+
+        molecular_function_filter = _create_go_filter(go_terms, "Molecular function")
+        parts.append(molecular_function_filter)
 
     return "\n".join(parts)
+
+
+def _create_go_filter(go_terms: Collection[str], term_type: str) -> str:
+    """Create SPARQL filter for GO terms.
+
+    Args:
+        go_terms: Collection of GO terms to filter by.
+        term_type: Type of GO terms for error messages (e.g., "Molecular function", "Subcellular location").
+
+    Returns:
+        SPARQL filter string.
+    """
+    # Validate all GO terms start with "GO:"
+    for term in go_terms:
+        if not term.startswith("GO:"):
+            msg = f"{term_type} GO term must start with 'GO:', got: {term}"
+            raise ValueError(msg)
+
+    if len(go_terms) == 1:
+        # Single GO term - get the first (and only) term
+        term = next(iter(go_terms))
+        return dedent(f"""
+            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) {term} .
+        """)
+
+    # Multiple GO terms - use UNION for OR logic
+    union_parts = [
+        dedent(f"""
+            {{ ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) {term} . }}
+        """).strip()
+        for term in go_terms
+    ]
+    return " UNION ".join(union_parts)
 
 
 def _append_subcellular_location_filters(query: Query) -> str:
     subcellular_location_uniprot_part = ""
     subcellular_location_go_part = ""
+
     if query.subcellular_location_uniprot:
         subcellular_location_uniprot_part = dedent(f"""
             ?protein up:annotation ?subcellAnnotation .
             ?subcellAnnotation up:locatedIn/up:cellularComponent ?cellcmpt .
             ?cellcmpt skos:prefLabel "{query.subcellular_location_uniprot}" .
         """)
+
     if query.subcellular_location_go:
-        if not query.subcellular_location_go.startswith("GO:"):
-            msg = "Subcellular location GO term must start with 'GO:'."
-            raise ValueError(msg)
-        subcellular_location_go_part = dedent(f"""
-            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) {query.subcellular_location_go} .
-        """)
-    if query.subcellular_location_uniprot and query.subcellular_location_go:
+        # Handle both single GO term (string) and multiple GO terms (list)
+        if isinstance(query.subcellular_location_go, str):
+            go_terms = [query.subcellular_location_go]
+        else:
+            go_terms = query.subcellular_location_go
+
+        subcellular_location_go_part = _create_go_filter(go_terms, "Subcellular location")
+
+    if subcellular_location_uniprot_part and subcellular_location_go_part:
         # If both are provided include results for both with logical OR
         return dedent(f"""
             {{
@@ -94,11 +133,8 @@ def _append_subcellular_location_filters(query: Query) -> str:
                 {subcellular_location_go_part}
             }}
         """)
-    if subcellular_location_uniprot_part:
-        return subcellular_location_uniprot_part
-    if subcellular_location_go_part:
-        return subcellular_location_go_part
-    return ""
+
+    return subcellular_location_uniprot_part or subcellular_location_go_part
 
 
 def _build_sparql_generic_query(select_clause: str, where_clause: str, limit: int = 10_000, groupby_clause="") -> str:
