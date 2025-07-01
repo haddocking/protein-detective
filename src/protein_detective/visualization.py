@@ -55,7 +55,6 @@ def _create_snapshot_description(fitted_model: dict[str, Any]) -> str:
         source = dedent(f"""\
             - Source: AlphaFold
             - AlphfoldDB ID: {fitted_model["af_id"]}
-            - Density filter ID: {fitted_model["density_filter_id"]}
         """)
     else:
         msg = "Fitted model must have either a PDB ID or an AlphaFold ID."
