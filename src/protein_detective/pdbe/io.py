@@ -130,13 +130,14 @@ class SingleChainResult:
         pdb_id: The PDB ID of the entry.
         output_file: The path to the output PDB file with
             just the first chain (renamed to A) belonging to given Uniprot accession.
+            Only set when passed is True.
         nr_residues: The number of residues in the chain that was written.
         passed: Whether the chain passed the number of residue filter.
     """
 
     uniprot_acc: str
     pdb_id: str
-    output_file: Path
+    output_file: Path | None
     nr_residues: int
     passed: bool
 
@@ -204,10 +205,13 @@ def write_single_chain_pdb_files(
             min_residues=query.min_residues,
             max_residues=query.max_residues,
         )
+        real_output_file = output_file.relative_to(session_dir)
+        if not passed:
+            real_output_file = None
         yield SingleChainResult(
             uniprot_acc=uniprot_acc,
             pdb_id=proteinpdb.id,
-            output_file=output_file.relative_to(session_dir),
+            output_file=real_output_file,
             nr_residues=nr_residues,
             passed=passed,
         )
