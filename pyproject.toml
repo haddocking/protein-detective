@@ -14,7 +14,7 @@ dependencies = [
     "duckdb>=1.2.2",
     "molviewspec>=1.6.0",
     "pandas>=2.3.0",
-    "powerfit-em>=3.0.2",
+    "powerfit-em>=3.0.3",
     "rich>=14.0.0",
     "sparqlwrapper>=2.0.0",
     "tqdm>=4.67.1",
@@ -62,11 +62,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.version]
 path = "src/protein_detective/__version__.py"
-
-[tool.uv.sources]
-# TODO remove branch when 
-# https://github.com/haddocking/protein-detective/pull/13 is merged
-powerfit_em = {git = "https://github.com/haddocking/powerfit.git", branch = "more-lib-like"}
 
 [tool.ruff]
 line-length = 120

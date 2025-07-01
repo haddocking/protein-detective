@@ -25,7 +25,7 @@ from protein_detective.db import (
     save_uniprot_accessions,
 )
 from protein_detective.pdbe.fetch import fetch as pdbe_fetch
-from protein_detective.pdbe.io import write_single_chain_pdb_files
+from protein_detective.pdbe.io import SingleChainQuery, write_single_chain_pdb_files
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
 
 logger = logging.getLogger(__name__)
@@ -178,17 +178,35 @@ def density_filter(session_dir: Path, query: DensityFilterQuery) -> DensityFilte
         )
 
 
-def prune_pdbs(session_dir: Path) -> tuple[Path, int]:
+def prune_pdbs(session_dir: Path, query: SingleChainQuery) -> tuple[Path, int]:
     """Prune the PDB files to only keep the first chain of the found Uniprot entries.
 
-    And rename that chain to A.
+    Only writes PDB files that have a single chain with a number of residues
+    between `min_residues` and `max_residues` (inclusive).
+
+    Also rename that chain to A.
+
+    Args:
+        session_dir: The directory where the session database is stored.
+        query: The single chain query containing the minimum and maximum number of residues.
+
+    Returns:
+        A tuple containing the directory where the single chain PDB files are stored,
+        and the number of PDB files that passed the residue filter and where written.
     """
     single_chain_dir = session_dir / "single_chain"
     single_chain_dir.mkdir(parents=True, exist_ok=True)
 
     with connect(session_dir) as con:
         proteinpdbs = load_pdbs(con)
-        new_files = list(write_single_chain_pdb_files(proteinpdbs, session_dir, single_chain_dir))
-        save_single_chain_pdb_files(new_files, con)
+        new_files = list(
+            write_single_chain_pdb_files(
+                proteinpdbs,
+                session_dir,
+                single_chain_dir=single_chain_dir,
+                query=query,
+            )
+        )
+        save_single_chain_pdb_files(new_files, query, con)
 
-        return single_chain_dir, len(new_files)
+        return single_chain_dir, len([f for f in new_files if f.passed])
