@@ -31,7 +31,7 @@ from protein_detective.uniprot import Query, search4af, search4pdb, search4unipr
 logger = logging.getLogger(__name__)
 
 
-def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 10_000) -> tuple[int, int, int]:
+def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 10_000) -> tuple[int, int, int, int]:
     """Searches for protein structures in UniProt database.
 
     Args:
@@ -41,6 +41,7 @@ def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 1
 
     Returns:
         A tuple containing the number of UniProt accessions, the number of PDB structures,
+        number of UniProt to PDB mappings,
         and the number of AlphaFold structures found.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
@@ -52,12 +53,10 @@ def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 1
     with connect(session_dir) as con:
         save_query(query, con)
         save_uniprot_accessions(uniprot_accessions, con)
-        save_pdbs(pdbs, con)
-        save_alphafolds(af_result, con)
+        nr_pdbs, nr_prot2pdb = save_pdbs(pdbs, con)
+        nr_afs = save_alphafolds(af_result, con)
 
-    nr_pdbs = len(set().union(*pdbs.values()))
-    nr_afs = len(set().union(*af_result.values()))
-    return len(uniprot_accessions), nr_pdbs, nr_afs
+    return len(uniprot_accessions), nr_pdbs, nr_prot2pdb, nr_afs
 
 
 WhatRetrieve = Literal["pdbe", "alphafold"]
