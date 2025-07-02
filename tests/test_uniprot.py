@@ -55,12 +55,12 @@ def test_build_sparql_query_uniprot():
 
             } UNION {
 
-            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) GO:0005634 .
+            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf+) GO:0005634 .
 
             }
 
 
-            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) GO:0003677 .
+            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf+) GO:0003677 .
 
 
             }
@@ -134,20 +134,20 @@ def test_build_sparql_query_pdb():
             None,
             "GO:0005634",
             dedent("""
-            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) GO:0005634 .
+            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf+) GO:0005634 .
         """),
         ),
         # Test case 4: Only multiple GO terms provided (list)
         (
             None,
             ["GO:0005634", "GO:0005737"],
-            "{ ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) GO:0005634 . } UNION { ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) GO:0005737 . }",
+            "{ ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf+) GO:0005634 . } UNION { ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf+) GO:0005737 . }",
         ),
         # Test case 5: Only multiple GO terms provided (set)
         (
             None,
             {"GO:0005634", "GO:0005737"},
-            "{ ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) GO:0005634 . } UNION { ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) GO:0005737 . }",
+            "{ ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf+) GO:0005634 . } UNION { ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf+) GO:0005737 . }",
         ),
         # Test case 6: Both UniProt and single GO term provided
         (
@@ -162,7 +162,7 @@ def test_build_sparql_query_pdb():
 
             } UNION {
 
-            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) GO:0005634 .
+            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf+) GO:0005634 .
 
             }
         """),
@@ -179,7 +179,7 @@ def test_build_sparql_query_pdb():
             ?cellcmpt skos:prefLabel "cytoplasm" .
 
             } UNION {
-            { ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) GO:0005634 . } UNION { ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) GO:0005737 . }
+            { ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf+) GO:0005634 . } UNION { ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf+) GO:0005737 . }
             }
         """),
         ),

@@ -91,13 +91,13 @@ def _create_go_filter(go_terms: Collection[str], term_type: str) -> str:
         # Single GO term - get the first (and only) term
         term = next(iter(go_terms))
         return dedent(f"""
-            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) {term} .
+            ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf+) {term} .
         """)
 
     # Multiple GO terms - use UNION for OR logic
     union_parts = [
         dedent(f"""
-            {{ ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf) {term} . }}
+            {{ ?protein up:classifiedWith|(up:classifiedWith/rdfs:subClassOf+) {term} . }}
         """).strip()
         for term in go_terms
     ]
