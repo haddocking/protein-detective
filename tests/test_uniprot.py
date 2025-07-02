@@ -39,7 +39,7 @@ def test_build_sparql_query_uniprot():
         PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
         PREFIX GO:<http://purl.obolibrary.org/obo/GO_>
 
-        SELECT ?protein
+        SELECT DISTINCT ?protein
         WHERE {
 
             # --- Protein Selection ---
