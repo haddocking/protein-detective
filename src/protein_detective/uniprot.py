@@ -186,7 +186,7 @@ def _build_sparql_query_uniprot(query: Query, limit=10_000) -> str:
     # and sequence, take care to take first isoform
     # ?protein up:sequence ?isoform .
     # ?isoform rdf:value ?sequence .
-    select_clause = "?protein"
+    select_clause = "DISTINCT ?protein"
     where_clause = dedent(f"""
         # --- Protein Selection ---
         ?protein a up:Protein .
