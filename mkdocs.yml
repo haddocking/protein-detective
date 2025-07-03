@@ -75,10 +75,9 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Prepare:
-    - EM: em_prepare.md
   - CLI Reference: cli.md
   - Notebooks:
+    - Prepare EM map: em_prepare.ipynb
     - Retrieve: uniprot.ipynb
     - AlphaFold: alphafold.ipynb
     - PDBe: pdbe.ipynb

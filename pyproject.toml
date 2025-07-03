@@ -142,6 +142,8 @@ ignore = [
     "PLE1142",
     # Allow generic variable name
     "PD901",
+    # Allow suspicious-url-open-usage
+    "S310",
 ]
 
 [tool.ruff.lint.pydocstyle]
