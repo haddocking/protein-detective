@@ -49,6 +49,20 @@ class FilterAfConfig(SessionDirConfig):
     max_threshold: int = 500
 
 
+class PowerfitConfig(SessionDirConfig):
+    target: str = "../powerfit-tutorial/ribosome-KsgA.map"
+    resolution: float = 13.0
+    angle: float = 10
+    laplace: bool = False
+    core_weighted: bool = False
+    no_resampling: bool = False
+    resampling_rate: float = 2
+    no_trimming: bool = False
+    trimming_cutoff: float | None = None
+    gpu: bool = False
+    nproc: int = 1
+
+
 @dg.definitions
 def resources():
     return dg.Definitions(
@@ -59,5 +73,6 @@ def resources():
             "sessionDirConfig": SessionDirConfig(),
             "prunePdbsConfig": PrunePdbsConfig(),
             "filterAfConfig": FilterAfConfig(),
+            "powerfitConfig": PowerfitConfig(),
         }
     )

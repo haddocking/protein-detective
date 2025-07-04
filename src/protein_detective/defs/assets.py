@@ -8,8 +8,10 @@ from protein_detective.db import (
     initialize_db,
     load_alphafold_ids,
     load_alphafolds,
+    load_density_filtered_alphafolds_files,
     load_pdb_ids,
     load_pdbs,
+    load_single_chain_pdb_files,
     load_uniprot_accessions,
     save_alphafolds,
     save_alphafolds_files,
@@ -19,9 +21,17 @@ from protein_detective.db import (
     save_single_chain_pdb_files,
     save_uniprot_accessions,
 )
-from protein_detective.defs.resources import FilterAfConfig, LimitConfig, PdConfig, PrunePdbsConfig, SessionDirConfig
+from protein_detective.defs.resources import (
+    FilterAfConfig,
+    LimitConfig,
+    PdConfig,
+    PowerfitConfig,
+    PrunePdbsConfig,
+    SessionDirConfig,
+)
 from protein_detective.pdbe.fetch import fetch as pdbe_fetch
 from protein_detective.pdbe.io import SingleChainQuery, write_single_chain_pdb_files
+from protein_detective.powerfit.run import run
 from protein_detective.uniprot import search4af, search4pdb, search4uniprot
 from protein_detective.workflow import af_fetch, af_relative_to, filter_on_density
 
@@ -148,3 +158,34 @@ def filter_afs(duckdb: DuckDBResource, config: FilterAfConfig) -> Path:
             conn,
         )
         return density_filtered_dir
+
+
+pdb_files_partitions = dg.DynamicPartitionsDefinition(name="pdb_files")
+
+
+@dg.asset(deps=[prune_pdbs, filter_afs])
+def powerfit_files(context: dg.AssetExecutionContext, duckdb: DuckDBResource) -> None:
+    """Asset that generates a dynamic partition for each PDB file."""
+    with duckdb.get_connection() as conn:
+        pdbe_files = load_single_chain_pdb_files(conn)
+        af_files = load_density_filtered_alphafolds_files(conn)
+        pdb_files = pdbe_files + af_files
+    context.log.info(f"Found {len(pdb_files)} pdb files to powerfit.")
+    pdb_files_str = [str(p) for p in pdb_files]
+    context.instance.add_dynamic_partitions(pdb_files_partitions.name, pdb_files_str)
+
+
+@dg.asset(
+    partitions_def=pdb_files_partitions,
+    deps=[powerfit_files],
+)
+def powerfit_partitioned(context: dg.AssetExecutionContext, config: PowerfitConfig) -> Path:
+    """A dynamically partitioned asset that runs powerfit on each PDB file."""
+    pdb_file = Path(context.partition_key)
+    session_dir = config.session_path
+    result_dir = session_dir / "powerfit" / pdb_file.stem
+    result_dir.mkdir(parents=True, exist_ok=True)
+    options = config
+    with Path(options.target).open("rb") as density_map:
+        run(density_map, pdb_file, result_dir, options)
+    return result_dir
