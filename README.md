@@ -158,28 +158,7 @@ dg dev
 
 Or to run from the command line:
 
-Create a configuration file `my_config.yaml` with the following content:
-
-```yaml
-ops:
-  alphafold_ids:
-    config:
-      limit: 1000
-  pdbe_ids:
-    config:
-      limit: 1000
-  proteins__uniprot_accessions:
-    config:
-      limit: 1000
-      uniprot:
-        molecular_function_go:
-        - GO:0003677
-        reviewed: true
-        subcellular_location_go:
-        - GO:0005634
-        subcellular_location_uniprot: nucleus
-        taxon_id: '9606'
-```
+Create a configuration file `my_config.yaml` with same content as displayed launchpad in Dagster UI.
 
 ```shell
 dg launch --job all_assets_job --config my_config.yaml

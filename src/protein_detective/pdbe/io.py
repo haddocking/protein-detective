@@ -109,7 +109,7 @@ class ProteinPdbRow:
     mmcif_file: Path | None
 
 
-@dataclass(frozen=True)
+@dataclass
 class SingleChainQuery:
     """Query for writing single chain PDB files.
 
