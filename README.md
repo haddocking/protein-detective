@@ -132,3 +132,55 @@ protein-detective powerfit fit-models docs/session1
 ## Contributing
 
 For development information and contribution guidelines, please see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Pipelines
+
+Protein detective use [dagster pipelines](https://dagster.io/) to run workflows.
+
+Setup, only needed once:
+
+```shell
+uv sync --group dagster
+
+Run from Dagster UI
+
+
+```shell
+dg dev
+```
+
+1. Open Dagster UI at http://127.0.0.1:3000/ in web browser.
+2. Goto the pipeline at http://127.0.0.1:3000/locations/protein-detective/jobs/all_assets_job
+3. Open pulldown on "Materialize all" button and select "Open launchpad".
+4. Configure the pipeline and press "Materialize" button.
+5. Follow progress and wait for it to finish.
+6. Look at ./session.db for results.
+
+Or to run from the command line:
+
+Create a configuration file `my_config.yaml` with the following content:
+
+```yaml
+ops:
+  alphafold_ids:
+    config:
+      limit: 1000
+  pdbe_ids:
+    config:
+      limit: 1000
+  proteins__uniprot_accessions:
+    config:
+      limit: 1000
+      uniprot:
+        molecular_function_go:
+        - GO:0003677
+        reviewed: true
+        subcellular_location_go:
+        - GO:0005634
+        subcellular_location_uniprot: nucleus
+        taxon_id: '9606'
+```
+
+```shell
+dg launch --job all_assets_job --config my_config.yaml
+```

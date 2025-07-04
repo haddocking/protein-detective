@@ -31,6 +31,12 @@ Source = "https://github.com/haddocking/protein-detective"
 protein-detective = "protein_detective.cli:main"
 
 [dependency-groups]
+dagster = [
+    "dagster>=1.11.1",
+    "dagster-dg-cli[local]>=1.11.1",
+    "dagster-duckdb>=0.27.1",
+    "dagster-webserver>=1.11.1",
+]
 dev = [
     "pyrefly>=0.15.1",
     "pytest>=8.3.5",
@@ -125,6 +131,8 @@ ignore = [
     "ISC001",
     # Conflicts with default rules
     "PLC0414",
+    # allow Path("."), more explict than Path()
+    "PTH201",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -152,3 +160,9 @@ known-first-party = ["protein_detective"]
 
 [tool.jupysql.SqlMagic]
 displaylimit = 100
+
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "protein_detective"

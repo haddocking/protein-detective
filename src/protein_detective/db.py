@@ -140,6 +140,11 @@ def save_uniprot_accessions(uniprot_accessions: Iterable[str], con: DuckDBPyConn
     return len(uniprot_df)
 
 
+def load_uniprot_accessions(con: DuckDBPyConnection) -> set[str]:
+    uniprot_rows = con.execute("SELECT uniprot_acc FROM proteins").fetchall()
+    return {row[0] for row in uniprot_rows}
+
+
 def save_pdbs(
     uniprot2pdbs: Mapping[str, Iterable[PdbResult]],
     con: DuckDBPyConnection,

@@ -25,8 +25,8 @@ class Query:
     taxon_id: str | None
     reviewed: bool | None
     subcellular_location_uniprot: str | None
-    subcellular_location_go: str | Collection[str] | None
-    molecular_function_go: str | Collection[str] | None
+    subcellular_location_go: list[str] | None
+    molecular_function_go: list[str] | None
 
 
 @dataclass(frozen=True)
