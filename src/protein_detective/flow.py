@@ -21,7 +21,6 @@ import duckdb
 import pandas as pd
 from prefect import flow, get_run_logger, task
 from prefect.assets import materialize
-from prefect.task_runners import ThreadPoolTaskRunner
 from prefect_dask.task_runners import DaskTaskRunner
 
 from protein_detective.alphafold import AlphaFoldEntry, Path
@@ -102,7 +101,7 @@ def filter_pdbs_task(
         query,
     )
 
-    return [result.output_file for result in results if result.passed]
+    return [result.output_file for result in results if result.passed and result.output_file]
 
 
 @materialize("file://./filtered_afs")
@@ -157,7 +156,9 @@ def powerfit_run_task(
 
 
 @materialize("file://./powerfit_results")
-def run_powerfit_on_models(powerfit_options: PowerfitOptions, filtered_pdb_files, filtered_af_files):
+def run_powerfit_on_models(
+    powerfit_options: PowerfitOptions, filtered_pdb_files, filtered_af_files
+) -> dict[Path, Path]:
     logger = get_run_logger()
 
     model_files = list(filtered_pdb_files) + list(filtered_af_files)
@@ -182,7 +183,7 @@ def run_powerfit_on_models(powerfit_options: PowerfitOptions, filtered_pdb_files
 
 
 @task
-def powerfit_report_task(result_dirs: Mapping[Path, Path]) -> pd.DataFrame:
+def powerfit_report_task(result_dirs: dict[Path, Path]) -> pd.DataFrame:
     logger = get_run_logger()
     logger.info(f"Generating PowerFit report from {len(result_dirs)} models")
     root_result_dir = Path("powerfit_results")
@@ -248,18 +249,14 @@ def fit_models_task(solutions: pd.DataFrame, top: int) -> pd.DataFrame:
 
 
 @materialize("file://./powerfit_results/solutions.duckdb")
-def save_powerfit_results(solutions: pd.DataFrame, fitted_solutions: pd.DataFrame):
+def save_powerfit_results(solutions: pd.DataFrame, fitted_solutions: pd.DataFrame):  # noqa: ARG001 - used by DuckDB query
     fn = Path("powerfit_results/solutions.duckdb")
     with duckdb.connect(fn) as con:
         con.execute("CREATE TABLE IF NOT EXISTS solutions AS SELECT * FROM solutions")
         con.execute("CREATE TABLE IF NOT EXISTS fitted_solutions AS SELECT * FROM fitted_solutions")
 
 
-# runner = DaskTaskRunner(cluster_kwargs={"n_workers": 6, "threads_per_worker": 1})
-#runner = ThreadPoolTaskRunner(max_workers=6)
-# Use default runner, will run all tasks in parallel, overloading CPU
-runner = None
-
+runner = DaskTaskRunner(cluster_kwargs={"n_workers": 6, "threads_per_worker": 1})
 
 @flow(task_runner=runner)  # type: ignore[arg-type]
 def my_workflow(
@@ -275,7 +272,10 @@ def my_workflow(
     filtered_pdb_files = fetch_and_filter_pdb_files.submit(pdb_query, uniprot_accessions, limit)
     filtered_af_files = fetch_and_filter_af.submit(dquery, uniprot_accessions, limit)
 
-    powerfit_result_dirs = run_powerfit_on_models(powerfit_options, filtered_pdb_files, filtered_af_files)
+    powerfit_result_dirs: dict[Path, Path] | None = run_powerfit_on_models(powerfit_options, filtered_pdb_files, filtered_af_files)
+    if powerfit_result_dirs is None:
+        msg = "No PowerFit results found. Check your queries and input data."
+        raise ValueError(msg)
 
     solutions = powerfit_report_task(powerfit_result_dirs)
     fitted_solutions = fit_models_task(solutions, top=top)
