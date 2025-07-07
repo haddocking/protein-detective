@@ -24,6 +24,7 @@ class PowerfitOptions:
     trimming_cutoff: float | None = None
     gpu: bool = False
     nproc: int = 1
+    show_progress: bool = True
 
     @staticmethod
     def from_args(parsed_args: Namespace) -> "PowerfitOptions":
@@ -50,6 +51,7 @@ class PowerfitOptions:
             trimming_cutoff=parsed_args.trimming_cutoff,
             gpu=parsed_args.gpu,
             nproc=parsed_args.nproc,
+            show_progress=parsed_args.progress,
         )
 
     def to_command(self, density_map: Path, template: Path, out_dir: Path, powerfit_cmd: str = "powerfit") -> str:
@@ -87,6 +89,7 @@ class PowerfitOptions:
             str(out_dir.absolute()),
             "--delimiter",
             ",",
+            "" if self.show_progress else "--no-progressbar",
         ]
         if self.angle:
             args.extend(["--angle", str(self.angle)])

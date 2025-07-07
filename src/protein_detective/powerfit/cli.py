@@ -32,6 +32,8 @@ def _copy_powerfit_parser_arguments(parser: argparse.ArgumentParser, borrowed_ar
         if powerfit_argument.dest in borrowed_arguments:
             parser._add_action(powerfit_argument)
 
+    parser.add_argument("--progress", action="store_true", default=False, help="Show progress bar")
+
 
 def add_powerfit_commands_parser(subparsers):
     # Add the commands sub-command

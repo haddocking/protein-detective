@@ -306,6 +306,7 @@ if __name__ == "__main__":
         angle=20,
         laplace=True,
         nproc=1,
+        show_progress=False,
     )
     top = 10
     my_workflow(query, 100, pdb_query, dquery, powerfit_options, top=top)
