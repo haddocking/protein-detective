@@ -14,17 +14,18 @@ uv run python3 src/protein_detective/flow.py
 
 """
 
-from collections.abc import Mapping
+from collections.abc import Generator, Mapping
 from dataclasses import dataclass
 
 import duckdb
 import pandas as pd
 from prefect import flow, get_run_logger, task
 from prefect.assets import materialize
+from prefect.cache_policies import INPUTS, TASK_SOURCE
 from prefect_dask.task_runners import DaskTaskRunner
 
 from protein_detective.alphafold import AlphaFoldEntry, Path
-from protein_detective.alphafold.density import DensityFilterQuery, filter_on_density
+from protein_detective.alphafold.density import DensityFilterQuery, DensityFilterResult, filter_on_density
 from protein_detective.db import PowerfitOptions
 from protein_detective.pdbe.fetch import fetch as pdbe_fetch
 from protein_detective.pdbe.io import ProteinPdbRow, SingleChainQuery, write_single_chain_pdb_files
@@ -34,22 +35,22 @@ from protein_detective.uniprot import PdbResult, Query, search4af, search4pdb, s
 from protein_detective.workflow import af_fetch
 
 
-@task
+@task(cache_policy=TASK_SOURCE + INPUTS)
 def search_uniprot(query: Query, limit: int) -> set[str]:
     return search4uniprot(query, limit)
 
 
-@task
+@task(cache_policy=TASK_SOURCE + INPUTS)
 def pdb_of_uniprot(uniprot_accessions: set[str], limit: int) -> dict[str, set[PdbResult]]:
     return search4pdb(uniprot_accessions, limit=limit)
 
 
-@task
+@task(cache_policy=TASK_SOURCE + INPUTS)
 def af_of_uniprot(uniprot_accessions: set[str], limit: int):
     return search4af(uniprot_accessions, limit=limit)
 
 
-@materialize("file://./pdbe_files")
+@materialize("file://./pdbe_files", cache_policy=TASK_SOURCE + INPUTS)
 def pdbe_fetch_task(pdb_results: dict[str, set[PdbResult]]) -> Mapping[str, Path]:
     pdb_ids = set()
     for results in pdb_results.values():
@@ -61,7 +62,7 @@ def pdbe_fetch_task(pdb_results: dict[str, set[PdbResult]]) -> Mapping[str, Path
     return pdbe_fetch(pdb_ids, save_dir)
 
 
-@materialize("file://./alphafold_files")
+@materialize("file://./alphafold_files", cache_policy=TASK_SOURCE + INPUTS)
 def af_fetch_task(af_results: dict[str, set[str]]) -> list[AlphaFoldEntry]:
     af_ids = set()
     for results in af_results.values():
@@ -73,7 +74,7 @@ def af_fetch_task(af_results: dict[str, set[str]]) -> list[AlphaFoldEntry]:
     return af_fetch(af_ids, save_dir)
 
 
-@materialize("file://./filtered_pdbs")
+@materialize("file://./filtered_pdbs", cache_policy=TASK_SOURCE + INPUTS)
 def filter_pdbs_task(
     pdb_results: dict[str, set[PdbResult]],
     pdb_files: Mapping[str, Path],
@@ -104,11 +105,11 @@ def filter_pdbs_task(
     return [result.output_file for result in results if result.passed and result.output_file]
 
 
-@materialize("file://./filtered_afs")
+@materialize("file://./filtered_afs", cache_policy=TASK_SOURCE + INPUTS)
 def filter_af_task(
     af_entries: list[AlphaFoldEntry],
     query: DensityFilterQuery,
-):
+) -> Generator[DensityFilterResult]:
     density_filtered_dir = Path("filtered_afs")
     density_filtered_dir.mkdir(parents=True, exist_ok=True)
 
@@ -116,14 +117,14 @@ def filter_af_task(
     return filter_on_density(af_files, query, density_filtered_dir)
 
 
-@task
-def fetch_and_filter_af(dquery, uniprot_accessions, limit: int):
+@task(cache_policy=TASK_SOURCE + INPUTS)
+def fetch_and_filter_af(dquery, uniprot_accessions, limit: int) -> Generator[DensityFilterResult] | None:
     af_results = af_of_uniprot(uniprot_accessions, limit)
     af_entries = af_fetch_task(af_results)
     return filter_af_task(af_entries, dquery)
 
 
-@task
+@task(cache_policy=TASK_SOURCE + INPUTS)
 def fetch_and_filter_pdb_files(pdb_query, uniprot_accessions, limit: int):
     pdb_results = pdb_of_uniprot(uniprot_accessions, limit)
     pdb_files = pdbe_fetch_task(pdb_results)
@@ -155,7 +156,7 @@ def powerfit_run_task(
     return (model_file, result_dir)
 
 
-@materialize("file://./powerfit_results")
+@materialize("file://./powerfit_results", cache_policy=TASK_SOURCE + INPUTS)
 def run_powerfit_on_models(
     powerfit_options: PowerfitOptions, filtered_pdb_files, filtered_af_files
 ) -> dict[Path, Path]:
@@ -182,7 +183,7 @@ def run_powerfit_on_models(
     return dict(result_dirs)
 
 
-@task
+@task(cache_policy=TASK_SOURCE + INPUTS)
 def powerfit_report_task(result_dirs: dict[Path, Path]) -> pd.DataFrame:
     logger = get_run_logger()
     logger.info(f"Generating PowerFit report from {len(result_dirs)} models")
@@ -213,7 +214,7 @@ def powerfit_report_task(result_dirs: dict[Path, Path]) -> pd.DataFrame:
     return duckdb.sql(query, params=(str(root_result_dir),)).df()
 
 
-@task
+@task(cache_policy=TASK_SOURCE + INPUTS)
 def fit_model_task(item):
     _index, row = item
     unfitted_model_file = row["model_file"]
@@ -236,7 +237,7 @@ def fit_model_task(item):
     }
 
 
-@task
+@task(cache_policy=TASK_SOURCE + INPUTS)
 def fit_models_task(solutions: pd.DataFrame, top: int) -> pd.DataFrame:
     logger = get_run_logger()
     logger.info(f"Fitting top {top} models")
@@ -248,7 +249,7 @@ def fit_models_task(solutions: pd.DataFrame, top: int) -> pd.DataFrame:
     )
 
 
-@materialize("file://./powerfit_results/solutions.duckdb")
+@materialize("file://./powerfit_results/solutions.duckdb", cache_policy=TASK_SOURCE + INPUTS)
 def save_powerfit_results(solutions: pd.DataFrame, fitted_solutions: pd.DataFrame):  # noqa: ARG001 - used by DuckDB query
     fn = Path("powerfit_results/solutions.duckdb")
     with duckdb.connect(fn) as con:
@@ -257,6 +258,14 @@ def save_powerfit_results(solutions: pd.DataFrame, fitted_solutions: pd.DataFram
 
 
 runner = DaskTaskRunner(cluster_kwargs={"n_workers": 6, "threads_per_worker": 1})
+"""Run prefect flow with this runner.
+
+To run with Slurm use
+https://jobqueue.dask.org/en/latest/generated/dask_jobqueue.SLURMCluster.html
+or
+mpirun https://docs.dask.org/en/latest/deploying-hpc.html#using-mpi
+"""
+
 
 @flow(task_runner=runner)  # type: ignore[arg-type]
 def my_workflow(
@@ -270,9 +279,14 @@ def my_workflow(
     uniprot_accessions = search_uniprot(query, limit)
 
     filtered_pdb_files = fetch_and_filter_pdb_files.submit(pdb_query, uniprot_accessions, limit)
-    filtered_af_files = fetch_and_filter_af.submit(dquery, uniprot_accessions, limit)
+    filtered_afs = fetch_and_filter_af.submit(dquery, uniprot_accessions, limit)
+    filtered_af_files = [
+        entry.density_filtered_file for entry in filtered_afs.result() if entry.density_filtered_file is not None
+    ]
 
-    powerfit_result_dirs: dict[Path, Path] | None = run_powerfit_on_models(powerfit_options, filtered_pdb_files, filtered_af_files)
+    powerfit_result_dirs: dict[Path, Path] | None = run_powerfit_on_models(
+        powerfit_options, filtered_pdb_files, filtered_af_files
+    )
     if powerfit_result_dirs is None:
         msg = "No PowerFit results found. Check your queries and input data."
         raise ValueError(msg)
@@ -309,4 +323,5 @@ if __name__ == "__main__":
         show_progress=False,
     )
     top = 10
-    my_workflow(query, 100, pdb_query, dquery, powerfit_options, top=top)
+    limit = 100
+    my_workflow(query, limit, pdb_query, dquery, powerfit_options, top=top)
