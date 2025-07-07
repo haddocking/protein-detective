@@ -32,7 +32,7 @@ def first_chain_from_uniprot_chains(uniprot_chains: str) -> str:
     return parts[0]
 
 
-def write_single_chain_pdb_file(
+def filter_and_write_single_chain_pdb_file(
     mmcif_file: Path | str,
     chain2keep: str,
     output_file: Path | str,
@@ -51,7 +51,8 @@ def write_single_chain_pdb_file(
         out_chain: Chain identifier for the saved chain in the output file.
 
     Returns:
-        A tuple containing a boolean indicating whether the file was written successfully,
+        A tuple containing a boolean indicating whether
+        chain is in the residue range and the file was written successfully,
         and the number of residues in the chain.
     """
     pdb = atomium.open(str(mmcif_file))
@@ -130,13 +131,14 @@ class SingleChainResult:
         pdb_id: The PDB ID of the entry.
         output_file: The path to the output PDB file with
             just the first chain (renamed to A) belonging to given Uniprot accession.
+            Only set when passed is True.
         nr_residues: The number of residues in the chain that was written.
         passed: Whether the chain passed the number of residue filter.
     """
 
     uniprot_acc: str
     pdb_id: str
-    output_file: Path
+    output_file: Path | None
     nr_residues: int
     passed: bool
 
@@ -156,6 +158,68 @@ def nr_residues_in_chain(file: Path | str, chain: str = "A") -> int:
     return len(chain)
 
 
+def write_single_chain_pdb_file(
+    proteinpdb: ProteinPdbRow,
+    session_dir: Path,
+    single_chain_dir: Path,
+    query: SingleChainQuery,
+) -> SingleChainResult:
+    """Process a ProteinPdbRow to write a single chain PDB file if possible, returning the result.
+
+    Args:
+        proteinpdb: A ProteinPdbRow object.
+        session_dir: The directory where the session files are stored.
+        single_chain_dir: The directory where the single chain PDB files will be saved.
+        query: The query containing the minimum and maximum number of residues.
+
+    Returns:
+        Result object containing the output file path and whether the chain passed the residue filter.
+    """
+    if not proteinpdb.mmcif_file:
+        logger.warning(
+            "Skipping %s, because it does not have a file.",
+            proteinpdb.id,
+        )
+        return SingleChainResult(
+            uniprot_acc=proteinpdb.uniprot_acc,
+            pdb_id=proteinpdb.id,
+            output_file=None,
+            nr_residues=0,
+            passed=False,
+        )
+
+    mmcif_file = proteinpdb.mmcif_file
+    chain2keep = first_chain_from_uniprot_chains(proteinpdb.uniprot_chains)
+    uniprot_acc = proteinpdb.uniprot_acc
+    output_file = single_chain_dir / f"{uniprot_acc}_{mmcif_file.stem}_{chain2keep}2A.pdb"
+
+    if output_file.exists():
+        logger.info(
+            f"Output file {output_file} already exists. Skipping saving single chain PDB file for {mmcif_file}.",
+        )
+        nr_residues = nr_residues_in_chain(output_file)
+        passed = True
+    else:
+        passed, nr_residues = filter_and_write_single_chain_pdb_file(
+            mmcif_file=mmcif_file,
+            chain2keep=chain2keep,
+            output_file=output_file,
+            min_residues=query.min_residues,
+            max_residues=query.max_residues,
+        )
+
+    real_output_file = None
+    if passed:
+        real_output_file = output_file.relative_to(session_dir)
+    return SingleChainResult(
+        uniprot_acc=uniprot_acc,
+        pdb_id=proteinpdb.id,
+        output_file=real_output_file,
+        nr_residues=nr_residues,
+        passed=passed,
+    )
+
+
 def write_single_chain_pdb_files(
     proteinpdbs: list[ProteinPdbRow], session_dir: Path, single_chain_dir: Path, query: SingleChainQuery
 ) -> Generator[SingleChainResult]:
@@ -168,46 +232,7 @@ def write_single_chain_pdb_files(
         query: The query containing the minimum and maximum number of residues.
 
     Yields:
-        SingleChainResult objects containing the UniProt accession, PDB ID, and output file path.
+        SingleChainResult objects containing the output file path and whether the chain passed the residue filter.
     """
-    # took 1 minute for 100 entries
-    # TODO parallelize
     for proteinpdb in tqdm(proteinpdbs, desc="Saving single chain PDB files from PDBe"):
-        if not proteinpdb.mmcif_file:
-            logger.warning(
-                "Skipping %s, because it does not have a file.",
-                proteinpdb.id,
-            )
-            continue
-        mmcif_file = proteinpdb.mmcif_file
-        uniprot_chains = proteinpdb.uniprot_chains
-        chain2keep = first_chain_from_uniprot_chains(uniprot_chains)
-        uniprot_acc = proteinpdb.uniprot_acc
-        output_file = single_chain_dir / f"{uniprot_acc}_{mmcif_file.stem}_{chain2keep}2A.pdb"
-        if output_file.exists():
-            logger.info(
-                f"Output file {output_file} already exists. Skipping saving single chain PDB file for {mmcif_file}.",
-            )
-            nr_residues = nr_residues_in_chain(output_file)
-            yield SingleChainResult(
-                uniprot_acc=uniprot_acc,
-                pdb_id=proteinpdb.id,
-                output_file=output_file.relative_to(session_dir),
-                nr_residues=nr_residues,
-                passed=True,
-            )
-            continue
-        passed, nr_residues = write_single_chain_pdb_file(
-            mmcif_file=mmcif_file,
-            chain2keep=chain2keep,
-            output_file=output_file,
-            min_residues=query.min_residues,
-            max_residues=query.max_residues,
-        )
-        yield SingleChainResult(
-            uniprot_acc=uniprot_acc,
-            pdb_id=proteinpdb.id,
-            output_file=output_file.relative_to(session_dir),
-            nr_residues=nr_residues,
-            passed=passed,
-        )
+        yield write_single_chain_pdb_file(proteinpdb, session_dir, single_chain_dir, query)

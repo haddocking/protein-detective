@@ -34,8 +34,18 @@ def add_search_parser(subparsers):
         default=None,
     )
     parser.add_argument("--subcellular-location-uniprot", type=str, help="Subcellular location (UniProt)")
-    parser.add_argument("--subcellular-location-go", type=str, help="Subcellular location (GO term, e.g. GO:0005737)")
-    parser.add_argument("--molecular-function-go", type=str, help="Molecular function (GO term, e.g. GO:0003677)")
+    parser.add_argument(
+        "--subcellular-location-go",
+        type=str,
+        action="append",
+        help="Subcellular location (GO term, e.g. GO:0005737). Can be specified multiple times.",
+    )
+    parser.add_argument(
+        "--molecular-function-go",
+        type=str,
+        action="append",
+        help="Molecular function (GO term, e.g. GO:0003677). Can be specified multiple times.",
+    )
     parser.add_argument("--limit", type=int, default=10_000, help="Limit number of results")
 
 
@@ -101,10 +111,11 @@ def handle_search(args):
         molecular_function_go=args.molecular_function_go,
     )
     session_dir = Path(args.session_dir)
-    nr_uniprot, nr_pdbes, nr_afs = search_structures_in_uniprot(query, session_dir, limit=args.limit)
+    nr_uniprot, nr_pdbes, nr_prot2pdbes, nr_afs = search_structures_in_uniprot(query, session_dir, limit=args.limit)
     rprint(
         f"Search completed: {nr_uniprot} UniProt entries found, "
-        f"{nr_pdbes} PDBe structures, {nr_afs} AlphaFold structures."
+        f"{nr_pdbes} PDBe structures, {nr_prot2pdbes} UniProt to PDB mappings, "
+        f"{nr_afs} AlphaFold structures."
     )
 
 

@@ -63,23 +63,14 @@ CREATE TABLE IF NOT EXISTS alphafolds (
     FOREIGN KEY (uniprot_acc) REFERENCES proteins (uniprot_acc)
 );
 
-CREATE SEQUENCE IF NOT EXISTS id_density_filters START 1;
-CREATE TABLE IF NOT EXISTS density_filters (
-    density_filter_id INTEGER DEFAULT nextval('id_density_filters') PRIMARY KEY,
-    confidence REAL NOT NULL,
-    min_threshold INTEGER NOT NULL,
-    max_threshold INTEGER NOT NULL,
-    UNIQUE (confidence, min_threshold, max_threshold)
-);
-
 CREATE TABLE IF NOT EXISTS density_filtered_alphafolds (
-    density_filter_id INTEGER NOT NULL,
+    filter_id INTEGER NOT NULL,
     uniprot_acc TEXT NOT NULL,
-    nr_residues_above_confidence INTEGER NOT NULL,
+    filter_stats JSON NOT NULL,  -- store nr_residues_above_confidence
     keep BOOLEAN,
     pdb_file TEXT,
-    PRIMARY KEY (density_filter_id, uniprot_acc),
-    FOREIGN KEY (density_filter_id) REFERENCES density_filters (density_filter_id),
+    PRIMARY KEY (filter_id, uniprot_acc),
+    FOREIGN KEY (filter_id) REFERENCES filters (filter_id),
     FOREIGN KEY (uniprot_acc) REFERENCES alphafolds (uniprot_acc),
 );
 
@@ -135,7 +126,6 @@ SELECT
     relz,
     translation,
     rotation,
-    density_filter_id,
     af_id,
     pdb_id,
     concat_ws(
@@ -146,7 +136,7 @@ SELECT
     coalesce(uniprot_acc, af_id) AS uniprot_acc,
 FROM raw_solutions
 LEFT JOIN (
-    SELECT density_filter_id, uniprot_acc AS af_id, pdb_file, parse_filename(pdb_file, true) AS structure
+    SELECT uniprot_acc AS af_id, pdb_file, parse_filename(pdb_file, true) AS structure
     FROM density_filtered_alphafolds WHERE keep=True
 ) AS a USING (structure)
 LEFT JOIN (

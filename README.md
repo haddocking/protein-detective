@@ -8,6 +8,25 @@
 
 Python package to detect proteins in EM density maps.
 
+It uses
+
+- [Uniprot Sparql endpoint](https://sparql.uniprot.org/) to search for proteins and their measured or predicted 3D structures.
+- [powerfit](https://pypi.org/project/powerfit-em/) to fit protein structure in a Electron Microscopy (EM) density map.
+
+An example workflow:
+
+```mermaid
+graph LR;
+    search{Search UniprotKB} --> |uniprot_accessions|fetchpdbe{Retrieve PDBe}
+    search{Search UniprotKB} --> |uniprot_accessions|fetchad{Retrieve AlphaFold}
+    fetchpdbe -->|mmcif_files| residuefilter{Filter on nr residues + write chain A}
+    fetchad -->|pdb_files| densityfilter{Filter out low confidence}
+    residuefilter -->|pdb_files| powerfit
+    densityfilter -->|pdb_files| powerfit
+    powerfit -->|*/solutions.out| solutions{Best scoring solutions}
+    solutions -->|dataframe| fitmodels{Fit models}
+```
+
 ## Install
 
 ```shell
@@ -22,6 +41,7 @@ pip install git+https://github.com/haddocking/protein-detective.git
 ## Usage
 
 The main entry point is the `protein-detective` command line tool which has multiple subcommands to perform actions.
+
 
 To use programmaticly, see the [notebooks](docs/notebooks) and [API documentation](https://www.bonvinlab.org/protein-detective/autoapi/summary/).
 
@@ -97,9 +117,9 @@ protein-detective powerfit report docs/session1
 Outputs something like:
 
 ```
-powerfit_run_id,structure,rank,cc,fishz,relz,translation,rotation,density_filter_id,pdb_id,pdb_file,uniprot_acc
-10,A8MT69_pdb4e45.ent_B2A,1,0.432,0.463,10.091,227.18:242.53:211.83,0.0:1.0:1.0:0.0:0.0:1.0:1.0:0.0:0.0,,4E45,docs/session1/single_chain/A8MT69_pdb4e45.ent_B2A.pdb,A8MT69
-10,A8MT69_pdb4ne5.ent_B2A,1,0.423,0.452,10.053,227.18:242.53:214.9,0.0:-0.0:-0.0:-0.604:0.797:0.0:0.797:0.604:0.0,,4NE5,docs/session1/single_chain/A8MT69_pdb4ne5.ent_B2A.pdb,A8MT69
+powerfit_run_id,structure,rank,cc,fishz,relz,translation,rotation,pdb_id,pdb_file,uniprot_acc
+10,A8MT69_pdb4e45.ent_B2A,1,0.432,0.463,10.091,227.18:242.53:211.83,0.0:1.0:1.0:0.0:0.0:1.0:1.0:0.0:0.0,4E45,docs/session1/single_chain/A8MT69_pdb4e45.ent_B2A.pdb,A8MT69
+10,A8MT69_pdb4ne5.ent_B2A,1,0.423,0.452,10.053,227.18:242.53:214.9,0.0:-0.0:-0.0:-0.604:0.797:0.0:0.797:0.604:0.0,4NE5,docs/session1/single_chain/A8MT69_pdb4ne5.ent_B2A.pdb,A8MT69
 ...
 ```
 

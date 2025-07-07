@@ -122,50 +122,71 @@ def save_query(query: Query, con: DuckDBPyConnection):
     con.execute("INSERT INTO uniprot_searches (query) VALUES (?)", (unstructure(query),))
 
 
-def save_uniprot_accessions(uniprot_accessions: Iterable[str], con: DuckDBPyConnection):
+def save_uniprot_accessions(uniprot_accessions: Iterable[str], con: DuckDBPyConnection) -> int:
     """Save UniProt accessions to the database.
 
     Args:
         uniprot_accessions: An iterable of UniProt accessions to save.
         con: The DuckDB connection to use for saving the data.
+
+    Returns:
+        The number of UniProt accessions saved to the database.
     """
-    rows = [(uniprot_acc,) for uniprot_acc in uniprot_accessions]
-    if len(rows) == 0:
-        return
-    con.executemany(
-        "INSERT OR IGNORE INTO proteins (uniprot_acc) VALUES (?)",
-        rows,
-    )
+    uniprot_data = [{"uniprot_acc": uniprot_acc} for uniprot_acc in uniprot_accessions]
+    if len(uniprot_data) == 0:
+        return 0
+    uniprot_df = DataFrame(uniprot_data)
+    con.execute("INSERT OR IGNORE INTO proteins (uniprot_acc) SELECT * FROM uniprot_df")
+    return len(uniprot_df)
 
 
 def save_pdbs(
     uniprot2pdbs: Mapping[str, Iterable[PdbResult]],
     con: DuckDBPyConnection,
-):
+) -> tuple[int, int]:
     """Save PDB entries and their associations with UniProt accessions to the database.
 
     Args:
         uniprot2pdbs: A mapping of UniProt accessions to their associated PDB.
         con: The DuckDB connection to use for saving the data.
+
+    Returns:
+        The number of PDB entries and their Uniprot associations saved to the database.
     """
     save_uniprot_accessions(uniprot2pdbs.keys(), con)
-    pdb_rows = []
+
+    # Collect PDB data
+    pdb_data = []
     for pdb_results in uniprot2pdbs.values():
-        pdb_rows.extend([(pdb.id, pdb.method, pdb.resolution) for pdb in pdb_results])
-    if len(pdb_rows) > 0:
-        con.executemany(
-            "INSERT OR IGNORE INTO pdbs (pdb_id, method, resolution) VALUES (?, ?, ?)",
-            pdb_rows,
-        )
-    prot2pdb_rows = []
+        pdb_data.extend([{"pdb_id": pdb.id, "method": pdb.method, "resolution": pdb.resolution} for pdb in pdb_results])
+
+    if len(pdb_data) == 0:
+        return 0, 0
+
+    pdb_df = DataFrame(pdb_data)
+    # Different uniprot accessions can have the same PDB ID, method, and resolution
+    # so we drop duplicates based on these columns
+    pdb_df = pdb_df.drop_duplicates(subset=["pdb_id", "method", "resolution"])
+    nr_pdbs = len(pdb_df)
+    con.execute("INSERT OR IGNORE INTO pdbs (pdb_id, method, resolution) SELECT * FROM pdb_df")
+
+    # Collect protein-PDB association data
+    prot2pdb_data = []
     for uniprot_acc, pdb_results in uniprot2pdbs.items():
-        prot2pdb_rows.extend([(uniprot_acc, pdb.id, pdb.uniprot_chains) for pdb in pdb_results])
-    if len(prot2pdb_rows) == 0:
-        return
-    con.executemany(
-        "INSERT OR IGNORE INTO proteins_pdbs (uniprot_acc, pdb_id, uniprot_chains) VALUES (?, ?, ?)",
-        prot2pdb_rows,
-    )
+        prot2pdb_data.extend(
+            [
+                {"uniprot_acc": uniprot_acc, "pdb_id": pdb.id, "uniprot_chains": pdb.uniprot_chains}
+                for pdb in pdb_results
+            ]
+        )
+
+    nr_prot2pdbs = len(prot2pdb_data)
+    if nr_prot2pdbs == 0:
+        return nr_pdbs, nr_prot2pdbs
+
+    prot2pdb_df = DataFrame(prot2pdb_data)  # noqa: F841
+    con.execute("INSERT OR IGNORE INTO proteins_pdbs (uniprot_acc, pdb_id, uniprot_chains) SELECT * FROM prot2pdb_df")
+    return nr_pdbs, nr_prot2pdbs
 
 
 def save_pdb_files(mmcif_files: Mapping[str, Path], con: DuckDBPyConnection):
@@ -228,25 +249,26 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
     ]
 
 
-def save_alphafolds(afs: dict[str, set[str]], con: DuckDBPyConnection):
+def save_alphafolds(afs: dict[str, set[str]], con: DuckDBPyConnection) -> int:
     """Save AlphaFold entries to the database.
 
     Args:
         afs: A dictionary mapping UniProt accessions to sets of AlphaFold IDs.
         con: The DuckDB connection to use for saving the data.
 
+    Returns:
+        The number of AlphaFold entries saved to the database.
     """
-    rows = []
+    alphafold_data = []
     for af_ids_of_uniprot in afs.values():
-        rows.extend([(af_id,) for af_id in af_ids_of_uniprot])
-    if len(rows) == 0:
-        return
-    con.executemany(
-        "INSERT OR IGNORE INTO alphafolds (uniprot_acc) VALUES (?)",
-        rows,
-    )
+        alphafold_data.extend([{"uniprot_acc": af_id} for af_id in af_ids_of_uniprot])
+    if len(alphafold_data) == 0:
+        return 0
+    alphafold_df = DataFrame(alphafold_data)
+    con.execute("INSERT OR IGNORE INTO alphafolds (uniprot_acc) SELECT * FROM alphafold_df")
 
     save_uniprot_accessions(afs.keys(), con)
+    return len(alphafold_df)
 
 
 def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
@@ -450,30 +472,14 @@ def save_density_filtered(
     Raises:
         ValueError: If the density filter could not be inserted or retrieved.
     """
-    result = con.execute(
-        """INSERT OR IGNORE INTO density_filters
-        (confidence, min_threshold, max_threshold)
-        VALUES (?, ?, ?)
-        RETURNING density_filter_id""",
-        (query.confidence, query.min_threshold, query.max_threshold),
-    ).fetchone()
-    if result is None:
-        # Already exists, so just fetch the id
-        result = con.execute(
-            """SELECT density_filter_id FROM density_filters
-            WHERE confidence = ? AND min_threshold = ? AND max_threshold = ?""",
-            (query.confidence, query.min_threshold, query.max_threshold),
-        ).fetchone()
-    if result is None or len(result) != 1:
-        msg = "Failed to insert or retrieve density filter"
-        raise ValueError(msg)
-    density_filter_id = result[0]
+    filter_options = unstructure(query)
+    filter_id = save_filter(filter_options, con)
 
     values = []
     for file, uniprot_accession in zip(files, uniprot_accessions, strict=False):
         values.append(
             (
-                density_filter_id,
+                filter_id,
                 uniprot_accession,
                 file.count,
                 file.density_filtered_file is not None,
@@ -482,7 +488,7 @@ def save_density_filtered(
         )
     con.executemany(
         """INSERT OR IGNORE INTO density_filtered_alphafolds
-        (density_filter_id, uniprot_acc, nr_residues_above_confidence, keep, pdb_file)
+        (filter_id, uniprot_acc, filter_stats, keep, pdb_file)
         VALUES (?, ?, ?, ?, ?)""",
         values,
     )
@@ -617,7 +623,7 @@ def powerfit_solutions(con: DuckDBPyConnection, powerfit_run_id: int | None = No
             - relz: The relative Z-score of the solution.
             - translation: The translation vector applied to the structure.
             - rotation: The rotation matrix applied to the structure.
-            - density_filter_id: The ID of the density filter applied to the structure, if stucture came from AlphaFold.
+            - filter_id: The ID of the filter applied to the structure, if stucture came from AlphaFold.
             - af_id: The AlphaFold ID associated with the structure, if structure came from AlphaFold.
             - pdb_id: The PDB ID of the structure, if structure came from PDBe.
             - pdb_file: The path to the PDB file of the structure used as input structre for powerfit run.
