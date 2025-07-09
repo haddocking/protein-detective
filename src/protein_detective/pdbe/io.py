@@ -2,6 +2,7 @@ import logging
 from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import atomium
 from tqdm import tqdm
@@ -56,7 +57,8 @@ def filter_and_write_single_chain_pdb_file(
         and the number of residues in the chain.
     """
     pdb = atomium.open(str(mmcif_file))
-    chain: atomium.Chain = pdb.model.chain(chain2keep)  # type: ignore[missing-attribute]
+    model = cast("atomium.Model", pdb.model)
+    chain = cast("atomium.Chain", model.chain(chain2keep))
     nr_residues = len(chain)
     if nr_residues < min_residues:
         logger.info(
