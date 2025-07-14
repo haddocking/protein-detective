@@ -96,17 +96,62 @@ protein-detective prune-pdbs \
 
 ### Powerfit
 
-Generate the powerfit commands for the filtered and pruned structures.
+Run powerfit on the filtered and pruned structures.
 
 ```shell
-protein-detective powerfit commands ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1
+protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1
 ```
-This will print commands to the terminal, which you can then run in whatever way you prefer.
-Like just sequentially, or with [GNU parallel](https://www.gnu.org/software/parallel/) or as a [Slurm array job](https://slurm.schedmd.com/job_array.html).
 
-Alternatively, you can use the `protein-detective powerfit run ...` command to run powerfit commands sequentially, which is useful for small datasets with rough options.
+This will use [dask-distributed](https://distributed.dask.org/en/latest/) to run powerfit in parallel on multiple CPU cores or GPUs.
+
+<details>
+
+<summary>Run powerfits on Slurm</summary>
+
+You can use [dask-jobqueue](https://jobqueue.dask.org/en/latest/) to run the powerfits on a Slurm deployment on multiple machines.
+
+In one terminal start the Dask cluster with
 
 ```shell
+pip install dask-jobqueue
+python3
+```
+
+```python
+from dask_jobqueue import SLURMCluster
+
+cluster = SLURMCluster(cores=8,
+                       processes=4,
+                       memory="16GB",
+                       queue="normal")
+print(cluster.scheduler_address)
+# Prints something like: 'tcp://192.168.1.1:34059'
+# Keep python process running until powerfits are done
+```
+
+In second terminal, run the powerfits on Dask cluster with
+
+```shell
+protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1 --scheduler-address tcp://192.168.1.1:34059
+```
+
+</details>
+
+<details>
+
+<summary>Alternativly run powerfit manually</summary>
+
+You can use the `protein-detective powerfit commands` to print the commands.
+
+For example to run 4 slots:
+
+```shell
+`protein-detective powerfit commands ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1 | parallel --jobs 4`
+```
+
+The commands can then be run in whatever way you prefer, like sequentially, with [GNU parallel](https://www.gnu.org/software/parallel/), or as a [Slurm array job](https://slurm.schedmd.com/job_array.html).
+
+</details>
 
 To print top 10 solutions to the terminal, you can use:
 
