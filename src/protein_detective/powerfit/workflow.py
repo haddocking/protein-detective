@@ -17,26 +17,10 @@ from protein_detective.db import (
     save_powerfit_options,
 )
 from protein_detective.powerfit.options import PowerfitOptions
-from protein_detective.powerfit.parallel import configure_dask_scheduler
-from protein_detective.powerfit.run import run as powerfit_run
+from protein_detective.powerfit.parallel import configure_dask_scheduler, powerfit_worker
 from protein_detective.powerfit.solution import fit_models
 
 logger = logging.getLogger(__name__)
-
-
-def _powerfit_worker(pdb_file: Path, density_map_target: Path, powerfit_run_root_dir: Path, options: PowerfitOptions):
-    """Worker function for running PowerFit on a single PDB file.
-
-    Args:
-        pdb_file: Path to the PDB file to process
-        density_map_target: Path to the density map file
-        powerfit_run_root_dir: Root directory for PowerFit results
-        options: PowerFit options
-    """
-    result_dir = powerfit_run_root_dir / pdb_file.stem
-    logger.info(f"Running PowerFit on {density_map_target} against {pdb_file} with options: {options}")
-    with density_map_target.open("rb") as density_map:
-        powerfit_run(density_map, pdb_file, result_dir, options)
 
 
 def _initialize_powerfit_run(session_dir, options):
@@ -112,7 +96,7 @@ def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_adress:
     with Client(scheduler_adress) as client:
         logger.info(f"Follow progress on dask dashboard at: {client.dashboard_link}")
         futures = client.map(
-            _powerfit_worker,
+            powerfit_worker,
             pdb_files,
             density_map_target=density_map_target,
             powerfit_run_root_dir=powerfit_run_root_dir,

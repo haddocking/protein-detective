@@ -1,6 +1,7 @@
 """Dask helper functions."""
 
 import logging
+from pathlib import Path
 
 from dask.distributed import LocalCluster, Nanny
 from dask.system import CPU_COUNT
@@ -9,6 +10,7 @@ from distributed.deploy.cluster import Cluster
 from distributed.worker_memory import parse_memory_limit
 
 from protein_detective.db import PowerfitOptions
+from protein_detective.powerfit.run import run as powerfit_run
 
 try:
     import pyopencl
@@ -93,3 +95,18 @@ def configure_dask_scheduler(
                 )
 
     return scheduler_adress
+
+
+def powerfit_worker(pdb_file: Path, density_map_target: Path, powerfit_run_root_dir: Path, options: PowerfitOptions):
+    """Worker function for running PowerFit on a single PDB file.
+
+    Args:
+        pdb_file: Path to the PDB file to process
+        density_map_target: Path to the density map file
+        powerfit_run_root_dir: Root directory for PowerFit results
+        options: PowerFit options
+    """
+    result_dir = powerfit_run_root_dir / pdb_file.stem
+    logger.info(f"Running PowerFit on {density_map_target} against {pdb_file} with options: {options}")
+    with density_map_target.open("rb") as density_map:
+        powerfit_run(density_map, pdb_file, result_dir, options)
