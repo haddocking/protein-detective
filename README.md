@@ -96,19 +96,20 @@ protein-detective prune-pdbs \
 
 ### Powerfit
 
-Run powerfit on the filtered and pruned structures.
+Rotate and translate the prepared structures to fit and score them into the EM density map using powerfit.
 
 ```shell
 protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1
 ```
 
-This will use [dask-distributed](https://distributed.dask.org/en/latest/) to run powerfit in parallel on multiple CPU cores or GPUs.
+This will use [dask-distributed](https://distributed.dask.org/en/latest/) to run powerfit for each structure in parallel on multiple CPU cores or GPUs.
 
 <details>
 
 <summary>Run powerfits on Slurm</summary>
 
-You can use [dask-jobqueue](https://jobqueue.dask.org/en/latest/) to run the powerfits on a Slurm deployment on multiple machines.
+You can use [dask-jobqueue](https://jobqueue.dask.org/en/latest/) to run the powerfits
+on a Slurm deployment on multiple machines on a shared filesystem.
 
 In one terminal start the Dask cluster with
 
@@ -126,7 +127,7 @@ cluster = SLURMCluster(cores=8,
                        queue="normal")
 print(cluster.scheduler_address)
 # Prints something like: 'tcp://192.168.1.1:34059'
-# Keep python process running until powerfits are done
+# Keep this Python process running until powerfits are done
 ```
 
 In second terminal, run the powerfits on Dask cluster with
@@ -139,17 +140,19 @@ protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 docs/se
 
 <details>
 
-<summary>Alternativly run powerfit manually</summary>
+<summary>Alternativly run powerfit yourself</summary>
 
 You can use the `protein-detective powerfit commands` to print the commands.
 
-For example to run 4 slots:
+The commands can then be run in whatever way you prefer, like sequentially, with [GNU parallel](https://www.gnu.org/software/parallel/),
+or as a [Slurm array job](https://slurm.schedmd.com/job_array.html).
+
+For example to run with parallel and 4 slots:
 
 ```shell
-`protein-detective powerfit commands ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1 | parallel --jobs 4`
+`protein-detective powerfit commands ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1 > commands.txt
+parallel --jobs 4 < commands.txt
 ```
-
-The commands can then be run in whatever way you prefer, like sequentially, with [GNU parallel](https://www.gnu.org/software/parallel/), or as a [Slurm array job](https://slurm.schedmd.com/job_array.html).
 
 </details>
 
