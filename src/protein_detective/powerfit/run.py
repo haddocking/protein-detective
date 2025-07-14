@@ -60,5 +60,5 @@ def run(density_map: BinaryIO, structure: Path, result_dir: Path, options: Power
             gpu=gpu,
             nproc=options.nproc,
             delimiter=",",
-            progress=progress,
+            progress=progress,  # type: ignore[bad-argument-type]
         )

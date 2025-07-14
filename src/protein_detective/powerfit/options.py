@@ -11,7 +11,21 @@ from shlex import join
 
 @dataclass
 class PowerfitOptions:
-    """Options for the Powerfit command."""
+    """Options for the Powerfit command.
+
+    Parameters:
+        target: Path to the density map file.
+        resolution: Resolution of the density map.
+        angle: Angle for the fitting.
+        laplace: Whether to use Laplace smoothing.
+        core_weighted: Whether to use core weighted fitting.
+        no_resampling: Whether to disable resampling.
+        resampling_rate: Rate of resampling.
+        no_trimming: Whether to disable trimming .
+        trimming_cutoff: Cutoff for trimming.
+        gpu: Number of threads per GPU. If > 0 then Powerfit will use GPU acceleration otherwise CPU.
+        nproc: Number of processes to use. Ignored if GPU is used.
+    """
 
     target: Path
     resolution: float
@@ -22,7 +36,7 @@ class PowerfitOptions:
     resampling_rate: float = 2
     no_trimming: bool = False
     trimming_cutoff: float | None = None
-    gpu: bool = False
+    gpu: int = 0
     nproc: int = 1
 
     @staticmethod
@@ -80,7 +94,7 @@ class PowerfitOptions:
             # to spare disk space and time,
             # use `protein-detective powerfit fit-models` command to generate fitted model PDB files
             str(0),
-            "--gpu" if self.gpu else "",
+            "--gpu" if self.gpu > 0 else "",
             "--nproc",
             str(self.nproc),
             "--directory",
