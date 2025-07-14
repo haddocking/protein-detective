@@ -5,7 +5,8 @@ import shutil
 from pathlib import Path
 
 import pandas as pd
-from tqdm.auto import tqdm
+from dask.distributed import Client, progress
+from distributed.deploy.cluster import Cluster
 
 from protein_detective.db import (
     connect,
@@ -16,8 +17,26 @@ from protein_detective.db import (
     save_powerfit_options,
 )
 from protein_detective.powerfit.options import PowerfitOptions
+from protein_detective.powerfit.parallel import configure_dask_scheduler
 from protein_detective.powerfit.run import run as powerfit_run
 from protein_detective.powerfit.solution import fit_models
+
+logger = logging.getLogger(__name__)
+
+
+def _powerfit_worker(pdb_file: Path, density_map_target: Path, powerfit_run_root_dir: Path, options: PowerfitOptions):
+    """Worker function for running PowerFit on a single PDB file.
+
+    Args:
+        pdb_file: Path to the PDB file to process
+        density_map_target: Path to the density map file
+        powerfit_run_root_dir: Root directory for PowerFit results
+        options: PowerFit options
+    """
+    result_dir = powerfit_run_root_dir / pdb_file.stem
+    logger.info(f"Running PowerFit on {density_map_target} against {pdb_file} with options: {options}")
+    with density_map_target.open("rb") as density_map:
+        powerfit_run(density_map, pdb_file, result_dir, options)
 
 
 def _initialize_powerfit_run(session_dir, options):
@@ -31,7 +50,7 @@ def _initialize_powerfit_run(session_dir, options):
     density_map = options.target
     density_map_target = powerfit_run_dir / density_map.name
     shutil.copy(density_map, density_map_target)
-    logging.getLogger(__name__).info(f"Copied density map from {density_map} to {density_map_target}")
+    logger.info(f"Copied density map from {density_map} to {density_map_target}")
 
     # Load the PDB files from the session directory
     pdb_files = []
@@ -73,12 +92,13 @@ def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list
     return commands, powerfit_run_id
 
 
-def powerfit_runs(session_dir: Path, options: PowerfitOptions) -> int:
-    """Run PowerFit on the PDB files in the session directory.
+def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_adress: str | Cluster | None) -> int:
+    """Run distributed PowerFits on each of the PDB files in the session directory.
 
     Args:
         session_dir: Directory containing the session data, including PDB files.
         options: Options for running PowerFit.
+        scheduler_adress: Address of the Dask scheduler or a Cluster instance or None for local execution.
 
     Returns:
         The ID of the PowerFit run saved in the session.
@@ -87,15 +107,21 @@ def powerfit_runs(session_dir: Path, options: PowerfitOptions) -> int:
     powerfit_run_id, powerfit_run_root_dir, density_map_target, pdb_files = _initialize_powerfit_run(
         session_dir, options
     )
+    scheduler_adress = configure_dask_scheduler(scheduler_adress, options, powerfit_run_id)
 
-    with density_map_target.open("rb") as density_map:
-        # TODO make run in parallel/distributed instead of sequentially
-        # with some distributed computing framework such as
-        # multiprocessing, joblib, dask, snakemake, airflow, cwl, prefect, ray, asyncio-subprocess
-        # TODO if options.gpu is truthy then make sure parallel runs do not use the same gpu
-        for pdb_file in tqdm(pdb_files, desc="Running PowerFit", unit="structure"):
-            result_dir = powerfit_run_root_dir / pdb_file.stem
-            powerfit_run(density_map, pdb_file, result_dir, options)
+    with Client(scheduler_adress) as client:
+        logger.info(f"Follow progress on dask dashboard at: {client.dashboard_link}")
+        futures = client.map(
+            _powerfit_worker,
+            pdb_files,
+            density_map_target=density_map_target,
+            powerfit_run_root_dir=powerfit_run_root_dir,
+            options=options,
+        )
+
+        progress(futures)
+
+        client.gather(futures)
 
     return powerfit_run_id
 

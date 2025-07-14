@@ -1,8 +1,10 @@
 import logging
+from functools import partial
 from pathlib import Path
 from typing import BinaryIO
 
 from powerfit_em.powerfit import powerfit
+from tqdm.auto import tqdm
 
 from protein_detective.db import PowerfitOptions
 
@@ -33,6 +35,9 @@ def run(density_map: BinaryIO, structure: Path, result_dir: Path, options: Power
     if options.gpu:
         gpu = "0:0"
 
+    # disable progress bar, use parent template_structures as progress bar
+    progress = partial(tqdm, disable=True)
+
     with structure.open() as template_structure:
         powerfit(
             target_volume=density_map,
@@ -55,4 +60,5 @@ def run(density_map: BinaryIO, structure: Path, result_dir: Path, options: Power
             gpu=gpu,
             nproc=options.nproc,
             delimiter=",",
+            progress=progress,
         )
