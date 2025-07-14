@@ -94,6 +94,8 @@ class PowerfitOptions:
             # to spare disk space and time,
             # use `protein-detective powerfit fit-models` command to generate fitted model PDB files
             str(0),
+            # TODO use 4 in `protein-detective powerfit commands --gpu 4` as device id,
+            # now always first device
             "--gpu" if self.gpu > 0 else "",
             "--nproc",
             str(self.nproc),
