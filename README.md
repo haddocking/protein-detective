@@ -150,7 +150,7 @@ or as a [Slurm array job](https://slurm.schedmd.com/job_array.html).
 For example to run with parallel and 4 slots:
 
 ```shell
-`protein-detective powerfit commands ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1 > commands.txt
+protein-detective powerfit commands ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1 > commands.txt
 parallel --jobs 4 < commands.txt
 ```
 

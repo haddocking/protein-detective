@@ -53,6 +53,8 @@ def configure_dask_scheduler(
                 msg = f"Unsupported GPU vendor: {platform.vendor} for multiple GPU support."
                 raise ValueError(msg)
             env_name = "CUDA_VISIBLE_DEVICES" if platform.vendor == "NVIDIA Corporation" else "ROCR_VISIBLE_DEVICES"
+            # running multiple thread per worker is slower than more single-threaded workers
+            # TODO change to multiple single threaded workers per GPU
             worker_specs = {
                 f"gpu-worker-{i}": {
                     "cls": Nanny,
