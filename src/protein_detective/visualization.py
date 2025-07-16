@@ -112,7 +112,14 @@ def show_fitted_models_and_density(fitted_models: DataFrame, density: Path, rend
         snapshots.append(snapshot)
         data[fitted_model_file.name] = fitted_model_file.read_bytes()
 
-    state = MVSJ(data=States(snapshots=snapshots, metadata=GlobalMetadata(description="Fitted models and density map")))
+    state = MVSJ(
+        data=States(
+            snapshots=snapshots,
+            metadata=GlobalMetadata(
+                title="", description="Fitted models and density map", description_format="markdown"
+            ),
+        )
+    )
 
     _render_state(state, data, renderer, "stories")
 
