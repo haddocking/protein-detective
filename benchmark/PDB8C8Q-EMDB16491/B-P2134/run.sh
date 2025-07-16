@@ -19,7 +19,7 @@ ls -1 downloads/8c8q.cif
 # downloads/8c8q.cif
 # Yes it is
 
-# Get known B length
+# Get length known B chain
 python3 -c "import atomium; print(atomium.open('downloads/8c8q.cif').model.chain('B').length)"
 # 238
 # use 200 to 280 as residue range
@@ -42,4 +42,15 @@ protein-detective prune-pdbs \
 chimerax --nogui --script prep.cxc
 
 # powerfit
+# Use vkfft branch of powerfit
 protein-detective powerfit run emd_16491-P21534_8c8q_B2A.mrc 3.38 . --gpu
+# Took 3 minutes for 54 structures
+
+protein-detective powerfit report .
+# Great that 8c8q:B is first
+# 15th place is different uniprot
+
+# Write all fitted pdbs
+protein-detective powerfit fit-models . --top 100
+
+# View known model + unknown density + fitted models in mol* or chimeraX
