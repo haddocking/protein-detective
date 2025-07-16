@@ -33,8 +33,9 @@ def _initialize_powerfit_run(session_dir, options):
     # Copy the density map to the powerfit directory
     density_map = options.target
     density_map_target = powerfit_run_dir / density_map.name
-    shutil.copy(density_map, density_map_target)
-    logger.info(f"Copied density map from {density_map} to {density_map_target}")
+    if density_map != density_map_target:
+        shutil.copy(density_map, density_map_target)
+        logger.info(f"Copied density map from {density_map} to {density_map_target}")
 
     # Load the PDB files from the session directory
     pdb_files = []
