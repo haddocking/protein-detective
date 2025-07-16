@@ -1770,6 +1770,12 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/c9/c1/58c8adc3cb2a02337fcbc85f847833cca01558fdb829e550937d8d3ea697/powerfit_em-3.0.3-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:48375274583b83854885bf2d5d006050e061309e01b6bb055da39d5e9066df11", size = 6039892, upload-time = "2025-07-01T09:38:26.201Z" },
 ]
 
+[package.optional-dependencies]
+opencl = [
+    { name = "pyopencl" },
+    { name = "siphash24" },
+]
+
 [[package]]
 name = "prettytable"
 version = "3.16.0"
@@ -1851,7 +1857,7 @@ dependencies = [
     { name = "duckdb" },
     { name = "molviewspec" },
     { name = "pandas" },
-    { name = "powerfit-em" },
+    { name = "powerfit-em", extra = ["opencl"] },
     { name = "rich" },
     { name = "sparqlwrapper" },
     { name = "tqdm" },
@@ -1898,7 +1904,7 @@ requires-dist = [
     { name = "duckdb", specifier = ">=1.2.2" },
     { name = "molviewspec", specifier = ">=1.6.0" },
     { name = "pandas", specifier = ">=2.3.0" },
-    { name = "powerfit-em", specifier = ">=3.0.3" },
+    { name = "powerfit-em", extras = ["opencl"], specifier = ">=3.0.3" },
     { name = "rich", specifier = ">=14.0.0" },
     { name = "sparqlwrapper", specifier = ">=2.0.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
@@ -2101,6 +2107,25 @@ wheels = [
 ]
 
 [[package]]
+name = "pyopencl"
+version = "2025.2.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "platformdirs" },
+    { name = "pytools" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/27/4c/1fa950dd7dfb3bb9492cdf2acc85b77e569d2cc503491bdd38e45540f1d3/pyopencl-2025.2.5.tar.gz", hash = "sha256:eab75b8b15c45c8cafe938759b9a82f1da62eb1c57ef7bc04bce21fcbb60f485", size = 442522, upload-time = "2025-07-03T21:38:51.296Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ab/be/b9dec34636e652ee3ae715badf1b789d5db55e6428f1ee31682b438fc695/pyopencl-2025.2.5-cp313-cp313-macosx_10_14_x86_64.whl", hash = "sha256:28b7e5deb7733122471d1e3087c37c9a630e7b09028bc9f0d0e810611b055fd1", size = 444627, upload-time = "2025-07-03T21:38:44.725Z" },
+    { url = "https://files.pythonhosted.org/packages/93/f0/3006976dac49b4172fcba65f09c36fa3e456b4a1621909285de7fea76957/pyopencl-2025.2.5-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:baa34852659aed566c6ca19635634436fb0fc8ef9098180722732d372d105cb6", size = 424961, upload-time = "2025-07-03T21:38:46.197Z" },
+    { url = "https://files.pythonhosted.org/packages/59/29/00e11e1b23d47fe8bb2c1de8695ee97f1022a755da14599710aebb254976/pyopencl-2025.2.5-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:e05f12c1bc0572c97035c5e2540cdb92ca48dfefdb7faff53edac2f9390fc3ad", size = 730226, upload-time = "2025-07-03T21:38:47.47Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/06/bbfc825ce5c79251d8435ab5e12260bdb95f023583289a5844e7bfd9beee/pyopencl-2025.2.5-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:36fe3d11d7abf00d29a2227c008e4dd8b3b8f184bf4c66545334edc8306975c5", size = 1220613, upload-time = "2025-07-03T21:38:48.902Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/6a/d51a861bff6c9d3199c1fa21b67b877c3ed5ad15aeed13d3251175791b15/pyopencl-2025.2.5-cp313-cp313-win_amd64.whl", hash = "sha256:621d044be0b8c0f82c90bbd0691b8688956dd62c5914ebd06849a90c7c81c153", size = 470572, upload-time = "2025-07-03T21:38:50.146Z" },
+]
+
+[[package]]
 name = "pyparsing"
 version = "3.2.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2149,6 +2174,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/66/c0/0c8b6ad9f17a802ee498c46e004a0eb49bc148f2fd230864601a86dcf6db/python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3", size = 342432, upload-time = "2024-03-01T18:36:20.211Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427", size = 229892, upload-time = "2024-03-01T18:36:18.57Z" },
+]
+
+[[package]]
+name = "pytools"
+version = "2025.2.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "platformdirs" },
+    { name = "siphash24" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/17/1e/e5471df34543a36d57dcf65b659aa07bd1124dbee79d5711f1599e3138d0/pytools-2025.2.2.tar.gz", hash = "sha256:88ec51d9233b0a2b0935ed7f153457ee70dfd31a5a0ae400f3fc6cdcaf2d43dd", size = 84641, upload-time = "2025-07-15T23:47:01.429Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d4/ba/eec9ed3b8fa3437f18ee756eb1fe88a373628ba64a48890ca75921fe74c1/pytools-2025.2.2-py3-none-any.whl", hash = "sha256:2821224e90609a5858a7b50a0159c1a8f10ea15df1b7b8d5d5c7e575c709b5d7", size = 98122, upload-time = "2025-07-15T23:46:59.623Z" },
 ]
 
 [[package]]
@@ -2366,6 +2405,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/18/5d/3bf57dcd21979b887
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl", hash = "sha256:062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922", size = 1201486, upload-time = "2025-05-27T00:56:49.664Z" },
 ]
+
+[[package]]
+name = "siphash24"
+version = "1.7"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0e/be/f0a0ffbb00c51c5633b41459b5ce9b017c025a9256b4403e648c18e70850/siphash24-1.7.tar.gz", hash = "sha256:6e90fee5f199ea25b4e7303646b31872a437174fe885a93dbd4cf7784eb48164", size = 19801, upload-time = "2024-10-15T13:41:51.924Z" }
 
 [[package]]
 name = "six"

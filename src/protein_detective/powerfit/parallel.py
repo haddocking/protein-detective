@@ -77,6 +77,9 @@ def configure_dask_scheduler(
             )
             logger.info(f"Found {n_workers} GPUs, using {threads_per_worker} threads per GPU worker.")
         else:
+            if CPU_COUNT is None:
+                msg = "CPU_COUNT is not defined, cannot determine number of CPU cores."
+                raise ValueError(msg)
             n_workers = CPU_COUNT // options.nproc
             # Use single thread per worker to prevent GIL slowing down the computations
             scheduler_adress = LocalCluster(
