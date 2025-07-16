@@ -4,10 +4,10 @@ import logging
 from pathlib import Path
 
 from dask.distributed import LocalCluster, Nanny
-from dask.system import CPU_COUNT
 from distributed import Scheduler, SpecCluster
 from distributed.deploy.cluster import Cluster
 from distributed.worker_memory import parse_memory_limit
+from psutil import cpu_count
 
 from protein_detective.db import PowerfitOptions
 from protein_detective.powerfit.run import run as powerfit_run
@@ -77,10 +77,11 @@ def configure_dask_scheduler(
             )
             logger.info(f"Found {n_workers} GPUs, using {threads_per_worker} threads per GPU worker.")
         else:
-            if CPU_COUNT is None:
-                msg = "CPU_COUNT is not defined, cannot determine number of CPU cores."
+            physical_cores = cpu_count(logical=False)
+            if physical_cores is None:
+                msg = "Cannot determine number of logical CPU cores."
                 raise ValueError(msg)
-            n_workers = CPU_COUNT // options.nproc
+            n_workers = physical_cores // options.nproc
             # Use single thread per worker to prevent GIL slowing down the computations
             scheduler_adress = LocalCluster(
                 name=f"powerfit-run-{powerfit_run_id}", threads_per_worker=1, n_workers=n_workers
