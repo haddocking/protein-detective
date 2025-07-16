@@ -1,0 +1,6 @@
+open emd_16491.map;
+open single_chain/P21534_8c8q_B2A.pdb;
+molmap #2 3.38 balls true;
+volume mask #1 surfaces #3 pad 4;
+save emd_16491-P21534_8c8q_B2A.mrc #4;
+exit
