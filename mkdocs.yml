@@ -7,6 +7,7 @@ exclude_docs: |
   cli_doc_hook.py
 hooks:
   - docs/cli_doc_hook.py
+use_directory_urls: false
 theme: 
   name: material
   features:
@@ -77,6 +78,7 @@ nav:
   - Home: index.md
   - CLI Reference: cli.md
   - Notebooks:
+    - Prepare EM map: em_prepare.ipynb
     - Retrieve: uniprot.ipynb
     - AlphaFold: alphafold.ipynb
     - PDBe: pdbe.ipynb
