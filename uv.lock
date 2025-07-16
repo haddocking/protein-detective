@@ -1943,7 +1943,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pyrefly", specifier = ">=0.15.1" },
+    { name = "pyrefly", specifier = ">=0.23.1" },
     { name = "pytest", specifier = ">=8.3.5" },
     { name = "types-aiofiles", specifier = ">=24.1.0.20250326" },
     { name = "types-tqdm", specifier = ">=4.67.0.20250513" },
