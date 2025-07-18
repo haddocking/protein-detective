@@ -59,6 +59,13 @@ def filter_and_write_single_chain_pdb_file(
     pdb = atomium.open(str(mmcif_file))
     model = cast("atomium.Model", pdb.model)
     chain = cast("atomium.Chain", model.chain(chain2keep))
+    if chain is None:
+        logger.warning(
+            "Chain %s not found in %s.",
+            chain2keep,
+            mmcif_file,
+        )
+        return False, 0
     nr_residues = len(chain)
     if nr_residues < min_residues:
         logger.info(
@@ -156,8 +163,8 @@ def nr_residues_in_chain(file: Path | str, chain: str = "A") -> int:
         The number of residues in the specified chain.
     """
     pdb = atomium.open(str(file))
-    chain: atomium.Chain = pdb.model.chain(chain)  # type: ignore[missing-attribute]
-    return len(chain)
+    achain: atomium.Chain = pdb.model.chain(chain)  # type: ignore[missing-attribute]
+    return len(achain)
 
 
 def write_single_chain_pdb_file(
