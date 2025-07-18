@@ -19,7 +19,7 @@ jobs:
       - name: Install the project
         run: uv sync --locked --dev
       - name: Install pocl
-        run: uv pip install pocl
+        run: uv pip install pocl-binary-distribution==3.0
       - name: Run tests
         run: uv run pytest
   build:
