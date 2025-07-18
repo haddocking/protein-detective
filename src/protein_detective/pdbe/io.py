@@ -227,22 +227,3 @@ def write_single_chain_pdb_file(
         nr_residues=nr_residues,
         passed=passed,
     )
-
-
-def write_single_chain_pdb_files(
-    proteinpdbs: list[ProteinPdbRow], session_dir: Path, single_chain_dir: Path, query: SingleChainQuery
-) -> Generator[SingleChainResult]:
-    """Writes single chain PDB files from the provided protein PDB rows.
-
-    Args:
-        proteinpdbs: A list of ProteinPdbRow objects.
-        session_dir: The directory where the session files are stored.
-        single_chain_dir: The directory where the single chain PDB files will be saved.
-        query: The query containing the minimum and maximum number of residues.
-
-    Yields:
-        SingleChainResult objects containing the output file path and whether the chain passed the residue filter.
-    """
-    # TODO took 30mins for 12k pdbs, use dask to parallelize this or other pdb manipulation library
-    for proteinpdb in tqdm(proteinpdbs, desc="Saving single chain PDB files from PDBe"):
-        yield write_single_chain_pdb_file(proteinpdb, session_dir, single_chain_dir, query)

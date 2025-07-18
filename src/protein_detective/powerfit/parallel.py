@@ -69,6 +69,7 @@ def _configure_cpu_dask_scheduler(nproc: int, name: str) -> LocalCluster:
     if physical_cores is None:
         msg = "Cannot determine number of logical CPU cores."
         raise ValueError(msg)
+    # TODO allow to not use whole machine, but just given number of cores
     n_workers = physical_cores // nproc
     # Use single thread per worker to prevent GIL slowing down the computations
     return LocalCluster(name=name, threads_per_worker=1, n_workers=n_workers)

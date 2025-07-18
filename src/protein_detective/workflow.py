@@ -3,7 +3,9 @@
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
+
+from dask.distributed import Client, progress
 
 from protein_detective.alphafold import DownloadableFormat
 from protein_detective.alphafold import fetch_many as af_fetch
@@ -25,7 +27,12 @@ from protein_detective.db import (
     save_uniprot_accessions,
 )
 from protein_detective.pdbe.fetch import fetch as pdbe_fetch
-from protein_detective.pdbe.io import SingleChainQuery, write_single_chain_pdb_files
+from protein_detective.pdbe.io import (
+    SingleChainQuery,
+    SingleChainResult,
+    write_single_chain_pdb_file,
+)
+from protein_detective.powerfit.parallel import configure_dask_scheduler
 from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
 
 logger = logging.getLogger(__name__)
@@ -196,16 +203,33 @@ def prune_pdbs(session_dir: Path, query: SingleChainQuery) -> tuple[Path, int]:
     single_chain_dir = session_dir / "single_chain"
     single_chain_dir.mkdir(parents=True, exist_ok=True)
 
-    with connect(session_dir) as con:
+    with connect(session_dir, read_only=True) as con:
         proteinpdbs = load_pdbs(con)
-        new_files = list(
-            write_single_chain_pdb_files(
-                proteinpdbs,
-                session_dir,
-                single_chain_dir=single_chain_dir,
-                query=query,
-            )
+
+    # TODO make scheduler address configurable from cli
+    # TODO reuse dask scheduler?
+    # TODO make function lazy?
+    scheduler_address = configure_dask_scheduler(
+        None,
+        name="prune-pdbs",
+    )
+
+    with Client(scheduler_address) as client:
+        logger.info(f"Follow progress on dask dashboard at: {client.dashboard_link}")
+        futures = client.map(
+            write_single_chain_pdb_file,
+            proteinpdbs,
+            session_dir=session_dir,
+            single_chain_dir=single_chain_dir,
+            query=query,
         )
+
+        progress(futures)
+
+        results = client.gather(futures)
+        new_files = cast("list[SingleChainResult]", results)
+
+    with connect(session_dir) as con:
         save_single_chain_pdb_files(new_files, query, con)
 
-        return single_chain_dir, len([f for f in new_files if f.passed])
+    return single_chain_dir, len([f for f in new_files if f.passed])
