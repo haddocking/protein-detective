@@ -1,11 +1,10 @@
 import logging
-from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
 
-import atomium
-from tqdm import tqdm
+import gemmi
+
+from protein_detective import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -56,16 +55,17 @@ def filter_and_write_single_chain_pdb_file(
         chain is in the residue range and the file was written successfully,
         and the number of residues in the chain.
     """
-    pdb = atomium.open(str(mmcif_file))
-    model = cast("atomium.Model", pdb.model)
-    chain = cast("atomium.Chain", model.chain(chain2keep))
+    structure = gemmi.read_structure(str(mmcif_file))
+    model = structure[0]
+    chain = model.find_chain(chain2keep)
     if chain is None:
         logger.warning(
-            "Chain %s not found in %s.",
+            "Chain %s not found in %s. Skipping.",
             chain2keep,
             mmcif_file,
         )
         return False, 0
+
     nr_residues = len(chain)
     if nr_residues < min_residues:
         logger.info(
@@ -93,10 +93,27 @@ def filter_and_write_single_chain_pdb_file(
         output_file,
         out_chain,
     )
-    # pyrefly: ignore  # noqa: ERA001
-    chain.copy(out_chain).save(
-        str(output_file),
-    )
+
+    new_structure = gemmi.Structure()
+    new_structure.resolution = structure.resolution
+    new_id = structure.name + f"{chain2keep}2{out_chain}"
+    new_structure.name = new_id
+    new_structure.info["_entry.id"] = new_id
+    new_title = f"From {structure.info['_entry.id']} chain {chain2keep} to {out_chain}"
+    new_structure.info["_struct.title"] = new_title
+    new_structure.info["_struct_keywords.pdbx_keywords"] = new_title.upper()
+    new_si = gemmi.SoftwareItem()
+    new_si.classification = gemmi.SoftwareItem.Classification.DataExtraction
+    new_si.name = "Protein Detective"
+    new_si.version = str(__version__)
+    new_structure.meta.software.append(new_si)
+    new_model = gemmi.Model(1)
+    chain.name = out_chain
+    new_model.add_chain(chain)
+    new_structure.add_model(new_model)
+    new_structure.remove_ligands_and_waters()
+    new_structure.write_pdb(str(output_file))
+
     # TODO use less diskspace, save gzipped and make powerfit work with it
     return True, nr_residues
 
@@ -162,9 +179,9 @@ def nr_residues_in_chain(file: Path | str, chain: str = "A") -> int:
     Returns:
         The number of residues in the specified chain.
     """
-    pdb = atomium.open(str(file))
-    achain: atomium.Chain = pdb.model.chain(chain)  # type: ignore[missing-attribute]
-    return len(achain)
+    structure = gemmi.read_structure(str(file))
+    model = structure[0]
+    return len(model[chain])
 
 
 def write_single_chain_pdb_file(
