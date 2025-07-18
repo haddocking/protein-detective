@@ -243,5 +243,6 @@ def write_single_chain_pdb_files(
     Yields:
         SingleChainResult objects containing the output file path and whether the chain passed the residue filter.
     """
+    # TODO took 30mins for 12k pdbs, use dask to parallelize this or other pdb manipulation library
     for proteinpdb in tqdm(proteinpdbs, desc="Saving single chain PDB files from PDBe"):
         yield write_single_chain_pdb_file(proteinpdb, session_dir, single_chain_dir, query)

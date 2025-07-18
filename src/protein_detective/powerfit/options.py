@@ -1,4 +1,5 @@
 from argparse import Namespace
+from collections.abc import Generator
 from dataclasses import dataclass
 from io import BufferedReader
 from pathlib import Path
@@ -23,7 +24,7 @@ class PowerfitOptions:
         resampling_rate: Rate of resampling.
         no_trimming: Whether to disable trimming .
         trimming_cutoff: Cutoff for trimming.
-        gpu: Number of threads per GPU. If > 0 then Powerfit will use GPU acceleration otherwise CPU.
+        gpu: Number of workers per GPU. If > 0 then Powerfit will use GPU acceleration otherwise CPU.
         nproc: Number of processes to use. Ignored if GPU is used.
     """
 
@@ -66,7 +67,14 @@ class PowerfitOptions:
             nproc=parsed_args.nproc,
         )
 
-    def to_command(self, density_map: Path, template: Path, out_dir: Path, powerfit_cmd: str = "powerfit") -> str:
+    def to_command(
+        self,
+        density_map: Path,
+        template: Path,
+        out_dir: Path,
+        powerfit_cmd: str = "powerfit",
+        gpu_cycler: Generator[int] | None = None,
+    ) -> str:
         """Generate command from options and given arguments.
 
         Args:
@@ -74,6 +82,7 @@ class PowerfitOptions:
             template: Path to the template PDB file.
             out_dir: Directory to save the output files.
             powerfit_cmd: Command to run Powerfit (default is "powerfit").
+            gpu_cycler: Generator to cycle through GPU indices.
 
         Returns:
             A string representing the command to run Powerfit.
@@ -94,9 +103,6 @@ class PowerfitOptions:
             # to spare disk space and time,
             # use `protein-detective powerfit fit-models` command to generate fitted model PDB files
             str(0),
-            # TODO use 4 in `protein-detective powerfit commands --gpu 4` as device id,
-            # now always first device
-            "--gpu" if self.gpu > 0 else "",
             "--nproc",
             str(self.nproc),
             "--directory",
@@ -104,6 +110,9 @@ class PowerfitOptions:
             "--delimiter",
             ",",
         ]
+        if self.gpu > 0 and gpu_cycler is not None:
+            gpu_id = next(gpu_cycler)
+            args.extend(["--gpu", str(gpu_id)])
         if self.angle:
             args.extend(["--angle", str(self.angle)])
         if self.trimming_cutoff is not None:
