@@ -58,7 +58,7 @@ def add_powerfit_commands_parser(subparsers):
         type=int,
         default=0,
         help="Off-load the intensive calculations to the GPU. "
-        "Optionally specify number of threads per GPU (default: 1).",
+        "Optionally specify number of workers per GPU (default: 1).",
     )
 
     parser.add_argument(
@@ -89,7 +89,7 @@ def add_powerfit_run_parser(subparsers):
         type=int,
         default=0,
         help="Off-load the intensive calculations to the GPU. "
-        "Optionally specify number of threads per GPU (default: 1).",
+        "Optionally specify number of workers per GPU (default: 1).",
     )
     parser.add_argument(
         "--scheduler-address",

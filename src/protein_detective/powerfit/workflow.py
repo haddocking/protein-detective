@@ -17,7 +17,7 @@ from protein_detective.db import (
     save_powerfit_options,
 )
 from protein_detective.powerfit.options import PowerfitOptions
-from protein_detective.powerfit.parallel import configure_dask_scheduler, powerfit_worker
+from protein_detective.powerfit.parallel import build_gpu_cycler, configure_dask_scheduler, powerfit_worker
 from protein_detective.powerfit.solution import fit_models
 
 logger = logging.getLogger(__name__)
@@ -64,12 +64,11 @@ def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list
 
     # Generate PowerFit commands for each PDB file
     commands = []
+    gpu_cycler = build_gpu_cycler(options.gpu)
     for pdb_file in pdb_files:
         result_dir = powerfit_run_root_dir / pdb_file.stem
         command = options.to_command(
-            density_map=density_map_target,
-            template=pdb_file,
-            out_dir=result_dir,
+            density_map=density_map_target, template=pdb_file, out_dir=result_dir, gpu_cycler=gpu_cycler
         )
         commands.append(command)
 
@@ -91,7 +90,12 @@ def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_adress:
     powerfit_run_id, powerfit_run_root_dir, density_map_target, pdb_files = _initialize_powerfit_run(
         session_dir, options
     )
-    scheduler_adress = configure_dask_scheduler(scheduler_adress, options, powerfit_run_id)
+    scheduler_adress = configure_dask_scheduler(
+        scheduler_adress,
+        name=f"powerfit-run-{powerfit_run_id}",
+        workers_per_gpu=options.gpu,
+        nproc=options.nproc,
+    )
 
     with Client(scheduler_adress) as client:
         logger.info(f"Follow progress on dask dashboard at: {client.dashboard_link}")

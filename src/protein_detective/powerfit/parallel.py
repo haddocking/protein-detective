@@ -1,6 +1,7 @@
 """Dask helper functions."""
 
 import logging
+from collections.abc import Generator
 from pathlib import Path
 
 from dask.distributed import LocalCluster, Nanny
@@ -22,14 +23,19 @@ logger = logging.getLogger(__name__)
 
 
 def configure_dask_scheduler(
-    scheduler_adress: str | Cluster | None, options: PowerfitOptions, powerfit_run_id: int
+    scheduler_adress: str | Cluster | None,
+    name: str,
+    workers_per_gpu: int = 0,
+    nproc: int = 1,
 ) -> str | Cluster:
-    """Configure the Dask scheduler based on the provided options and run ID.
+    """Configure the Dask scheduler by reusing existing or creating a new cluster.
 
     Args:
         scheduler_adress: Address of the Dask scheduler to connect to, or None for local cluster.
-        options: PowerFit options containing GPU and nproc settings.
-        powerfit_run_id: ID of the PowerFit run for naming the cluster.
+        name: Name for the Dask cluster.
+        workers_per_gpu: Number of workers per GPU.
+            If > 0, a GPU cluster will be configured otherwise a CPU cluster.
+        nproc: Number of processes to use per worker for CPU support.
 
     Raises:
         ImportError: If GPU support is requested but pyopencl is not installed.
@@ -39,58 +45,13 @@ def configure_dask_scheduler(
         A Dask Cluster instance or a string address for the scheduler.
     """
     if scheduler_adress is None:
-        if options.gpu > 0:
-            if pyopencl is None:
-                msg = "pyopencl is required for GPU support in PowerFit."
-                raise ImportError(msg)
-            platform = pyopencl.get_platforms()[0]
-            gpus = platform.get_devices()
-            # Below is similar to https://github.com/rapidsai/dask-cuda/blob/main/dask_cuda/local_cuda_cluster.py
-            # but more minimalistic and with AMD support
-            n_workers = len(gpus)
-            threads_per_worker = options.gpu
-            if platform.vendor not in ["NVIDIA Corporation", "Advanced Micro Devices, Inc."] and n_workers > 1:
-                msg = f"Unsupported GPU vendor: {platform.vendor} for multiple GPU support."
-                raise ValueError(msg)
-            env_name = "CUDA_VISIBLE_DEVICES" if platform.vendor == "NVIDIA Corporation" else "ROCR_VISIBLE_DEVICES"
-            # running multiple thread per worker is slower than more single-threaded workers
-            # TODO change to multiple single threaded workers per GPU
-            worker_specs = {
-                f"gpu-worker-{i}": {
-                    "cls": Nanny,
-                    "options": {
-                        "memory_limit": parse_memory_limit("auto", 1, n_workers, logger=logger),
-                        "nthreads": threads_per_worker,
-                        "dashboard_address": ":0",
-                        "env": {env_name: str(i)},
-                    },
-                }
-                for i in range(n_workers)
-            }
-            scheduler_adress = SpecCluster(
-                workers=worker_specs,
-                scheduler={
-                    "cls": Scheduler,
-                    "options": {
-                        "dashboard_address": ":8787",
-                    },
-                },
-                name=f"powerfit-run-{powerfit_run_id}",
-            )
-            logger.info(f"Found {n_workers} GPUs, using {threads_per_worker} threads per GPU worker.")
+        if workers_per_gpu > 0:
+            scheduler_adress = _configure_gpu_dask_scheduler(workers_per_gpu, name)
         else:
-            physical_cores = cpu_count(logical=False)
-            if physical_cores is None:
-                msg = "Cannot determine number of logical CPU cores."
-                raise ValueError(msg)
-            n_workers = physical_cores // options.nproc
-            # Use single thread per worker to prevent GIL slowing down the computations
-            scheduler_adress = LocalCluster(
-                name=f"powerfit-run-{powerfit_run_id}", threads_per_worker=1, n_workers=n_workers
-            )
+            scheduler_adress = _configure_cpu_dask_scheduler(nproc, name)
         logger.info(f"Using local Dask cluster: {scheduler_adress}")
     else:
-        if options.gpu > 0:
+        if workers_per_gpu > 0:
             if pyopencl is None:
                 msg = "pyopencl is required for GPU support in PowerFit."
                 raise ImportError(msg)
@@ -100,6 +61,88 @@ def configure_dask_scheduler(
                     "CUDA_VISIBLE_DEVICES or ROCR_VISIBLE_DEVICES environment variables."
                 )
 
+    return scheduler_adress
+
+
+def _configure_cpu_dask_scheduler(nproc: int, name: str) -> LocalCluster:
+    physical_cores = cpu_count(logical=False)
+    if physical_cores is None:
+        msg = "Cannot determine number of logical CPU cores."
+        raise ValueError(msg)
+    n_workers = physical_cores // nproc
+    # Use single thread per worker to prevent GIL slowing down the computations
+    return LocalCluster(name=name, threads_per_worker=1, n_workers=n_workers)
+
+
+def nr_gpus() -> int:
+    if pyopencl is None:
+        return 0
+    platform = pyopencl.get_platforms()[0]
+    gpus = platform.get_devices()
+    return len(gpus)
+
+
+def build_gpu_cycler(workers_per_gpu: int = 1, n_gpus: int = nr_gpus()) -> Generator[int]:
+    """Generator to cycle through GPU indices.
+
+    On machine with multiple GPUs and a computation that does not use a full GPU.
+    This will yield GPU indices in a round-robin fashion.
+
+    If n_gpus is set to 0, it will yield 0 indefinitely.
+    If workers_per_gpu>0 and n_gpus=1, it will yield 0 indefinitely.
+    If workers_per_gpu=1 and n_gpus=2, it will yield 0, 1 indefinitely.
+    If workers_per_gpu=4 and n_gpus=2, it will yield 0, 1, 0, 1, 0, 1, 0, 1 indefinitely.
+    """
+    if n_gpus == 0:
+        while True:
+            yield 0
+    else:
+        while True:
+            for _ in range(workers_per_gpu):
+                yield from range(n_gpus)
+
+
+def _configure_gpu_dask_scheduler(workers_per_gpu: int, cluster_name: str) -> SpecCluster:
+    if pyopencl is None:
+        msg = "pyopencl is required for GPU support in PowerFit."
+        raise ImportError(msg)
+        # Assume first platform is quickest
+    platform = pyopencl.get_platforms()[0]
+    gpus = platform.get_devices()
+    # Below is similar to https://github.com/rapidsai/dask-cuda/blob/main/dask_cuda/local_cuda_cluster.py
+    # but more minimalistic and with AMD support
+    n_gpus = len(gpus)
+    if platform.vendor not in ["NVIDIA Corporation", "Advanced Micro Devices, Inc."] and n_gpus > 1:
+        msg = f"Unsupported GPU vendor: {platform.vendor} for multiple GPU support."
+        raise ValueError(msg)
+    env_name = "CUDA_VISIBLE_DEVICES" if platform.vendor == "NVIDIA Corporation" else "ROCR_VISIBLE_DEVICES"
+    worker_specs = {}
+    # The computation besides using GPU also uses Python,
+    # so we can not use multiple threads
+    # as it would slow down the computations due to GIL.
+    for i in range(n_gpus):
+        for j in range(workers_per_gpu):
+            worker_spec = {
+                "cls": Nanny,
+                "options": {
+                    "memory_limit": parse_memory_limit("auto", 1, n_gpus * workers_per_gpu, logger=logger),
+                    "nthreads": 1,
+                    "dashboard_address": ":0",
+                    "env": {env_name: str(i)},
+                },
+            }
+            worker_specs[f"gpu-worker-{i}-{j}"] = worker_spec
+    scheduler_adress = SpecCluster(
+        workers=worker_specs,
+        scheduler={
+            "cls": Scheduler,
+            "options": {
+                "dashboard_address": ":8787",
+            },
+        },
+        name=cluster_name,
+    )
+    logger.info(f"Found {n_gpus} GPUs, using {workers_per_gpu} workers per GPU.")
     return scheduler_adress
 
 
