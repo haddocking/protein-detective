@@ -427,11 +427,11 @@ def save_single_chain_pdb_files(files: list[SingleChainResult], query: SingleCha
         rows.append(
             (filter_id, file.uniprot_acc, file.pdb_id, {"nr_residues": file.nr_residues}, file.passed, output_file)
         )
-    con.executemany(
+    single_chain_df = DataFrame(rows)  # noqa: F841 used in SQL query below
+    con.execute(
         """INSERT OR IGNORE INTO filtered_pdbs
         (filter_id, uniprot_acc, pdb_id, filter_stats, passed, output_file)
-        VALUES (?, ?, ?, ?, ?, ?)""",
-        rows,
+        SELECT * FROM single_chain_df""",
     )
 
 
@@ -486,11 +486,11 @@ def save_density_filtered(
                 str(file.density_filtered_file) if file.density_filtered_file else None,
             )
         )
-    con.executemany(
+    density_filtered_alphafolds_df = DataFrame(values)  # noqa: F841 used in SQL query below
+    con.execute(
         """INSERT OR IGNORE INTO density_filtered_alphafolds
         (filter_id, uniprot_acc, filter_stats, keep, pdb_file)
-        VALUES (?, ?, ?, ?, ?)""",
-        values,
+        SELECT * FROM density_filtered_alphafolds_df""",
     )
 
 
