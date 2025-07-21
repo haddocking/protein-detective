@@ -100,11 +100,12 @@ def retrieve_structures(
     if "pdbe" in what:
         # mmCIF files from PDBe for the Uniprot entries in the session.
         pdb_ids = set()
-        with connect(session_dir) as con:
+        with connect(session_dir, read_only=True) as con:
             pdb_ids = load_pdb_ids(con)
 
-            mmcif_files = pdbe_fetch(pdb_ids, download_dir)
+        mmcif_files = pdbe_fetch(pdb_ids, download_dir)
 
+        with connect(session_dir) as con:
             # make paths relative to session_dir, so db stores paths relative to session_dir
             sr_mmcif_files = {pdb_id: mmcif_file.relative_to(session_dir) for pdb_id, mmcif_file in mmcif_files.items()}
             save_pdb_files(sr_mmcif_files, con)
@@ -113,11 +114,12 @@ def retrieve_structures(
     if "alphafold" in what:
         # AlphaFold entries for the given query
         af_ids = set()
-        with connect(session_dir) as con:
+        with connect(session_dir, read_only=True) as con:
             af_ids = load_alphafold_ids(con)
 
-            afs = af_fetch(af_ids, download_dir, what=what_af_formats)
+        afs = af_fetch(af_ids, download_dir, what=what_af_formats)
 
+        with connect(session_dir) as con:
             sr_afs = [af_relative_to(af, session_dir) for af in afs]
             save_alphafolds_files(sr_afs, con)
 
