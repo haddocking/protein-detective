@@ -17,9 +17,10 @@ def create_run_script_content(row: dict) -> str:
     tax_id = row["Ncbi tax id"]
     subcellular_uniprot = row["First cellular location - Uniprot"]
     go_location = row["First (larger) cellular location - GO"]
-    pdb_id = row["PDB_id"]
+    pdb_id = row["PDB_id"].strip()
     chain = row["Chain"]
     # Use a range around the modelled residues for filtering
+    # TODO use better logic to determine min/max residues based on the volume of the unknown density
     min_res = int(row["Number of residues modelled"]) - 40
     max_res = int(row["Number of residues modelled"]) + 40
 
@@ -28,8 +29,13 @@ def create_run_script_content(row: dict) -> str:
     map_file = f"../emd_{emdb_id}.map"
     map_gz_file = f"../emd_{emdb_id}.map.gz"
     masked_map = f"emd_{emdb_id}-{uniprot}_{pdb_id.lower()}_{chain}2A.mrc"
+    # TODO document how to figure out what is good argument for --gpu, aka if gpu is not fully utilized then ++
+    powerfit_args = "--gpu 3"
 
-    return f"""#!/bin/sh
+    return f"""\
+#!/bin/bash
+
+set -euxo pipefail
 
 if [ ! -f "{map_file}" ]; then
     wget https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdb_id}/map/emd_{emdb_id}.map.gz -O {map_gz_file}
@@ -73,7 +79,7 @@ EOF
 chimerax --nogui --script prep.cxc
 
 # powerfit
-protein-detective powerfit run {masked_map} {resolution} . --gpu
+protein-detective powerfit run {masked_map} {resolution} . {powerfit_args}
 
 protein-detective powerfit report .
 
@@ -91,7 +97,7 @@ def main():
     benchmark_dir = Path(__file__).parent
     csv_path = benchmark_dir / "Benchmarklist.csv"
 
-    with open(csv_path, newline="", encoding="utf-8") as csvfile:
+    with csv_path.open(newline="", encoding="utf-8") as csvfile:
         reader = csv.DictReader(csvfile)
         previous_row = {}
         for row in reader:
@@ -124,7 +130,7 @@ def main():
             script_content = create_run_script_content(row)
             run_sh_path = output_dir / "run.sh"
             run_sh_path.write_text(script_content, encoding="utf-8")
-            print(f"Generated {run_sh_path}")
+            print(f"Generated {run_sh_path}")  # noqa: T201
             previous_row = row
 
 
