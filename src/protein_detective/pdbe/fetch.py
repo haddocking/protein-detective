@@ -8,10 +8,10 @@ from protein_detective.utils import retrieve_files
 
 def _map_id_mmcif(pdb_id: str) -> tuple[str, str]:
     """
-    Map PDB id to a download mmCIF url and file.
+    Map PDB id to a download gzipped mmCIF url and file.
 
     For example for PDB id "8WAS", the url will be
-    "https://www.ebi.ac.uk/pdbe/entry-files/download/8was.cif" and the file will be "8was.cif".
+    "https://www.ebi.ac.uk/pdbe/entry-files/download/8was.cif.gz" and the file will be "8was.cif.gz".
 
     Args:
         pdb_id: The PDB ID to map.
@@ -19,7 +19,7 @@ def _map_id_mmcif(pdb_id: str) -> tuple[str, str]:
     Returns:
         A tuple containing the URL to download the mmCIF file and the filename.
     """
-    fn = f"{pdb_id.lower()}.cif"
+    fn = f"{pdb_id.lower()}.cif.gz"
     # On PDBe you can sometimes download an updated mmCIF file,
     # Current url is for the archive mmCIF file
     # TODO check if archive is OK, or if we should try to download the updated file

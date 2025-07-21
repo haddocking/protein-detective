@@ -217,7 +217,8 @@ def write_single_chain_pdb_file(
     mmcif_file = proteinpdb.mmcif_file
     chain2keep = first_chain_from_uniprot_chains(proteinpdb.uniprot_chains)
     uniprot_acc = proteinpdb.uniprot_acc
-    output_file = single_chain_dir / f"{uniprot_acc}_{mmcif_file.stem}_{chain2keep}2A.pdb"
+    mmmcif_filename = mmcif_file.name.replace(".cif", "").replace(".gz", "")
+    output_file = single_chain_dir / f"{uniprot_acc}_{mmmcif_filename}_{chain2keep}2A.pdb"
 
     if output_file.exists():
         logger.info(
