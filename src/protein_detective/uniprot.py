@@ -276,7 +276,7 @@ def _execute_sparql_search(
 
     # Default is GET method which can be cached by the server so is preferred.
     # Too prevent URITooLong errors, we use POST method for large queries.
-    too_long_for_get = 10_000
+    too_long_for_get = 8_000
     if len(sparql_query) > too_long_for_get:
         sparql.setMethod("POST")
 
