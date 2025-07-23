@@ -57,6 +57,10 @@ def filter_and_write_single_chain_pdb_file(
     """
     structure = gemmi.read_structure(str(mmcif_file))
     model = structure[0]
+
+    # Only count residues of polymer
+    model.remove_ligands_and_waters()
+
     chain = model.find_chain(chain2keep)
     if chain is None:
         logger.warning(
@@ -111,7 +115,6 @@ def filter_and_write_single_chain_pdb_file(
     chain.name = out_chain
     new_model.add_chain(chain)
     new_structure.add_model(new_model)
-    new_structure.remove_waters()
     new_structure.write_pdb(str(output_file))
 
     # TODO use less diskspace, save gzipped and make powerfit work with it
