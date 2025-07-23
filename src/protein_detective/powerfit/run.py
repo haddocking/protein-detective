@@ -35,7 +35,7 @@ def run(density_map: BinaryIO, structure: Path, result_dir: Path, options: Power
     if options.gpu:
         gpu = "0:0"
 
-    # disable progress bar, use parent template_structures as progress bar
+    # disable progress bar, use parent structures loop as progress bar
     progress = partial(tqdm, disable=True)
 
     with structure.open() as template_structure:
