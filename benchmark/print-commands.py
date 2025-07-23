@@ -22,7 +22,6 @@ def create_run_script_content(row: dict) -> str:
     map_file = f"../emd_{emdb_id}.map"
     map_gz_file = f"../emd_{emdb_id}.map.gz"
     masked_map = f"emd_{emdb_id}-{uniprot}_{pdb_id.lower()}_{chain}2A.mrc"
-    # TODO document how to figure out what is good argument for --gpu, aka if gpu is not fully utilized then ++
     powerfit_args = "--gpu 3"
 
     return f"""\
