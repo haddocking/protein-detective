@@ -111,7 +111,7 @@ def filter_and_write_single_chain_pdb_file(
     chain.name = out_chain
     new_model.add_chain(chain)
     new_structure.add_model(new_model)
-    new_structure.remove_ligands_and_waters()
+    new_structure.remove_waters()
     new_structure.write_pdb(str(output_file))
 
     # TODO use less diskspace, save gzipped and make powerfit work with it
