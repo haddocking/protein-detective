@@ -53,8 +53,12 @@ def add_powerfit_commands_parser(subparsers):
         "-g",
         "--gpu",
         dest="gpu",
-        action="store_true",
-        help="Off-load the intensive calculations to the GPU. ",
+        nargs="?",
+        const=1,
+        type=int,
+        default=0,
+        help="Off-load the intensive calculations to the GPU. "
+        "Optionally specify number of workers per GPU (default: 1).",
     )
 
     parser.add_argument(
@@ -80,8 +84,16 @@ def add_powerfit_run_parser(subparsers):
         "-g",
         "--gpu",
         dest="gpu",
-        action="store_true",
-        help="Off-load the intensive calculations to the GPU. ",
+        nargs="?",
+        const=1,
+        type=int,
+        default=0,
+        help="Off-load the intensive calculations to the GPU. "
+        "Optionally specify number of workers per GPU (default: 1).",
+    )
+    parser.add_argument(
+        "--scheduler-address",
+        help="Address of the Dask scheduler to connect to. If not provided, will create a local cluster.",
     )
 
 
@@ -143,7 +155,7 @@ def add_powerfit_parser(subparsers):
 
 def handler_powerfit_run(args):
     session_dir = Path(args.session_dir)
-    powerfit_run_id = powerfit_runs(session_dir, PowerfitOptions.from_args(args))
+    powerfit_run_id = powerfit_runs(session_dir, PowerfitOptions.from_args(args), args.scheduler_address)
     rprint(f"PowerFit run completed with ID: {powerfit_run_id}. Use this ID for reporting or fitting models.")
 
 

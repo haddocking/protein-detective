@@ -96,17 +96,86 @@ protein-detective prune-pdbs \
 
 ### Powerfit
 
-Generate the powerfit commands for the filtered and pruned structures.
+Rotate and translate the prepared structures to fit and score them into the EM density map using powerfit.
 
 ```shell
-protein-detective powerfit commands ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1
+protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1
 ```
-This will print commands to the terminal, which you can then run in whatever way you prefer.
-Like just sequentially, or with [GNU parallel](https://www.gnu.org/software/parallel/) or as a [Slurm array job](https://slurm.schedmd.com/job_array.html).
 
-Alternatively, you can use the `protein-detective powerfit run ...` command to run powerfit commands sequentially, which is useful for small datasets with rough options.
+This will use [dask-distributed](https://distributed.dask.org/en/latest/) to run powerfit for each structure in parallel on multiple CPU cores or GPUs.
+
+<details>
+
+<summary>Run powerfits on Slurm</summary>
+
+You can use [dask-jobqueue](https://jobqueue.dask.org/en/latest/) to run the powerfits
+on a Slurm deployment on multiple machines on a shared filesystem.
+
+In one terminal start the Dask cluster with
 
 ```shell
+pip install dask-jobqueue
+python3
+```
+
+```python
+from dask_jobqueue import SLURMCluster
+
+cluster = SLURMCluster(cores=8,
+                       processes=4,
+                       memory="16GB",
+                       queue="normal")
+print(cluster.scheduler_address)
+# Prints something like: 'tcp://192.168.1.1:34059'
+# Keep this Python process running until powerfits are done
+```
+
+In second terminal, run the powerfits on Dask cluster with
+
+```shell
+protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1 --scheduler-address tcp://192.168.1.1:34059
+```
+
+</details>
+
+<details>
+<summary>How to run efficiently</summary>
+
+Powerfit is quickest on GPU, but can also run on CPU.
+
+To run powerfits on a GPU you can use the `--gpu <workers_per_gpu>`.
+The value of `workers_per_gpu` should be high enough so the GPU is fully utilized.
+You can start with 1 (the default) and monitor the GPU usage with `nvtop` if you see that the GPU is not 100% loaded, you can increase the number until there are no more valleys in the GPU usage graph.
+
+If you have multiple GPUs, then `--gpu 2` will run powerfits on all GPUs and run 2 powerfits concurrently on each GPU.
+
+If you do not use `--gpu` flag, then powerfit will run on CPU.
+By default each powerfit will use 1 CPU core and run multiple powerfits in parallel
+according to the number of physical CPU cores available on the machine (so excluding hyperthreaded cores).
+
+You can set the `--nproc <int>` so each powerfit will use that many CPU cores.
+This is useful if you have more CPU cores available then there are structures to fit.
+If the number of structure to fit is greater than available CPU cores then using the default (1 core per powerfit) is recommended.
+
+</details>
+
+<details>
+
+<summary>Alternativly run powerfit yourself</summary>
+
+You can use the `protein-detective powerfit commands` to print the commands.
+
+The commands can then be run in whatever way you prefer, like sequentially, with [GNU parallel](https://www.gnu.org/software/parallel/),
+or as a [Slurm array job](https://slurm.schedmd.com/job_array.html).
+
+For example to run with parallel and 4 slots:
+
+```shell
+protein-detective powerfit commands ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1 > commands.txt
+parallel --jobs 4 < commands.txt
+```
+
+</details>
 
 To print top 10 solutions to the terminal, you can use:
 
