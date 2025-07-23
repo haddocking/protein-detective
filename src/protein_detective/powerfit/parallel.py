@@ -31,6 +31,9 @@ def configure_dask_scheduler(
 ) -> str | Cluster:
     """Configure the Dask scheduler by reusing existing or creating a new cluster.
 
+    When creating a local GPU cluster on a machine with multiple GPUs,
+    it will start workers which each can only see a single GPU.
+
     Args:
         scheduler_address: Address of the Dask scheduler to connect to, or None for local cluster.
         name: Name for the Dask cluster.
@@ -77,6 +80,11 @@ def _configure_cpu_dask_scheduler(nproc: int, name: str) -> LocalCluster:
 
 
 def nr_gpus() -> int:
+    """The number of available GPUs on the system.
+
+    Returns:
+        Number of GPUs available
+    """
     if pyopencl is None:
         return 0
     try:
@@ -94,10 +102,10 @@ def build_gpu_cycler(workers_per_gpu: int = 1, n_gpus: int = nr_gpus()) -> Gener
     On machine with multiple GPUs and a computation that does not use a full GPU.
     This will yield GPU indices in a round-robin fashion.
 
-    If n_gpus is set to 0, it will yield 0 indefinitely.
-    If workers_per_gpu>0 and n_gpus=1, it will yield 0 indefinitely.
-    If workers_per_gpu=1 and n_gpus=2, it will yield 0, 1 indefinitely.
-    If workers_per_gpu=4 and n_gpus=2, it will yield 0, 1, 0, 1, 0, 1, 0, 1 indefinitely.
+    - If n_gpus is set to 0, it will yield 0 indefinitely.
+    - If workers_per_gpu>0 and n_gpus=1, it will yield 0 indefinitely.
+    - If workers_per_gpu=1 and n_gpus=2, it will yield 0, 1 indefinitely.
+    - If workers_per_gpu=4 and n_gpus=2, it will yield 0, 1, 0, 1, 0, 1, 0, 1 indefinitely.
     """
     if n_gpus == 0:
         while True:

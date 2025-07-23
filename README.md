@@ -139,6 +139,27 @@ protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 docs/se
 </details>
 
 <details>
+<summary>How to run efficiently</summary>
+
+Powerfit is quickest on GPU, but can also run on CPU.
+
+To run powerfits on a GPU you can use the `--gpu <workers_per_gpu>`.
+The value of `workers_per_gpu` should be high enough so the GPU is fully utilized.
+You can start with 1 (the default) and monitor the GPU usage with `nvtop` if you see that the GPU is not 100% loaded, you can increase the number until there are no more valleys in the GPU usage graph.
+
+If you have multiple GPUs, then `--gpu 2` will run powerfits on all GPUs and run 2 powerfits concurrently on each GPU.
+
+If you do not use `--gpu` flag, then powerfit will run on CPU.
+By default each powerfit will use 1 CPU core and run multiple powerfits in parallel
+according to the number of physical CPU cores available on the machine (so excluding hyperthreaded cores).
+
+You can set the `--nproc <int>` so each powerfit will use that many CPU cores.
+This is useful if you have more CPU cores available then there are structures to fit.
+If the number of structure to fit is greater than available CPU cores then using the default (1 core per powerfit) is recommended.
+
+</details>
+
+<details>
 
 <summary>Alternativly run powerfit yourself</summary>
 
