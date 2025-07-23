@@ -1,11 +1,3 @@
-"""
-This script generates run.sh files for benchmarking based on a CSV file.
-
-It reads benchmark data from "Benchmarklist.csv", and for each relevant
-row, it creates a directory structure and a corresponding run.sh script
-to execute a protein-detective pipeline.
-"""
-
 import csv
 from pathlib import Path
 
@@ -17,7 +9,8 @@ def create_run_script_content(row: dict) -> str:
     tax_id = row["Ncbi tax id"]
     subcellular_uniprot = row["First cellular location - Uniprot"]
     go_location = row["First (larger) cellular location - GO"]
-    pdb_id = row["PDB_id"].strip()
+    search_limit = 100_000
+    pdb_id = row["PDB_id"]
     chain = row["Chain"]
     # Use a range around the modelled residues for filtering
     # TODO use better logic to determine min/max residues based on the volume of the unknown density
@@ -37,6 +30,8 @@ def create_run_script_content(row: dict) -> str:
 
 set -euxo pipefail
 
+echo $PWD
+
 if [ ! -f "{map_file}" ]; then
     wget https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdb_id}/map/emd_{emdb_id}.map.gz -O {map_gz_file}
     gunzip {map_gz_file}
@@ -46,7 +41,7 @@ protein-detective search \\
     --taxon-id {tax_id} \\
     --subcellular-location-uniprot "{subcellular_uniprot}" \\
     --subcellular-location-go GO:{go_location} \\
-    --limit 50000 \\
+    --limit {search_limit} \\
     .
 
 protein-detective retrieve .
@@ -120,8 +115,8 @@ def main():
                 continue
 
             # Create directory structure
-            pdb_emdb_dir_name = f"PDB{row['PDB_id']}-EMDB{row['EMDB']}"
-            pdb_emdb_dir = benchmark_dir / pdb_emdb_dir_name
+            pdb_emdb_dir_name = f"{row['PDB_id']}-{row['EMDB']}"
+            pdb_emdb_dir = benchmark_dir / "work" / pdb_emdb_dir_name
             chain_uniprot_dir = f"{row['Chain']}-{row['Uniprot_id']}"
             output_dir = pdb_emdb_dir / chain_uniprot_dir
             output_dir.mkdir(parents=True, exist_ok=True)
