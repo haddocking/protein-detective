@@ -9,6 +9,7 @@ from distributed import Scheduler, SpecCluster
 from distributed.deploy.cluster import Cluster
 from distributed.worker_memory import parse_memory_limit
 from psutil import cpu_count
+from pyopencl import LogicError
 
 from protein_detective.db import PowerfitOptions
 from protein_detective.powerfit.run import run as powerfit_run
@@ -78,9 +79,13 @@ def _configure_cpu_dask_scheduler(nproc: int, name: str) -> LocalCluster:
 def nr_gpus() -> int:
     if pyopencl is None:
         return 0
-    platform = pyopencl.get_platforms()[0]
-    gpus = platform.get_devices()
-    return len(gpus)
+    try:
+        platform = pyopencl.get_platforms()[0]
+        gpus = platform.get_devices()
+        return len(gpus)
+    except LogicError:
+        # If no OpenCL platform is available, return 0 GPUs
+        return 0
 
 
 def build_gpu_cycler(workers_per_gpu: int = 1, n_gpus: int = nr_gpus()) -> Generator[int]:
