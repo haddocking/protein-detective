@@ -76,13 +76,13 @@ def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list
     return commands, powerfit_run_id
 
 
-def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_adress: str | Cluster | None) -> int:
+def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_address: str | Cluster | None) -> int:
     """Run distributed PowerFits on each of the PDB files in the session directory.
 
     Args:
         session_dir: Directory containing the session data, including PDB files.
         options: Options for running PowerFit.
-        scheduler_adress: Address of the Dask scheduler or a Cluster instance or None for local execution.
+        scheduler_address: Address of the Dask scheduler or a Cluster instance or None for local execution.
 
     Returns:
         The ID of the PowerFit run saved in the session.
@@ -91,14 +91,14 @@ def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_adress:
     powerfit_run_id, powerfit_run_root_dir, density_map_target, pdb_files = _initialize_powerfit_run(
         session_dir, options
     )
-    scheduler_adress = configure_dask_scheduler(
-        scheduler_adress,
+    scheduler_address = configure_dask_scheduler(
+        scheduler_address,
         name=f"powerfit-run-{powerfit_run_id}",
         workers_per_gpu=options.gpu,
         nproc=options.nproc,
     )
 
-    with Client(scheduler_adress) as client:
+    with Client(scheduler_address) as client:
         logger.info(f"Follow progress on dask dashboard at: {client.dashboard_link}")
         futures = client.map(
             powerfit_worker,

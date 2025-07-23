@@ -100,6 +100,10 @@ def add_prune_pdbs_parser(subparsers):
         default=1_000_000,
         help="Maximum number of residues in chain. PDBe files with more residues will be discarded.",
     )
+    parser.add_argument(
+        "--scheduler-address",
+        help="Address of the Dask scheduler to connect to. If not provided, will create a local cluster.",
+    )
 
 
 def handle_search(args):
@@ -153,6 +157,7 @@ def handle_prune_pdbs(args):
     single_chain_dir, nr_files = prune_pdbs(
         session_dir,
         query,
+        args.scheduler_address,
     )
     rprint(f"Written {nr_files} PDB files to {single_chain_dir} directory.")
 

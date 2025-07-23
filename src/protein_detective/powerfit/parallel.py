@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 def configure_dask_scheduler(
-    scheduler_adress: str | Cluster | None,
+    scheduler_address: str | Cluster | None,
     name: str,
     workers_per_gpu: int = 0,
     nproc: int = 1,
@@ -32,7 +32,7 @@ def configure_dask_scheduler(
     """Configure the Dask scheduler by reusing existing or creating a new cluster.
 
     Args:
-        scheduler_adress: Address of the Dask scheduler to connect to, or None for local cluster.
+        scheduler_address: Address of the Dask scheduler to connect to, or None for local cluster.
         name: Name for the Dask cluster.
         workers_per_gpu: Number of workers per GPU.
             If > 0, a GPU cluster will be configured otherwise a CPU cluster.
@@ -45,12 +45,12 @@ def configure_dask_scheduler(
     Returns:
         A Dask Cluster instance or a string address for the scheduler.
     """
-    if scheduler_adress is None:
+    if scheduler_address is None:
         if workers_per_gpu > 0:
-            scheduler_adress = _configure_gpu_dask_scheduler(workers_per_gpu, name)
+            scheduler_address = _configure_gpu_dask_scheduler(workers_per_gpu, name)
         else:
-            scheduler_adress = _configure_cpu_dask_scheduler(nproc, name)
-        logger.info(f"Using local Dask cluster: {scheduler_adress}")
+            scheduler_address = _configure_cpu_dask_scheduler(nproc, name)
+        logger.info(f"Using local Dask cluster: {scheduler_address}")
     else:
         if workers_per_gpu > 0:
             if pyopencl is None:
@@ -62,7 +62,7 @@ def configure_dask_scheduler(
                     "CUDA_VISIBLE_DEVICES or ROCR_VISIBLE_DEVICES environment variables."
                 )
 
-    return scheduler_adress
+    return scheduler_address
 
 
 def _configure_cpu_dask_scheduler(nproc: int, name: str) -> LocalCluster:

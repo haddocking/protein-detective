@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Literal, cast
 
 from dask.distributed import Client, progress
+from distributed.deploy.cluster import Cluster
 
 from protein_detective.alphafold import DownloadableFormat
 from protein_detective.alphafold import fetch_many as af_fetch
@@ -186,7 +187,9 @@ def density_filter(session_dir: Path, query: DensityFilterQuery) -> DensityFilte
         )
 
 
-def prune_pdbs(session_dir: Path, query: SingleChainQuery) -> tuple[Path, int]:
+def prune_pdbs(
+    session_dir: Path, query: SingleChainQuery, scheduler_address: str | Cluster | None = None
+) -> tuple[Path, int]:
     """Prune the PDB files to only keep the first chain of the found Uniprot entries.
 
     Only writes PDB files that have a single chain with a number of residues
@@ -197,6 +200,7 @@ def prune_pdbs(session_dir: Path, query: SingleChainQuery) -> tuple[Path, int]:
     Args:
         session_dir: The directory where the session database is stored.
         query: The single chain query containing the minimum and maximum number of residues.
+        scheduler_address: Address of the Dask scheduler or a Cluster instance or None for local execution.
 
     Returns:
         A tuple containing the directory where the single chain PDB files are stored,
@@ -208,7 +212,6 @@ def prune_pdbs(session_dir: Path, query: SingleChainQuery) -> tuple[Path, int]:
     with connect(session_dir, read_only=True) as con:
         proteinpdbs = load_pdbs(con)
 
-    # TODO make scheduler address configurable from cli
     # TODO reuse dask scheduler?
     # TODO make function lazy?
     scheduler_address = configure_dask_scheduler(
