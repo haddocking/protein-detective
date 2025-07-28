@@ -276,7 +276,7 @@ def _execute_sparql_search(
 
     # Default is GET method which can be cached by the server so is preferred.
     # Too prevent URITooLong errors, we use POST method for large queries.
-    too_long_for_get = 8_000
+    too_long_for_get = 7_000
     if len(sparql_query) > too_long_for_get:
         sparql.setMethod("POST")
 
@@ -393,6 +393,7 @@ def search4pdb(uniprot_accs: Iterable[str], limit: int = 10_000, timeout: int = 
         Dictionary with protein IDs as keys and sets of PDB results as values.
     """
     sparql_query = _build_sparql_query_pdb(uniprot_accs, limit)
+    print(len(sparql_query))
     logger.info("Executing SPARQL query for PDB: %s", sparql_query)
 
     # Type assertion is needed because _execute_sparql_search returns a Union
