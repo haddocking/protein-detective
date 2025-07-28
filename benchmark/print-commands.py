@@ -7,8 +7,8 @@ def create_run_script_content(row: dict) -> str:
     emdb_id = row["EMDB"]
     uniprot = row["Uniprot_id"]
     tax_id = row["Ncbi tax id"]
-    subcellular_uniprot = row["First cellular location - Uniprot"]
-    go_location = row["First (larger) cellular location - GO"]
+    subcellular_uniprot = row["First cellular location - Uniprot"].replace("\\", "")
+    go_location = row["First (larger) cellular location - GO"].replace("\\", "")
     search_limit = 100_000
     pdb_id = row["PDB_id"]
     chain = row["Chain"]
@@ -24,6 +24,22 @@ def create_run_script_content(row: dict) -> str:
     masked_map = f"emd_{emdb_id}-{uniprot}_{pdb_id.lower()}_{chain}2A.mrc"
     powerfit_args = "--gpu 3"
 
+    search = f"""\
+protein-detective search \\
+    --taxon-id {tax_id} \\
+    --subcellular-location-uniprot "{subcellular_uniprot}" \\
+    --subcellular-location-go GO:{go_location} \\
+    --limit {search_limit} \\
+    .
+"""
+    if not subcellular_uniprot and not go_location:
+        search = f"""\
+protein-detective search \\
+    --taxon-id {tax_id} \\
+    --limit {search_limit} \\
+    .
+"""
+
     return f"""\
 #!/bin/bash
 
@@ -36,12 +52,7 @@ if [ ! -f "{map_file}" ]; then
     gunzip {map_gz_file}
 fi
 
-protein-detective search \\
-    --taxon-id {tax_id} \\
-    --subcellular-location-uniprot "{subcellular_uniprot}" \\
-    --subcellular-location-go GO:{go_location} \\
-    --limit {search_limit} \\
-    .
+{search}
 
 protein-detective retrieve .
 
