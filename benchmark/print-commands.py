@@ -57,7 +57,7 @@ fi
 protein-detective retrieve .
 
 # Is fitted model {pdb_id}:{chain} part of the search results?
-ls -1 downloads/{pdb_id.lower()}.cif
+ls -1 downloads/{pdb_id.lower()}.cif.gz
 
 # use {min_res} to {max_res} as residue range
 
