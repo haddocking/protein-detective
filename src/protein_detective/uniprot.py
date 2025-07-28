@@ -1,9 +1,11 @@
 import logging
 from collections.abc import Collection, Iterable
 from dataclasses import dataclass
+from itertools import batched
 from textwrap import dedent
 
 from SPARQLWrapper import JSON, SPARQLWrapper
+from tqdm.auto import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -380,7 +382,9 @@ def search4uniprot(query: Query, limit: int = 10_000, timeout: int = 1_800) -> s
     return {result["protein"]["value"].split("/")[-1] for result in raw_results}
 
 
-def search4pdb(uniprot_accs: Iterable[str], limit: int = 10_000, timeout: int = 1_800) -> dict[str, set[PdbResult]]:
+def search4pdb(
+    uniprot_accs: Collection[str], limit: int = 10_000, timeout: int = 1_800, batch_size: int = 10_000
+) -> dict[str, set[PdbResult]]:
     """
     Search for PDB entries in UniProtKB accessions.
 
@@ -388,24 +392,32 @@ def search4pdb(uniprot_accs: Iterable[str], limit: int = 10_000, timeout: int = 
         uniprot_accs: UniProt accessions.
         limit: Maximum number of results to return.
         timeout: Timeout for the SPARQL query in seconds.
+        batch_size: Size of batches to process the UniProt accessions.
 
     Returns:
         Dictionary with protein IDs as keys and sets of PDB results as values.
     """
-    sparql_query = _build_sparql_query_pdb(uniprot_accs, limit)
-    print(len(sparql_query))
-    logger.info("Executing SPARQL query for PDB: %s", sparql_query)
+    all_raw_results = []
+    total = len(uniprot_accs)
+    with tqdm(total=total, desc="Searching for PDBs of uniprots", disable=total < batch_size, unit="acc") as pbar:
+        for batch in batched(uniprot_accs, batch_size, strict=False):
+            sparql_query = _build_sparql_query_pdb(batch, limit)
+            logger.info("Executing SPARQL query for PDB: %s", sparql_query)
 
-    # Type assertion is needed because _execute_sparql_search returns a Union
-    raw_results = _execute_sparql_search(
-        sparql_query=sparql_query,
-        timeout=timeout,
-    )
-    limit_check("Search for pdbs on uniprot", limit, len(raw_results))
-    return _flatten_results_pdb(raw_results)
+            raw_results = _execute_sparql_search(
+                sparql_query=sparql_query,
+                timeout=timeout,
+            )
+            all_raw_results.extend(raw_results)
+            pbar.update(len(batch))
+
+    limit_check("Search for pdbs on uniprot", limit, len(all_raw_results))
+    return _flatten_results_pdb(all_raw_results)
 
 
-def search4af(uniprot_accs: Iterable[str], limit: int = 10_000, timeout: int = 1_800) -> dict[str, set[str]]:
+def search4af(
+    uniprot_accs: Collection[str], limit: int = 10_000, timeout: int = 1_800, batch_size: int = 10_000
+) -> dict[str, set[str]]:
     """
     Search for AlphaFold entries in UniProtKB accessions.
 
@@ -413,20 +425,27 @@ def search4af(uniprot_accs: Iterable[str], limit: int = 10_000, timeout: int = 1
         uniprot_accs: UniProt accessions.
         limit: Maximum number of results to return.
         timeout: Timeout for the SPARQL query in seconds.
+        batch_size: Size of batches to process the UniProt accessions.
 
     Returns:
         Dictionary with protein IDs as keys and sets of AlphaFold IDs as values.
     """
-    sparql_query = _build_sparql_query_af(uniprot_accs, limit)
-    logger.info("Executing SPARQL query for AlphaFold: %s", sparql_query)
+    all_raw_results = []
+    total = len(uniprot_accs)
+    with tqdm(total=total, desc="Searching for AlphaFolds of uniprots", disable=total < batch_size, unit="acc") as pbar:
+        for batch in batched(uniprot_accs, batch_size, strict=False):
+            sparql_query = _build_sparql_query_af(batch, limit)
+            logger.info("Executing SPARQL query for AlphaFold: %s", sparql_query)
 
-    # Type assertion is needed because _execute_sparql_search returns a Union
-    raw_results = _execute_sparql_search(
-        sparql_query=sparql_query,
-        timeout=timeout,
-    )
-    limit_check("Search for alphafold entries on uniprot", limit, len(raw_results))
-    return _flatten_results_af(raw_results)
+            raw_results = _execute_sparql_search(
+                sparql_query=sparql_query,
+                timeout=timeout,
+            )
+            all_raw_results.extend(raw_results)
+            pbar.update(len(batch))
+
+    limit_check("Search for alphafold entries on uniprot", limit, len(all_raw_results))
+    return _flatten_results_af(all_raw_results)
 
 
 def search4emdb(uniprot_accs: Iterable[str], limit: int = 10_000, timeout: int = 1_800) -> dict[str, set[str]]:
