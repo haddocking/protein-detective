@@ -125,6 +125,21 @@ def save_query(query: Query, used_limit: int, con: DuckDBPyConnection):
     )
 
 
+def load_uniprot_queries(con: DuckDBPyConnection) -> list[tuple[Query, int]]:
+    """Load all UniProt search queries from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A list of tuples containing the query and the used limit.
+    """
+    query = "SELECT query, used_limit FROM uniprot_searches"
+    rows = con.execute(query).fetchall()
+    print(rows)
+    return [(converter.loads(row[0], Query), row[1]) for row in rows]
+
+
 def uniprot_query_exists(query: Query, used_limit: int, con: DuckDBPyConnection) -> bool:
     """Check if a UniProt search query already exists in the database.
 
@@ -746,3 +761,20 @@ def list_lcc_files(con: DuckDBPyConnection) -> list[tuple[int, str, str]]:
 
     """)
     return con.fetchall()
+
+
+def copy_search_results(source_session_dir: Path, con: DuckDBPyConnection):
+    """Copy search results from another session directory to the current database.
+
+    Args:
+        source_session_dir: The directory of the source session to copy from.
+        con: The DuckDB connection to use for copying the data.
+    """
+    source_db_path = db_path(source_session_dir)
+    con.execute(f"ATTACH DATABASE '{source_db_path!s}' AS source_db")
+    con.execute("INSERT INTO uniprot_searches SELECT * FROM source_db.uniprot_searches")
+    con.execute("INSERT INTO proteins SELECT * FROM source_db.proteins")
+    con.execute("INSERT INTO pdbs SELECT * FROM source_db.pdbs")
+    con.execute("INSERT INTO proteins_pdbs SELECT * FROM source_db.proteins_pdbs")
+    con.execute("INSERT INTO alphafolds SELECT * FROM source_db.alphafolds")
+    con.execute("DETACH DATABASE source_db")

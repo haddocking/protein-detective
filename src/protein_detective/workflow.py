@@ -1,12 +1,16 @@
 """Workflow steps"""
 
+import dataclasses
+import hashlib
+import json
 import logging
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal, cast
 
 from dask.distributed import Client, progress
 from distributed.deploy.cluster import Cluster
+from platformdirs import user_cache_dir
 
 from protein_detective.alphafold import DownloadableFormat
 from protein_detective.alphafold import fetch_many as af_fetch
@@ -14,10 +18,12 @@ from protein_detective.alphafold import relative_to as af_relative_to
 from protein_detective.alphafold.density import DensityFilterQuery, filter_on_density
 from protein_detective.db import (
     connect,
+    copy_search_results,
     load_alphafold_ids,
     load_alphafolds,
     load_pdb_ids,
     load_pdbs,
+    load_uniprot_queries,
     save_alphafolds,
     save_alphafolds_files,
     save_density_filtered,
@@ -40,6 +46,17 @@ from protein_detective.uniprot import Query, search4af, search4pdb, search4unipr
 
 logger = logging.getLogger(__name__)
 
+cache_dir = Path(user_cache_dir("protein-detective", ensure_exists=True))
+cache_uniprot_root = cache_dir / "uniprot"
+cache_uniprot_root.mkdir(parents=True, exist_ok=True)
+
+
+def _generate_query_hash(query: Query, limit: int) -> str:
+    query_dict = asdict(query)
+    query_dict["limit"] = limit
+    body = json.dumps(query_dict, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
 
 def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 10_000) -> tuple[int, int, int, int]:
     """Searches for protein structures in UniProt database.
@@ -56,17 +73,34 @@ def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 1
     """
     session_dir.mkdir(parents=True, exist_ok=True)
 
+    # Reuse cached results in other sessions
+    qhash = _generate_query_hash(query, limit)
+    cache_path = cache_uniprot_root / qhash
+    if cache_path.exists():
+        cached_session_dir = cache_path.readlink()
+        if session_dir.absolute() != cached_session_dir.absolute() and cached_session_dir.exists():
+            with connect(session_dir) as con:
+                logger.warning(f"Query seen before, copying search results from {cached_session_dir} session.")
+                copy_search_results(cached_session_dir, con)
+                # TODO if cached session dir has files downloaded also copy those, do in `retrieve_structures()`
+    else:
+        cache_path.symlink_to(session_dir.absolute())
+
+    # Reuse existing search results in the current session database
     with connect(session_dir) as con:
         if uniprot_query_exists(query, limit, con):
             logger.warning(
-                "Results of this UniProt query already exists in the session database. Not querying Uniprot SPARQL endpoint again."
+                "Results of this UniProt query already exists in the session database. "
+                "Not querying Uniprot SPARQL endpoint again."
             )
             return uniprot_search_counts(con)
 
+    # Perform the searches in UniProt
     uniprot_accessions = search4uniprot(query, limit)
     pdbs = search4pdb(uniprot_accessions, limit=limit)
     af_result = search4af(uniprot_accessions, limit=limit)
 
+    # Store in db
     with connect(session_dir) as con:
         save_query(query, limit, con)
         save_uniprot_accessions(uniprot_accessions, con)
@@ -99,6 +133,54 @@ def retrieve_structures(
     session_dir.mkdir(parents=True, exist_ok=True)
     download_dir = session_dir / "downloads"
     download_dir.mkdir(parents=True, exist_ok=True)
+
+    # Check if there is an another session with same query and downloaded files
+    with connect(session_dir, read_only=True) as con:
+        uniprot_queries = load_uniprot_queries(con)
+    if not uniprot_queries:
+        msg = "No UniProt queries results found in the session database. Please run a search first."
+        raise ValueError(msg)
+    query, limit = uniprot_queries[0]
+    qhash = _generate_query_hash(query, limit)
+    cache_path = cache_uniprot_root / qhash
+    if cache_path.exists() and cache_path != session_dir:
+        if "pdbe" in what_retrieve_choices:
+            with connect(cache_path, read_only=True) as cache_con:
+                cached_pdbes = load_pdbs(cache_con)
+            if cached_pdbes:
+                logger.warning(
+                    'PDBe files already downloaded in session "%s". Symlinking instead of downloading.', cache_path
+                )
+            linked_files = {}
+            for pdb in cached_pdbes:
+                if pdb.mmcif_file:
+                    current_pdb = download_dir / pdb.mmcif_file.name
+                    if current_pdb.exists():
+                        continue
+                    current_pdb.symlink_to(pdb.mmcif_file.resolve())
+                    linked_files[pdb.id] = current_pdb.relative_to(session_dir)
+            with connect(session_dir) as scon:
+                save_pdb_files(linked_files, scon)
+        if "alphafold" in what_retrieve_choices and cache_path.exists() and cache_path != session_dir:
+            with connect(cache_path, read_only=True) as cache_con:
+                cached_afs = load_alphafolds(cache_con)
+            if cached_afs:
+                logger.warning(
+                    'AlphaFold files already downloaded in session "%s". Symlinking instead of downloading.', cache_path
+                )
+            current_afs = []
+            for af in cached_afs:
+                # TODO also handle other files like pae, but only pdb is needed for now
+                if af.pdb_file:
+                    current_af_pdb = download_dir / af.pdb_file.name
+                    if not current_af_pdb.exists():
+                        current_af_pdb.symlink_to(af.pdb_file.resolve())
+                    current_af = dataclasses.replace(af, pdb_file=current_af_pdb.relative_to(session_dir))
+                    current_afs.append(current_af)
+            with connect(session_dir) as scon:
+                save_alphafolds_files(current_afs, scon)
+    if linked_files or current_afs:
+        return download_dir, len(linked_files), len(current_afs)
 
     if what is None:
         what = {"pdbe", "alphafold"}
