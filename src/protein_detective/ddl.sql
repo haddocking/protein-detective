@@ -6,6 +6,8 @@ SET VARIABLE session_dir = coalesce(
 
 CREATE TABLE IF NOT EXISTS uniprot_searches (
     query JSON,
+    used_limit INTEGER,
+    PRIMARY KEY (query, used_limit)
 );
 
 CREATE TABLE IF NOT EXISTS proteins (

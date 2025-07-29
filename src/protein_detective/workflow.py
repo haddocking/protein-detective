@@ -26,6 +26,8 @@ from protein_detective.db import (
     save_query,
     save_single_chain_pdb_files,
     save_uniprot_accessions,
+    uniprot_query_exists,
+    uniprot_search_counts,
 )
 from protein_detective.pdbe.fetch import fetch as pdbe_fetch
 from protein_detective.pdbe.io import (
@@ -54,12 +56,19 @@ def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 1
     """
     session_dir.mkdir(parents=True, exist_ok=True)
 
+    with connect(session_dir) as con:
+        if uniprot_query_exists(query, limit, con):
+            logger.warning(
+                "Results of this UniProt query already exists in the session database. Not querying Uniprot SPARQL endpoint again."
+            )
+            return uniprot_search_counts(con)
+
     uniprot_accessions = search4uniprot(query, limit)
     pdbs = search4pdb(uniprot_accessions, limit=limit)
     af_result = search4af(uniprot_accessions, limit=limit)
 
     with connect(session_dir) as con:
-        save_query(query, con)
+        save_query(query, limit, con)
         save_uniprot_accessions(uniprot_accessions, con)
         nr_pdbs, nr_prot2pdb = save_pdbs(pdbs, con)
         nr_afs = save_alphafolds(af_result, con)

@@ -112,14 +112,59 @@ def connect(session_dir: Path, read_only: bool = False) -> Iterator[DuckDBPyConn
     con.close()
 
 
-def save_query(query: Query, con: DuckDBPyConnection):
+def save_query(query: Query, used_limit: int, con: DuckDBPyConnection):
     """Save a UniProt search query to the database.
 
     Args:
         query: The UniProt search query to save.
+        used_limit: The limit used for the query.
         con: The DuckDB connection to use for saving the data.
     """
-    con.execute("INSERT INTO uniprot_searches (query) VALUES (?)", (unstructure(query),))
+    con.execute(
+        "INSERT OR IGNORE INTO uniprot_searches (query, used_limit) VALUES (?, ?)", (unstructure(query), used_limit)
+    )
+
+
+def uniprot_query_exists(query: Query, used_limit: int, con: DuckDBPyConnection) -> bool:
+    """Check if a UniProt search query already exists in the database.
+
+    Args:
+        query: The UniProt search query to check.
+        used_limit: The limit used for the query.
+        con: The DuckDB connection to use for checking the data.
+
+    Returns:
+        bool: True if the query exists, False otherwise.
+    """
+    result = con.execute(
+        "SELECT EXISTS(SELECT 1 FROM uniprot_searches WHERE query = ? AND used_limit = ?)",
+        (unstructure(query), used_limit),
+    ).fetchone()
+    return result[0] if result else False
+
+
+def _fetchint(con: DuckDBPyConnection) -> int:
+    row = con.fetchone()
+    if row is None:
+        msg = "No row returned from the query."
+        raise ValueError(msg)
+    return row[0]
+
+
+def uniprot_search_counts(con: DuckDBPyConnection) -> tuple[int, int, int, int]:
+    """Get counts of all uniprot searches.
+
+    Returns:
+        A tuple containing the number of UniProt accessions, PDB structures,
+        number of UniProt to PDB mappings,
+        and AlphaFold structures.
+    """
+    return (
+        _fetchint(con.execute("SELECT COUNT(*) FROM proteins")),
+        _fetchint(con.execute("SELECT COUNT(*) FROM pdbs")),
+        _fetchint(con.execute("SELECT COUNT(*) FROM proteins_pdbs")),
+        _fetchint(con.execute("SELECT COUNT(*) FROM alphafolds")),
+    )
 
 
 def save_uniprot_accessions(uniprot_accessions: Iterable[str], con: DuckDBPyConnection) -> int:
