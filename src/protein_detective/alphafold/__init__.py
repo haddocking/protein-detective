@@ -87,7 +87,7 @@ downloadable_formats: set[DownloadableFormat] = {
 
 
 async def fetch_many_async(
-    ids: Iterable[str], save_dir: Path, what: set[DownloadableFormat] | None = None
+    ids: Iterable[str], save_dir: Path, what: set[DownloadableFormat]
 ) -> AsyncGenerator[AlphaFoldEntry]:
     """Asynchronously fetches summaries and pdb and pae (predicted alignment error) files from
     [AlphaFold Protein Structure Database](https://alphafold.ebi.ac.uk/).
@@ -95,15 +95,13 @@ async def fetch_many_async(
     Args:
         ids: A set of Uniprot IDs to fetch.
         save_dir: The directory to save the fetched files to.
-        what: A set of formats to download. Defaults to {"pdb"}.
+        what: A set of formats to download.
 
     Yields:
         A dataclass containing the summary, pdb file, and pae file.
     """
     summaries = [s async for s in fetch_summaries(ids)]
 
-    if what is None:
-        what = {"pdb"}
     files = files_to_download(what, summaries)
 
     await retrieve_files(
@@ -158,13 +156,13 @@ def files_to_download(what: set[DownloadableFormat], summaries: Iterable[EntrySu
     return files
 
 
-def fetch_many(ids: Iterable[str], save_dir: Path, what: set[DownloadableFormat] | None = None) -> list[AlphaFoldEntry]:
+def fetch_many(ids: Iterable[str], save_dir: Path, what: set[DownloadableFormat]) -> list[AlphaFoldEntry]:
     """Synchronously fetches summaries and pdb and pae files from AlphaFold Protein Structure Database.
 
     Args:
         ids: A set of Uniprot IDs to fetch.
         save_dir: The directory to save the fetched files to.
-        what: A set of formats to download (e.g., "pdb", "cif"). Defaults to {"pdb"}.
+        what: A set of formats to download.
 
     Returns:
         A list of AlphaFoldEntry dataclasses containing the summary, pdb file, and pae file.

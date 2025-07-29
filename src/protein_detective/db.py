@@ -136,7 +136,6 @@ def load_uniprot_queries(con: DuckDBPyConnection) -> list[tuple[Query, int]]:
     """
     query = "SELECT query, used_limit FROM uniprot_searches"
     rows = con.execute(query).fetchall()
-    print(rows)
     return [(converter.loads(row[0], Query), row[1]) for row in rows]
 
 
@@ -774,7 +773,12 @@ def copy_search_results(source_session_dir: Path, con: DuckDBPyConnection):
     con.execute(f"ATTACH DATABASE '{source_db_path!s}' AS source_db")
     con.execute("INSERT INTO uniprot_searches SELECT * FROM source_db.uniprot_searches")
     con.execute("INSERT INTO proteins SELECT * FROM source_db.proteins")
-    con.execute("INSERT INTO pdbs SELECT * FROM source_db.pdbs")
+    # Do not copy over file paths, as they are retrieved by another function
+    con.execute("INSERT INTO pdbs SELECT pdb_id, method, resolution, null FROM source_db.pdbs")
     con.execute("INSERT INTO proteins_pdbs SELECT * FROM source_db.proteins_pdbs")
-    con.execute("INSERT INTO alphafolds SELECT * FROM source_db.alphafolds")
+    con.execute("""
+        INSERT INTO alphafolds
+        SELECT uniprot_acc, summary, null, null, null, null, null, null, null, null
+        FROM source_db.alphafolds
+    """)
     con.execute("DETACH DATABASE source_db")
