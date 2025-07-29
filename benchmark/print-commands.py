@@ -47,11 +47,6 @@ set -euxo pipefail
 
 echo $PWD
 
-if [ ! -f "{map_file}" ]; then
-    wget https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdb_id}/map/emd_{emdb_id}.map.gz -O {map_gz_file}
-    gunzip {map_gz_file}
-fi
-
 {search}
 
 protein-detective retrieve .
@@ -71,6 +66,11 @@ protein-detective prune-pdbs \\
     --min-residues {min_res} \\
     --max-residues {max_res} \\
     .
+
+if [ ! -f "{map_file}" ]; then
+    wget -q https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdb_id}/map/emd_{emdb_id}.map.gz -O {map_gz_file}
+    gunzip {map_gz_file}
+fi
 
 # prep density for just unknown volume
 cat > prep.cxc << EOF
