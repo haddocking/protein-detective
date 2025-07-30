@@ -8,6 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from platformdirs import user_cache_dir
+from tqdm.auto import tqdm
 
 from protein_detective.alphafold import AlphaFoldEntry, DownloadableFormat
 from protein_detective.db import (
@@ -143,7 +144,7 @@ def symlink_cached_alphafold_files(
             rel_cached_session_dir,
         )
     current_afs: list[AlphaFoldEntry] = []
-    for af in cached_afs:
+    for af in tqdm(cached_afs, desc="Symlinking AlphaFold files", unit="entry"):
         af_files = {}
         for af_format in what_af_formats:
             # DownloadableFormat uses camelcAse, while AlphaFoldEntry uses snake_case, so convert
@@ -186,7 +187,7 @@ def symlink_cached_pdbe_files(session_dir: Path, download_dir: Path, cached_sess
             'PDBe files already downloaded in session "%s". Symlinking instead of downloading.', cached_session_dir
         )
     linked_files: dict[str, Path] = {}
-    for pdb in cached_pdbes:
+    for pdb in tqdm(cached_pdbes, desc="Symlinking PDBe files", unit="file"):
         if pdb.mmcif_file:
             if not pdb.mmcif_file.exists():
                 msg = (
