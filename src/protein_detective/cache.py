@@ -6,7 +6,6 @@ import json
 import logging
 from dataclasses import asdict
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from platformdirs import user_cache_dir
 
@@ -19,11 +18,9 @@ from protein_detective.db import (
     load_uniprot_queries,
     save_alphafolds_files,
     save_pdb_files,
+    uniprot_search_counts,
 )
 from protein_detective.uniprot import Query
-
-if TYPE_CHECKING:
-    from protein_detective.workflow import WhatRetrieve
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +42,9 @@ def _generate_query_hash(query: Query, limit: int) -> str:
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
-def try_reusing_search_results_from_another_session(query: Query, session_dir: Path, limit: int):
+def try_reusing_search_results_from_another_session(
+    query: Query, session_dir: Path, limit: int
+) -> tuple[int, int, int, int] | None:
     """Tries to reuse search results from a previous session if the same query has been run before.
 
     To detect if the same query has been run before, it generates a hash of the query and checks if a symlink
@@ -58,6 +57,10 @@ def try_reusing_search_results_from_another_session(query: Query, session_dir: P
         query: The search query.
         session_dir: The path to the current session directory.
         limit: The limit on the number of search results.
+
+    Returns:
+        If the search results were reused, returns a tuple containing the counts.
+        If the search results were not reused, returns None.
     """
     qhash = _generate_query_hash(query, limit)
     cache_path = cache_uniprot_root / qhash
@@ -70,31 +73,24 @@ def try_reusing_search_results_from_another_session(query: Query, session_dir: P
                 rel_cached_session_dir = cached_session_dir.relative_to(session_dir.absolute(), walk_up=True)
                 logger.warning(f"Query seen before, copying search results from {rel_cached_session_dir} session.")
                 copy_search_results(cached_session_dir, con)
+                return uniprot_search_counts(con)
     else:
         cache_path.unlink(missing_ok=True)
         cache_path.symlink_to(session_dir.absolute())
+    return None
 
 
-def try_linking_files_from_another_session(
-    session_dir: Path, what: set["WhatRetrieve"], what_af_formats: set[DownloadableFormat], download_dir: Path
-) -> tuple[dict[str, Path], list[AlphaFoldEntry]]:
-    """Tries to link files from another session if the same query has been run before.
-
-    Cache logic is explained in [try_reusing_search_results_from_another_session][].
+def find_session_with_same_query(session_dir: Path) -> Path | None:
+    """Finds a session directory with the same Uniprot query as the given session.
 
     Args:
-        session_dir: The path to the current session directory.
-        what: A set of file types to link.
-        what_af_formats: A set of AlphaFold formats to link.
-        download_dir: The directory where files are downloaded to normally.
+        session_dir: The session directory.
 
     Returns:
-        A tuple containing:
-        - A dictionary mapping file IDs to their linked paths for PDBe files.
-        - A list of AlphaFoldEntry objects with linked paths for AlphaFold files.
+        The path to the cached session directory if found, otherwise None.
 
     Raises:
-        ValueError: If no UniProt queries results are found in the session database.
+        ValueError: If no UniProt queries results are found in the session database of session_dir.
     """
     # Check if there is an another session with same query and downloaded files
     with connect(session_dir, read_only=True) as con:
@@ -111,34 +107,34 @@ def try_linking_files_from_another_session(
 
     qhash = _generate_query_hash(query, limit)
     cached_session_dir = cache_uniprot_root / qhash
-    linked_files = {}
-    current_afs = []
     if (
         not cached_session_dir.exists()
         or not cached_session_dir.readlink().exists()
         or cached_session_dir.resolve() == session_dir.absolute()
     ):
-        logger.info("No cached session found for query, downloading files instead of linking to existing files.")
-        return linked_files, current_afs
+        logger.info("Unable to find session with same query, downloading files instead of linking to existing files.")
+        return None
     cached_session_dir = cached_session_dir.readlink().relative_to(session_dir.absolute(), walk_up=True)
     logger.info(
         'Found cached session "%s" with same query, linking files instead of re-downloading', cached_session_dir
     )
-    if "pdbe" in what:
-        linked_files = _symlink_cached_pdbe_files(session_dir, download_dir, cached_session_dir)
-    if "alphafold" in what:
-        current_afs = _symlink_cached_alphafold_files(session_dir, what_af_formats, download_dir, cached_session_dir)
-    return linked_files, current_afs
+    return cached_session_dir
 
 
-def _camel_to_snake_case(name: str) -> str:
-    """Convert a camelCase string to snake_case."""
-    return "".join(["_" + c.lower() if c.isupper() else c for c in name]).lstrip("_")
-
-
-def _symlink_cached_alphafold_files(
+def symlink_cached_alphafold_files(
     session_dir: Path, what_af_formats: set[DownloadableFormat], download_dir: Path, cached_session_dir: Path
-) -> list[AlphaFoldEntry]:
+) -> int:
+    """Symlink cached AlphaFold files from another session to the current session directory.
+
+    Args:
+        session_dir: The current session directory.
+        what_af_formats: The set of AlphaFold formats to symlink.
+        download_dir: The directory where the files are downloaded.
+        cached_session_dir: The directory of the cached session from which to symlink files.
+
+    Returns:
+        The number of AlphaFold entries processed.
+    """
     with connect(cached_session_dir, read_only=True) as cache_con:
         cached_afs = load_alphafolds(cache_con)
     if cached_afs:
@@ -152,10 +148,15 @@ def _symlink_cached_alphafold_files(
         af_files = {}
         for af_format in what_af_formats:
             # DownloadableFormat uses camelcAse, while AlphaFoldEntry uses snake_case, so convert
-            entry_key = _camel_to_snake_case(af_format) + "_file"
-            cached_file = getattr(af, entry_key)
-            if cached_file is None:
-                continue
+            entry_key = af.format2attr(af_format)
+            cached_file = af.by_format(af_format)
+            if cached_file is None or not cached_file.exists():
+                msg = (
+                    f"{af_format} file for AlphaFold entry {af.uniprot_acc} does not exist in {cached_session_dir}. "
+                    f"Please run `protein-detective retrieve --what-af-formats {af_format} {cached_session_dir}`"
+                    " command first."
+                )
+                raise FileNotFoundError(msg)
             linked_file = download_dir / cached_file.name
             if not linked_file.exists():
                 rel_cached_file = cached_file.resolve().relative_to(download_dir.absolute(), walk_up=True)
@@ -165,10 +166,20 @@ def _symlink_cached_alphafold_files(
         current_afs.append(current_af)
     with connect(session_dir) as scon:
         save_alphafolds_files(current_afs, scon)
-    return current_afs
+    return len(current_afs)
 
 
-def _symlink_cached_pdbe_files(session_dir: Path, download_dir: Path, cached_session_dir: Path) -> dict[str, Path]:
+def symlink_cached_pdbe_files(session_dir: Path, download_dir: Path, cached_session_dir: Path) -> int:
+    """Symlink cached PDBe files from another session to the current session directory.
+
+    Args:
+        session_dir: The current session directory.
+        download_dir: The directory where the files are downloaded.
+        cached_session_dir: The directory of the cached session from which to symlink files.
+
+    Returns:
+        The number of PDBe files processed.
+    """
     with connect(cached_session_dir, read_only=True) as cache_con:
         cached_pdbes = load_pdbs(cache_con)
     if cached_pdbes:
@@ -178,12 +189,27 @@ def _symlink_cached_pdbe_files(session_dir: Path, download_dir: Path, cached_ses
     linked_files: dict[str, Path] = {}
     for pdb in cached_pdbes:
         if pdb.mmcif_file:
+            if not pdb.mmcif_file.exists():
+                msg = (
+                    f"{pdb.mmcif_file} does not exist in {cached_session_dir}. "
+                    f"Please run `protein-detective retrieve {cached_session_dir}` command first."
+                )
+                raise FileNotFoundError(msg)
             current_pdb = download_dir / pdb.mmcif_file.name
             if current_pdb.exists():
+                logger.info(
+                    f"Output file {current_pdb} already exists. Skipping symlinking for {pdb.mmcif_file}.",
+                )
                 continue
             rel_cached_file = pdb.mmcif_file.resolve().relative_to(download_dir.absolute(), walk_up=True)
             current_pdb.symlink_to(rel_cached_file)
             linked_files[pdb.id] = current_pdb.relative_to(session_dir)
+        else:
+            msg = (
+                f"File for PDB entry {pdb.id} does not exist in {cached_session_dir}. "
+                f"Please run `protein-detective retrieve {cached_session_dir}` command first."
+            )
+            raise FileNotFoundError(msg)
     with connect(session_dir) as scon:
         save_pdb_files(linked_files, scon)
-    return linked_files
+    return len(linked_files)
