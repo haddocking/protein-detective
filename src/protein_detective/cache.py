@@ -11,6 +11,7 @@ from platformdirs import user_cache_dir
 
 from protein_detective.alphafold import AlphaFoldEntry, DownloadableFormat
 from protein_detective.db import (
+    SearchCounts,
     connect,
     copy_search_results,
     load_alphafolds,
@@ -42,9 +43,7 @@ def _generate_query_hash(query: Query, limit: int) -> str:
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
-def try_reusing_search_results_from_another_session(
-    query: Query, session_dir: Path, limit: int
-) -> tuple[int, int, int, int] | None:
+def try_reusing_search_results_from_another_session(query: Query, session_dir: Path, limit: int) -> SearchCounts | None:
     """Tries to reuse search results from a previous session if the same query has been run before.
 
     To detect if the same query has been run before, it generates a hash of the query and checks if a symlink
@@ -60,7 +59,7 @@ def try_reusing_search_results_from_another_session(
 
     Returns:
         If the search results were reused, returns a tuple containing the counts.
-        If the search results were not reused, returns None.
+            If the search results were not reused, returns None.
     """
     qhash = _generate_query_hash(query, limit)
     cache_path = cache_uniprot_root / qhash

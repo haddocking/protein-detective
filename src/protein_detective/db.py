@@ -165,7 +165,11 @@ def _fetchint(con: DuckDBPyConnection) -> int:
     return row[0]
 
 
-def uniprot_search_counts(con: DuckDBPyConnection) -> tuple[int, int, int, int]:
+SearchCounts = tuple[int, int, int, int]
+"""Type alias for search counts: (nr_uniprot_accessions, nr_pdbs, nr_uniprot_to_pdb_mappings, nr_alphafolds)"""
+
+
+def uniprot_search_counts(con: DuckDBPyConnection) -> SearchCounts:
     """Get counts of all uniprot searches.
 
     Returns:

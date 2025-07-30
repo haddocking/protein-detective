@@ -25,6 +25,7 @@ from protein_detective.cache import (
     try_reusing_search_results_from_another_session,
 )
 from protein_detective.db import (
+    SearchCounts,
     connect,
     load_alphafolds,
     load_pdbs,
@@ -51,7 +52,7 @@ from protein_detective.uniprot import Query, search4af, search4pdb, search4unipr
 logger = logging.getLogger(__name__)
 
 
-def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 10_000) -> tuple[int, int, int, int]:
+def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 10_000) -> SearchCounts:
     """Searches for protein structures in UniProt database.
 
     Checks if the query results are already in another session with the same query.
@@ -64,8 +65,8 @@ def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 1
 
     Returns:
         A tuple containing the number of UniProt accessions, the number of PDB structures,
-        number of UniProt to PDB mappings,
-        and the number of AlphaFold structures found.
+            number of UniProt to PDB mappings,
+            and the number of AlphaFold structures found.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
 
