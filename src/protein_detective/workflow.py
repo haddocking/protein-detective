@@ -122,7 +122,7 @@ def retrieve_pdbe_structures(session_dir: Path) -> tuple[Path, int]:
         pdbs = load_pdbs(con)
     retrieved_files = [p.mmcif_file for p in pdbs if p.mmcif_file is not None and p.mmcif_file.exists()]
     if len(pdbs) == len(retrieved_files):
-        logger.info("All PDBe files already downloaded in this session. Not downloading again.")
+        logger.warning("All PDBe files already downloaded in this session. Not downloading again.")
         return download_dir, len(retrieved_files)
 
     cached_session_dir = find_session_with_same_query(session_dir)
@@ -169,7 +169,7 @@ def retrieve_alphafold_structures(session_dir: Path, what: set[DownloadableForma
             if af_file is not None and af_file.exists():
                 nr_downloaded += 1
     if nr_downloaded == nr_expected_downloaded:
-        logger.info("All AlphaFold files already downloaded in this session. Not downloading again.")
+        logger.warning("All AlphaFold files already downloaded in this session. Not downloading again.")
         return download_dir, len(entries)
 
     # find session with same query and symlink files
