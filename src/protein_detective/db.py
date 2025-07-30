@@ -433,7 +433,7 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     return [
         AlphaFoldEntry(
             uniprot_acc=row[0],
-            summary=converter.loads(row[1], EntrySummary) if row[0] else None,
+            summary=converter.loads(row[1], EntrySummary) if row[1] else None,
             bcif_file=Path(row[2]) if row[2] else None,
             cif_file=Path(row[3]) if row[3] else None,
             pdb_file=Path(row[4]) if row[4] else None,
