@@ -67,6 +67,9 @@ protein-detective prune-pdbs \\
     --max-residues {max_res} \\
     .
 
+# Is the fitted model {pdb_id}:{chain} still part of the search results?
+ls -l single_chain/{uniprot}_{pdb_id.lower()}_{chain}2A.pdb
+
 if [ ! -f "{map_file}" ]; then
     wget -q https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdb_id}/map/emd_{emdb_id}.map.gz -O {map_gz_file}
     gunzip {map_gz_file}

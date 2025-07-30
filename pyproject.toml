@@ -17,6 +17,7 @@ dependencies = [
     "gemmi>=0.7.3",
     "molviewspec>=1.6.0",
     "pandas>=2.3.0",
+    "platformdirs>=4.3.8",
     "powerfit-em[opencl]>=3.0.3",
     "psutil>=7.0.0",
     "rich>=14.0.0",

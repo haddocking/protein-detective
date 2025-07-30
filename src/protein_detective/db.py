@@ -125,6 +125,20 @@ def save_query(query: Query, used_limit: int, con: DuckDBPyConnection):
     )
 
 
+def load_uniprot_queries(con: DuckDBPyConnection) -> list[tuple[Query, int]]:
+    """Load all UniProt search queries from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+
+    Returns:
+        A list of tuples containing the query and the used limit.
+    """
+    query = "SELECT query, used_limit FROM uniprot_searches"
+    rows = con.execute(query).fetchall()
+    return [(converter.loads(row[0], Query), row[1]) for row in rows]
+
+
 def uniprot_query_exists(query: Query, used_limit: int, con: DuckDBPyConnection) -> bool:
     """Check if a UniProt search query already exists in the database.
 
@@ -151,7 +165,11 @@ def _fetchint(con: DuckDBPyConnection) -> int:
     return row[0]
 
 
-def uniprot_search_counts(con: DuckDBPyConnection) -> tuple[int, int, int, int]:
+SearchCounts = tuple[int, int, int, int]
+"""Type alias for search counts: (nr_uniprot_accessions, nr_pdbs, nr_uniprot_to_pdb_mappings, nr_alphafolds)"""
+
+
+def uniprot_search_counts(con: DuckDBPyConnection) -> SearchCounts:
     """Get counts of all uniprot searches.
 
     Returns:
@@ -415,7 +433,7 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     return [
         AlphaFoldEntry(
             uniprot_acc=row[0],
-            summary=converter.loads(row[1], EntrySummary) if row[0] else None,
+            summary=converter.loads(row[1], EntrySummary) if row[1] else None,
             bcif_file=Path(row[2]) if row[2] else None,
             cif_file=Path(row[3]) if row[3] else None,
             pdb_file=Path(row[4]) if row[4] else None,
@@ -746,3 +764,25 @@ def list_lcc_files(con: DuckDBPyConnection) -> list[tuple[int, str, str]]:
 
     """)
     return con.fetchall()
+
+
+def copy_search_results(source_session_dir: Path, con: DuckDBPyConnection):
+    """Copy search results from another session directory to the current database.
+
+    Args:
+        source_session_dir: The directory of the source session to copy from.
+        con: The DuckDB connection to use for copying the data.
+    """
+    source_db_path = db_path(source_session_dir)
+    con.execute(f"ATTACH DATABASE '{source_db_path!s}' AS source_db")
+    con.execute("INSERT INTO uniprot_searches SELECT * FROM source_db.uniprot_searches")
+    con.execute("INSERT INTO proteins SELECT * FROM source_db.proteins")
+    # Do not copy over file paths, as they are retrieved by another function
+    con.execute("INSERT INTO pdbs SELECT pdb_id, method, resolution, null FROM source_db.pdbs")
+    con.execute("INSERT INTO proteins_pdbs SELECT * FROM source_db.proteins_pdbs")
+    con.execute("""
+        INSERT INTO alphafolds
+        SELECT uniprot_acc, summary, null, null, null, null, null, null, null, null
+        FROM source_db.alphafolds
+    """)
+    con.execute("DETACH DATABASE source_db")

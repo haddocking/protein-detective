@@ -1,6 +1,7 @@
 """Dask helper functions."""
 
 import logging
+import os
 from collections.abc import Generator
 from pathlib import Path
 
@@ -68,13 +69,38 @@ def configure_dask_scheduler(
     return scheduler_address
 
 
-def _configure_cpu_dask_scheduler(nproc: int, name: str) -> LocalCluster:
+def nr_cpus() -> int:
+    """Determine the number of CPU cores to use.
+
+    If the environment variables SLURM_CPUS_PER_TASK or OMP_NUM_THREADS are set,
+    their value is used. Otherwise, the number of physical CPU cores is returned.
+
+    Returns:
+        The number of CPU cores to use.
+
+    Raises:
+        ValueError: If the number of physical CPU cores cannot be determined.
+    """
     physical_cores = cpu_count(logical=False)
     if physical_cores is None:
         msg = "Cannot determine number of logical CPU cores."
         raise ValueError(msg)
-    # TODO allow to not use whole machine, but just given number of cores
-    n_workers = physical_cores // nproc
+    for var in ["SLURM_CPUS_PER_TASK", "OMP_NUM_THREADS"]:
+        value = os.environ.get(var)
+        if value is not None:
+            logger.warning(
+                'Not using all CPU cores (%s) of machine, environment variable "%s" is set to %s.',
+                physical_cores,
+                var,
+                value,
+            )
+            return int(value)
+    return physical_cores
+
+
+def _configure_cpu_dask_scheduler(nproc: int, name: str) -> LocalCluster:
+    total_cpus = nr_cpus()
+    n_workers = total_cpus // nproc
     # Use single thread per worker to prevent GIL slowing down the computations
     return LocalCluster(name=name, threads_per_worker=1, n_workers=n_workers)
 

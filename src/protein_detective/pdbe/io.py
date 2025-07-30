@@ -29,7 +29,16 @@ def first_chain_from_uniprot_chains(uniprot_chains: str) -> str:
     """
     chains = uniprot_chains.split("=")
     parts = chains[0].split("/")
-    return parts[0]
+    chain = parts[0]
+    try:
+        # Workaround for Q9Y2Q5 │ 5YK3 │ 1/B/G=1-124, 1 does not exist but B does
+        int(chain)
+        if len(parts) > 1:
+            return parts[1]
+    except ValueError:
+        # A letter
+        pass
+    return chain
 
 
 def filter_and_write_single_chain_pdb_file(

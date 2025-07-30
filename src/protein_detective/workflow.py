@@ -1,4 +1,10 @@
-"""Workflow steps"""
+"""Workflow steps.
+
+High level function that are the public API of the package.
+
+Functions where data is fetched and processed
+and where that data is saved and/or loaded from session database.
+"""
 
 import logging
 from dataclasses import dataclass
@@ -12,11 +18,16 @@ from protein_detective.alphafold import DownloadableFormat
 from protein_detective.alphafold import fetch_many as af_fetch
 from protein_detective.alphafold import relative_to as af_relative_to
 from protein_detective.alphafold.density import DensityFilterQuery, filter_on_density
+from protein_detective.cache import (
+    find_session_with_same_query,
+    symlink_cached_alphafold_files,
+    symlink_cached_pdbe_files,
+    try_reusing_search_results_from_another_session,
+)
 from protein_detective.db import (
+    SearchCounts,
     connect,
-    load_alphafold_ids,
     load_alphafolds,
-    load_pdb_ids,
     load_pdbs,
     save_alphafolds,
     save_alphafolds_files,
@@ -41,8 +52,11 @@ from protein_detective.uniprot import Query, search4af, search4pdb, search4unipr
 logger = logging.getLogger(__name__)
 
 
-def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 10_000) -> tuple[int, int, int, int]:
+def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 10_000) -> SearchCounts:
     """Searches for protein structures in UniProt database.
+
+    Checks if the query results are already in another session with the same query.
+    If found will copy them instead of fetching them from Uniprot SPARQL endpoint again.
 
     Args:
         query: The search query.
@@ -51,22 +65,31 @@ def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 1
 
     Returns:
         A tuple containing the number of UniProt accessions, the number of PDB structures,
-        number of UniProt to PDB mappings,
-        and the number of AlphaFold structures found.
+            number of UniProt to PDB mappings,
+            and the number of AlphaFold structures found.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
 
+    # Reuse existing search results in the current session database
     with connect(session_dir) as con:
         if uniprot_query_exists(query, limit, con):
             logger.warning(
-                "Results of this UniProt query already exists in the session database. Not querying Uniprot SPARQL endpoint again."
+                "Results of this UniProt query already exists in the session database. "
+                "Not querying Uniprot SPARQL endpoint again."
+                "To force re-query, delete the session database."
             )
             return uniprot_search_counts(con)
 
+    counts = try_reusing_search_results_from_another_session(query, session_dir, limit)
+    if counts is not None:
+        return counts
+
+    # Perform the searches in UniProt
     uniprot_accessions = search4uniprot(query, limit)
     pdbs = search4pdb(uniprot_accessions, limit=limit)
     af_result = search4af(uniprot_accessions, limit=limit)
 
+    # Store in db
     with connect(session_dir) as con:
         save_query(query, limit, con)
         save_uniprot_accessions(uniprot_accessions, con)
@@ -74,6 +97,94 @@ def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 1
         nr_afs = save_alphafolds(af_result, con)
 
     return len(uniprot_accessions), nr_pdbs, nr_prot2pdb, nr_afs
+
+
+def retrieve_pdbe_structures(session_dir: Path) -> tuple[Path, int]:
+    """Retrieve structure files from PDBe for the Uniprot entries in the session.
+
+    Does not download files that are already downloaded in the session.
+    Checks if the files are already downloaded in another session with the same query
+    if found will symlink them instead of downloading again.
+
+    Args:
+        session_dir: The directory to store downloaded files and the session database.
+
+    Returns:
+        A tuple containing the download directory and the number of PDBe mmCIF files downloaded.
+    """
+    download_dir = session_dir / "downloads"
+    download_dir.mkdir(parents=True, exist_ok=True)
+
+    # Do not download or symlink if files are already there.
+    # The database has columns for paths that are NULL when the file has not been retrieved.
+    # need to check that non null values are on the file system.
+    with connect(session_dir, read_only=True) as con:
+        pdbs = load_pdbs(con)
+    retrieved_files = [p.mmcif_file for p in pdbs if p.mmcif_file is not None and p.mmcif_file.exists()]
+    if len(pdbs) == len(retrieved_files):
+        logger.warning("All PDBe files already downloaded in this session. Not downloading again.")
+        return download_dir, len(retrieved_files)
+
+    cached_session_dir = find_session_with_same_query(session_dir)
+    if cached_session_dir:
+        return download_dir, symlink_cached_pdbe_files(session_dir, download_dir, cached_session_dir)
+
+    # Download mmCIF files from PDBe for the Uniprot entries in the session.
+    pdb_ids = {p.id for p in pdbs}
+    mmcif_files = pdbe_fetch(pdb_ids, download_dir)
+
+    with connect(session_dir) as con:
+        # make paths relative to session_dir, so db stores paths relative to session_dir
+        sr_mmcif_files = {pdb_id: mmcif_file.relative_to(session_dir) for pdb_id, mmcif_file in mmcif_files.items()}
+        save_pdb_files(sr_mmcif_files, con)
+
+    return download_dir, len(mmcif_files)
+
+
+def retrieve_alphafold_structures(session_dir: Path, what: set[DownloadableFormat]) -> tuple[Path, int]:
+    """Retrieve structure files from AlphaFold database for the Uniprot entries in the session.
+
+    Does not download files that are already downloaded in the session.
+    Checks if the files are already downloaded in another session with the same query
+    if found will symlink them instead of downloading again.
+
+    Args:
+        session_dir: The directory to store downloaded files and the session database.
+        what: A set of formats to download from AlphaFold.
+
+    Returns:
+        A tuple containing the download directory and the number of AlphaFold entries downloaded.
+    """
+    download_dir = session_dir / "downloads"
+    download_dir.mkdir(parents=True, exist_ok=True)
+
+    # check if all AlphaFold files are already downloaded in the session
+    with connect(session_dir, read_only=True) as con:
+        entries = load_alphafolds(con)
+    nr_downloaded = 0
+    nr_expected_downloaded = len(entries) * len(what)
+    for entry in entries:
+        for af_format in what:
+            af_file = entry.by_format(af_format)
+            if af_file is not None and af_file.exists():
+                nr_downloaded += 1
+    if nr_downloaded == nr_expected_downloaded:
+        logger.warning("All AlphaFold files already downloaded in this session. Not downloading again.")
+        return download_dir, len(entries)
+
+    # find session with same query and symlink files
+    cached_session_dir = find_session_with_same_query(session_dir)
+    if cached_session_dir:
+        return download_dir, symlink_cached_alphafold_files(session_dir, what, download_dir, cached_session_dir)
+
+    # Download
+    af_ids = {e.uniprot_acc for e in entries if e.uniprot_acc}
+    afs = af_fetch(af_ids, download_dir, what=what)
+
+    with connect(session_dir) as con:
+        sr_afs = [af_relative_to(af, session_dir) for af in afs]
+        save_alphafolds_files(sr_afs, con)
+    return download_dir, len(afs)
 
 
 WhatRetrieve = Literal["pdbe", "alphafold"]
@@ -87,53 +198,43 @@ def retrieve_structures(
 ) -> tuple[Path, int, int]:
     """Retrieve structure files from PDBe and AlphaFold databases for the Uniprot entries in the session.
 
+    Does not download files that are already downloaded in the session.
+    Checks if the files are already downloaded in another session with the same query
+    if found will symlink them instead of downloading again.
+
     Args:
         session_dir: The directory to store downloaded files and the session database.
         what: A tuple of strings indicating which databases to retrieve files from.
-        what_af_formats: A tuple of formats to download from AlphaFold (e.g., "pdb", "cif").
+        what_af_formats: A tuple of formats to download from AlphaFold. Defaults to {"pdb"}.
 
     Returns:
         A tuple containing the download directory, the number of PDBe mmCIF files downloaded,
         and the number of AlphaFold files downloaded.
+
+    Raises:
+        ValueError: If `what` is not a subset of `what_retrieve_choices`
     """
     session_dir.mkdir(parents=True, exist_ok=True)
-    download_dir = session_dir / "downloads"
-    download_dir.mkdir(parents=True, exist_ok=True)
 
     if what is None:
         what = {"pdbe", "alphafold"}
     if not (what <= what_retrieve_choices):
         msg = f"Invalid 'what' argument: {what}. Must be a subset of {what_retrieve_choices}."
         raise ValueError(msg)
+    if len(what) == 0:
+        msg = f"At least one of {what_retrieve_choices} must be specified in 'what'."
+        raise ValueError(msg)
+    if what_af_formats is None:
+        what_af_formats = {"pdb"}
 
-    sr_mmcif_files = {}
+    nr_pdbe_files = 0
+    download_dir = session_dir / "downloads"
     if "pdbe" in what:
-        # mmCIF files from PDBe for the Uniprot entries in the session.
-        pdb_ids = set()
-        with connect(session_dir, read_only=True) as con:
-            pdb_ids = load_pdb_ids(con)
-
-        mmcif_files = pdbe_fetch(pdb_ids, download_dir)
-
-        with connect(session_dir) as con:
-            # make paths relative to session_dir, so db stores paths relative to session_dir
-            sr_mmcif_files = {pdb_id: mmcif_file.relative_to(session_dir) for pdb_id, mmcif_file in mmcif_files.items()}
-            save_pdb_files(sr_mmcif_files, con)
-
-    afs = []
+        download_dir, nr_pdbe_files = retrieve_pdbe_structures(session_dir)
+    nr_af_files = 0
     if "alphafold" in what:
-        # AlphaFold entries for the given query
-        af_ids = set()
-        with connect(session_dir, read_only=True) as con:
-            af_ids = load_alphafold_ids(con)
-
-        afs = af_fetch(af_ids, download_dir, what=what_af_formats)
-
-        with connect(session_dir) as con:
-            sr_afs = [af_relative_to(af, session_dir) for af in afs]
-            save_alphafolds_files(sr_afs, con)
-
-    return download_dir, len(sr_mmcif_files), len(afs)
+        download_dir, nr_af_files = retrieve_alphafold_structures(session_dir, what_af_formats)
+    return download_dir, nr_pdbe_files, nr_af_files
 
 
 @dataclass
