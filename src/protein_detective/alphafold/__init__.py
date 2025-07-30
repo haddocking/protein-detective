@@ -17,6 +17,36 @@ from protein_detective.utils import friendly_session, retrieve_files
 logger = logging.getLogger(__name__)
 
 
+DownloadableFormat = Literal[
+    "bcif",
+    "cif",
+    "pdb",
+    "paeImage",
+    "paeDoc",
+    "amAnnotations",
+    "amAnnotationsHg19",
+    "amAnnotationsHg38",
+]
+"""Types of formats that can be downloaded from the AlphaFold web service."""
+
+downloadable_formats: set[DownloadableFormat] = {
+    "bcif",
+    "cif",
+    "pdb",
+    "paeImage",
+    "paeDoc",
+    "amAnnotations",
+    "amAnnotationsHg19",
+    "amAnnotationsHg38",
+}
+"""Set of formats that can be downloaded from the AlphaFold web service."""
+
+
+def _camel_to_snake_case(name: str) -> str:
+    """Convert a camelCase string to snake_case."""
+    return "".join(["_" + c.lower() if c.isupper() else c for c in name]).lstrip("_")
+
+
 @dataclass
 class AlphaFoldEntry:
     """AlphaFoldEntry represents a minimal single entry in the AlphaFold database.
@@ -34,6 +64,40 @@ class AlphaFoldEntry:
     am_annotations_file: Path | None = None
     am_annotations_hg19_file: Path | None = None
     am_annotations_hg38_file: Path | None = None
+
+    @classmethod
+    def format2attr(cls, dl_format: DownloadableFormat) -> str:
+        """Get the attribute name for a specific download format.
+
+        Args:
+            dl_format: The format for which to get the attribute name.
+
+        Returns:
+            The attribute name corresponding to the download format.
+
+        Raises:
+            ValueError: If the format is not valid.
+        """
+        if dl_format not in downloadable_formats:
+            msg = f"Invalid format: {dl_format}. Valid formats are: {downloadable_formats}"
+            raise ValueError(msg)
+        return _camel_to_snake_case(dl_format) + "_file"
+
+    def by_format(self, dl_format: DownloadableFormat) -> Path | None:
+        """Get the file path for a specific format.
+
+        Args:
+            dl_format: The format for which to get the file path.
+
+        Returns:
+            The file path corresponding to the download format.
+            Or None if the file is not set.
+
+        Raises:
+            ValueError: If the format is not valid.
+        """
+        attr = self.format2attr(dl_format)
+        return getattr(self, attr, None)
 
 
 async def fetch_summmary(qualifier: str, session: RetryClient, semaphore: Semaphore) -> list[EntrySummary]:
@@ -59,31 +123,6 @@ async def fetch_summaries(qualifiers: Iterable[str], max_parallel_downloads: int
 def url2name(url: str) -> str:
     """Given a URL, return the final path component as the name of the file."""
     return url.split("/")[-1]
-
-
-DownloadableFormat = Literal[
-    "bcif",
-    "cif",
-    "pdb",
-    "paeImage",
-    "paeDoc",
-    "amAnnotations",
-    "amAnnotationsHg19",
-    "amAnnotationsHg38",
-]
-"""Types of formats that can be downloaded from the AlphaFold web service."""
-
-downloadable_formats: set[DownloadableFormat] = {
-    "bcif",
-    "cif",
-    "pdb",
-    "paeImage",
-    "paeDoc",
-    "amAnnotations",
-    "amAnnotationsHg19",
-    "amAnnotationsHg38",
-}
-"""Set of formats that can be downloaded from the AlphaFold web service."""
 
 
 async def fetch_many_async(
