@@ -47,25 +47,30 @@ set -euxo pipefail
 
 echo $PWD
 
+if [ ! -d "downloads" ]; then
 {search}
-
 protein-detective retrieve .
+fi
 
 # Is fitted model {pdb_id}:{chain} part of the search results?
 ls -1 downloads/{pdb_id.lower()}.cif.gz
 
 # use {min_res} to {max_res} as residue range
 
+if [ ! -d "density_filtered" ]; then
 protein-detective density-filter \\
     --confidence-threshold 70 \\
     --min-residues {min_res} \\
     --max-residues {max_res} \\
     .
+fi
 
+if [ ! -d "single_chain" ]; then
 protein-detective prune-pdbs \\
     --min-residues {min_res} \\
     --max-residues {max_res} \\
     .
+fi
 
 # Is the fitted model {pdb_id}:{chain} still part of the search results?
 ls -l single_chain/{uniprot}_{pdb_id.lower()}_{chain}2A.pdb
