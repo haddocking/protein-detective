@@ -72,6 +72,13 @@ def filter_and_write_single_chain_pdb_file(
 
     chain = model.find_chain(chain2keep)
     if chain is None:
+        # For chain A in 4v92 the find_chain method returns None,
+        # however it is prefixed with 'B',
+        # so we try again as last char of chain name
+        mchains = [c for c in model if c.name.endswith(chain2keep)]
+        if mchains:
+            chain = mchains[0]
+    if chain is None:
         # TODO use _struct_ref_seq in cif file to find uniprot accession
         logger.warning(
             "Chain %s not found in %s. Skipping.",
