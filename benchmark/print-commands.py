@@ -1,8 +1,9 @@
+import argparse
 import csv
 from pathlib import Path
 
 
-def create_run_script_content(row: dict) -> str:
+def create_run_script_content(row: dict, map_root: str) -> str:
     """Generate the content of a run.sh script from a CSV row."""
     emdb_id = row["EMDB"]
     uniprot = row["Uniprot_id"]
@@ -19,9 +20,6 @@ def create_run_script_content(row: dict) -> str:
 
     resolution = float(row["Resolution"])
 
-    map_file = f"../emd_{emdb_id}.map"
-    map_gz_file = f"../emd_{emdb_id}.map.gz"
-    masked_map = f"emd_{emdb_id}-{uniprot}_{pdb_id.lower()}_{chain}2A.mrc"
     powerfit_args = "--gpu 3"
 
     search = f"""\
@@ -39,6 +37,9 @@ protein-detective search \\
     --limit {search_limit} \\
     .
 """
+
+    resampled_resolution = "6"
+    masked_map = f"{map_root}/{pdb_id}/situs/{pdb_id}_{resampled_resolution}_{chain}.mrc"
 
     return f"""\
 #!/bin/bash
@@ -75,22 +76,6 @@ fi
 # Is the fitted model {pdb_id}:{chain} still part of the search results?
 ls -l single_chain/{uniprot}_{pdb_id.lower()}_{chain}2A.pdb
 
-if [ ! -f "{map_file}" ]; then
-    wget -q https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-{emdb_id}/map/emd_{emdb_id}.map.gz -O {map_gz_file}
-    gunzip {map_gz_file}
-fi
-
-# prep density for just unknown volume
-cat > prep.cxc << EOF
-open {map_file};
-open single_chain/{uniprot}_{pdb_id.lower()}_{chain}2A.pdb;
-molmap #2 {resolution} balls true;
-volume mask #1 surfaces #3 pad 4;
-save {masked_map} #4;
-exit
-EOF
-chimerax --nogui --script prep.cxc
-
 # powerfit
 protein-detective powerfit run {masked_map} {resolution} . {powerfit_args}
 
@@ -109,6 +94,15 @@ def main():
     """
     benchmark_dir = Path(__file__).parent
     csv_path = benchmark_dir / "Benchmarklist.csv"
+
+    parser = argparse.ArgumentParser(description="Generate benchmark scripts from CSV.")
+    parser.add_argument(
+        "--map_root",
+        help="Root directory for the maps.",
+        default="/trinity/login/aengle/pipeline_project/simulated_benchmark/pdbs",
+    )
+    args = parser.parse_args()
+    map_root = args.map_root
 
     with csv_path.open(newline="", encoding="utf-8") as csvfile:
         reader = csv.DictReader(csvfile)
@@ -140,7 +134,7 @@ def main():
             output_dir.mkdir(parents=True, exist_ok=True)
 
             # Generate and write run.sh
-            script_content = create_run_script_content(row)
+            script_content = create_run_script_content(row, map_root)
             run_sh_path = output_dir / "run.sh"
             run_sh_path.write_text(script_content, encoding="utf-8")
             print(f"Generated {run_sh_path}")  # noqa: T201
