@@ -76,6 +76,7 @@ def try_reusing_search_results_from_another_session(query: Query, session_dir: P
                 return uniprot_search_counts(con)
     else:
         cache_path.unlink(missing_ok=True)
+        # TODO symlink after search has been completed
         cache_path.symlink_to(session_dir.absolute())
     return None
 

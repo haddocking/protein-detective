@@ -72,6 +72,7 @@ def filter_and_write_single_chain_pdb_file(
 
     chain = model.find_chain(chain2keep)
     if chain is None:
+        # TODO use _struct_ref_seq in cif file to find uniprot accession
         logger.warning(
             "Chain %s not found in %s. Skipping.",
             chain2keep,
