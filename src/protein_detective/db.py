@@ -11,10 +11,10 @@ from cattrs.preconf.json import make_converter
 from duckdb import ConstraintException, DuckDBPyConnection, InvalidInputException
 from duckdb import connect as duckdb_connect
 from pandas import DataFrame
+from protein_quest.alphafold.confidence import ConfidenceFilterQuery, ConfidenceFilterResult
+from protein_quest.alphafold.entry_summary import EntrySummary
+from protein_quest.alphafold.fetch import AlphaFoldEntry
 
-from protein_detective.alphafold import AlphaFoldEntry
-from protein_detective.alphafold.density import DensityFilterQuery, DensityFilterResult
-from protein_detective.alphafold.entry_summary import EntrySummary
 from protein_detective.pdbe.io import ProteinPdbRow, SingleChainQuery, SingleChainResult
 from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.uniprot import PdbResult, Query
@@ -456,8 +456,8 @@ def load_single_chain_pdb_files(con: DuckDBPyConnection) -> list[Path]:
 
 
 def save_density_filtered(
-    query: DensityFilterQuery,
-    files: list[DensityFilterResult],
+    query: ConfidenceFilterQuery,
+    files: list[ConfidenceFilterResult],
     uniprot_accessions: list[str],
     con: DuckDBPyConnection,
 ):

@@ -5,10 +5,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from protein_detective.alphafold import DownloadableFormat
-from protein_detective.alphafold import fetch_many as af_fetch
-from protein_detective.alphafold import relative_to as af_relative_to
-from protein_detective.alphafold.density import DensityFilterQuery, filter_on_density
+from protein_quest.alphafold.confidence import ConfidenceFilterQuery, filter_files_on_confidence
+from protein_quest.alphafold.fetch import DownloadableFormat
+from protein_quest.alphafold.fetch import fetch_many as af_fetch
+from protein_quest.alphafold.fetch import relative_to as af_relative_to
+
 from protein_detective.db import (
     connect,
     load_alphafold_ids,
@@ -132,7 +133,7 @@ class DensityFilterSessionResult:
     nr_discarded: int
 
 
-def density_filter(session_dir: Path, query: DensityFilterQuery) -> DensityFilterSessionResult:
+def density_filter(session_dir: Path, query: ConfidenceFilterQuery) -> DensityFilterSessionResult:
     """Filter the AlphaFoldDB structures based on density confidence.
 
     In AlphaFold PDB files, the b-factor column has the
@@ -157,7 +158,7 @@ def density_filter(session_dir: Path, query: DensityFilterQuery) -> DensityFilte
         alphafold_pdb_files = [e.pdb_file for e in afs if e.pdb_file is not None]
         uniproc_accs = [e.uniprot_acc for e in afs]
 
-        density_filtered = list(filter_on_density(alphafold_pdb_files, query, density_filtered_dir))
+        density_filtered = list(filter_files_on_confidence(alphafold_pdb_files, query, density_filtered_dir))
         for e in density_filtered:
             if e.density_filtered_file is not None:
                 e.density_filtered_file = e.density_filtered_file.relative_to(session_dir)
