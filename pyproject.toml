@@ -18,6 +18,7 @@ dependencies = [
     "molviewspec>=1.6.0",
     "pandas>=2.3.0",
     "powerfit-em[opencl]>=3.0.3",
+    "protein-quest",
     "psutil>=7.0.0",
     "rich>=14.0.0",
     "sparqlwrapper>=2.0.0",
@@ -158,3 +159,6 @@ known-first-party = ["protein_detective"]
 
 [tool.jupysql.SqlMagic]
 displaylimit = 100
+
+[tool.uv.sources]
+protein-quest = { path = "../protein-quest", editable = true }
