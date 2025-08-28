@@ -17,7 +17,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
       - name: Install the project
-        run: uv sync --dev --locked --no-sources
+        run: uv sync --dev --no-sources
       - name: Install pocl
         run: uv pip install pocl-binary-distribution==3.0
       - name: Run tests
@@ -48,7 +48,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
       - name: Install the project
-        run: uv sync --dev --locked --no-sources
+        run: uv sync --dev  --no-sources
       - name: Run type checkers
         run: uv run --no-sources pyrefly check src tests
   typing-docs:
@@ -59,9 +59,9 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
       - name: Install the project
-        run: uv sync --locked --group docs-type --group docs --no-sources
+        run: uv sync --group docs-type --group docs --no-sources
       - name: Convert notebooks to Python scripts
         run: |
-          find docs/ -name "*.ipynb" -exec uv run  --no-sources --group docs-type marimo convert {} -o {}.py \;
+          find docs/ -name "*.ipynb" -exec uv run --no-sources --group docs-type marimo convert {} -o {}.py \;
       - name: Run type checkers on docs
         run: uv run --no-sources --group docs-type pyrefly check docs/*.ipynb.py
