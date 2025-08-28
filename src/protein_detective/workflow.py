@@ -1,14 +1,20 @@
 """Workflow steps"""
 
+import asyncio
+import itertools
 import logging
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from distributed.deploy.cluster import Cluster
 from protein_quest.alphafold.confidence import ConfidenceFilterQuery, filter_files_on_confidence
 from protein_quest.alphafold.fetch import DownloadableFormat
 from protein_quest.alphafold.fetch import fetch_many as af_fetch
 from protein_quest.alphafold.fetch import relative_to as af_relative_to
+from protein_quest.filters import filter_files_on_chain, filter_files_on_residues
+from protein_quest.pdbe.fetch import fetch as pdbe_fetch
 from protein_quest.uniprot import Query, search4af, search4pdb, search4uniprot
 
 from protein_detective.db import (
@@ -26,8 +32,6 @@ from protein_detective.db import (
     save_single_chain_pdb_files,
     save_uniprot_accessions,
 )
-from protein_detective.pdbe.fetch import fetch as pdbe_fetch
-from protein_detective.pdbe.io import SingleChainQuery, write_single_chain_pdb_files
 
 logger = logging.getLogger(__name__)
 
@@ -92,12 +96,15 @@ def retrieve_structures(
 
     sr_mmcif_files = {}
     if "pdbe" in what:
+        download_pdbe_dir = download_dir / "pdbe"
+        download_pdbe_dir.mkdir(parents=True, exist_ok=True)
         # mmCIF files from PDBe for the Uniprot entries in the session.
         pdb_ids = set()
         with connect(session_dir) as con:
             pdb_ids = load_pdb_ids(con)
 
-            mmcif_files = pdbe_fetch(pdb_ids, download_dir)
+            # TODO use sync version
+            mmcif_files = asyncio.run(pdbe_fetch(pdb_ids, download_pdbe_dir))
 
             # make paths relative to session_dir, so db stores paths relative to session_dir
             sr_mmcif_files = {pdb_id: mmcif_file.relative_to(session_dir) for pdb_id, mmcif_file in mmcif_files.items()}
@@ -109,10 +116,13 @@ def retrieve_structures(
         af_ids = set()
         if what_af_formats is None:
             what_af_formats = {"cif"}
+
+        download_af_dir = download_dir / "alphafold"
+        download_af_dir.mkdir(parents=True, exist_ok=True)
         with connect(session_dir) as con:
             af_ids = load_alphafold_ids(con)
 
-            afs = af_fetch(af_ids, download_dir, what=what_af_formats)
+            afs = af_fetch(af_ids, download_af_dir, what=what_af_formats)
 
             sr_afs = [af_relative_to(af, session_dir) for af in afs]
             # the af_fetch downloads summaries as <uniprot_acc>.json files
@@ -182,7 +192,9 @@ def density_filter(session_dir: Path, query: ConfidenceFilterQuery) -> DensityFi
         )
 
 
-def prune_pdbs(session_dir: Path, query: SingleChainQuery) -> tuple[Path, int]:
+def prune_pdbs(
+    session_dir: Path, min_residues: int, max_residues: int, scheduler_adress: str | Cluster | None
+) -> tuple[Path, int]:
     """Prune the PDB files to only keep the first chain of the found Uniprot entries.
 
     Only writes PDB files that have a single chain with a number of residues
@@ -192,7 +204,9 @@ def prune_pdbs(session_dir: Path, query: SingleChainQuery) -> tuple[Path, int]:
 
     Args:
         session_dir: The directory where the session database is stored.
-        query: The single chain query containing the minimum and maximum number of residues.
+        min_residues: The minimum number of residues for the single chain.
+        max_residues: The maximum number of residues for the single chain.
+        scheduler_adress: The address of the Dask scheduler.
 
     Returns:
         A tuple containing the directory where the single chain PDB files are stored,
@@ -201,16 +215,44 @@ def prune_pdbs(session_dir: Path, query: SingleChainQuery) -> tuple[Path, int]:
     single_chain_dir = session_dir / "single_chain"
     single_chain_dir.mkdir(parents=True, exist_ok=True)
 
-    with connect(session_dir) as con:
+    with connect(session_dir, read_only=True) as con:
         proteinpdbs = load_pdbs(con)
-        new_files = list(
-            write_single_chain_pdb_files(
-                proteinpdbs,
-                session_dir,
-                single_chain_dir=single_chain_dir,
-                query=query,
+
+    # this code looks more complicated than I want to because:
+    # In protein-quest we are just working with pdb files,
+    # but in protein-detective we keep track which
+    # pdb+chain belongs to which uniprot entry
+    # so there is a lot of bookkeeping needed
+    input_dirs = {p.mmcif_file.parent for p in proteinpdbs if p.mmcif_file is not None}
+    # TODO allow to write chain B and C from same pdb
+    id2chains = {p.pdb_id: p.chain for p in proteinpdbs}
+
+    with tempfile.TemporaryDirectory() as intermediate_dir:
+        intermediate_path = Path(intermediate_dir)
+        logger.debug("Writing intermediate files to %s", intermediate_dir)
+
+        logger.info("Filtering PDB files on chain")
+        chain_filtered = list(
+            itertools.chain.from_iterable(
+                [
+                    filter_files_on_chain(input_dir, id2chains, intermediate_path, scheduler_address=scheduler_adress)
+                    for input_dir in input_dirs
+                ]
             )
         )
-        save_single_chain_pdb_files(new_files, query, con)
+        intermediate_files = [f[2] for f in chain_filtered if f[2] is not None]
+        logger.info("Write %i files with just chain A", len(intermediate_files))
+        logger.info("Filtering PDB files on number of residues in chain A")
+        residue_filtered = list(
+            filter_files_on_residues(intermediate_files, single_chain_dir, min_residues, max_residues)
+        )
 
-        return single_chain_dir, len([f for f in new_files if f.passed])
+    # make paths relative to session_dir, so db stores paths relative to session_dir
+    for r in residue_filtered:
+        if r.output_file is not None:
+            r.output_file = r.output_file.relative_to(session_dir)
+
+    with connect(session_dir) as con:
+        save_single_chain_pdb_files(proteinpdbs, chain_filtered, residue_filtered, min_residues, max_residues, con)
+
+    return single_chain_dir, len([f for f in residue_filtered if f.passed])

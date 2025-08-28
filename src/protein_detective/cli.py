@@ -9,7 +9,6 @@ from rich import print as rprint
 from rich.logging import RichHandler
 
 from protein_detective.__version__ import __version__
-from protein_detective.pdbe.io import SingleChainQuery
 from protein_detective.powerfit.cli import (
     add_powerfit_parser,
     handle_powerfit,
@@ -100,6 +99,10 @@ def add_prune_pdbs_parser(subparsers):
         default=1_000_000,
         help="Maximum number of residues in chain. PDBe files with more residues will be discarded.",
     )
+    parser.add_argument(
+        "--scheduler-address",
+        help="Address of the Dask scheduler to connect to. If not provided, will create a local cluster.",
+    )
 
 
 def handle_search(args):
@@ -146,13 +149,11 @@ def handle_density_filter(args):
 
 def handle_prune_pdbs(args):
     session_dir = Path(args.session_dir)
-    query = SingleChainQuery(
-        min_residues=args.min_residues,
-        max_residues=args.max_residues,
-    )
     single_chain_dir, nr_files = prune_pdbs(
         session_dir,
-        query,
+        min_residues=args.min_residues,
+        max_residues=args.max_residues,
+        scheduler_adress=args.scheduler_address,
     )
     rprint(f"Written {nr_files} PDB files to {single_chain_dir} directory.")
 

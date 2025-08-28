@@ -3,6 +3,7 @@
 import logging
 from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
+from dataclasses import dataclass
 from importlib.resources import read_text
 from pathlib import Path
 
@@ -14,9 +15,9 @@ from pandas import DataFrame
 from protein_quest.alphafold.confidence import ConfidenceFilterQuery, ConfidenceFilterResult
 from protein_quest.alphafold.entry_summary import EntrySummary
 from protein_quest.alphafold.fetch import AlphaFoldEntry
+from protein_quest.filters import FilterStat
 from protein_quest.uniprot import PdbResult, Query
 
-from protein_detective.pdbe.io import ProteinPdbRow, SingleChainQuery, SingleChainResult
 from protein_detective.powerfit.options import PowerfitOptions
 
 logger = logging.getLogger(__name__)
@@ -221,6 +222,25 @@ def load_pdb_ids(con: DuckDBPyConnection) -> set[str]:
     return {row[0] for row in rows}
 
 
+@dataclass(frozen=True)
+class ProteinPdbRow:
+    """Info about PDB entry and its relation to an Uniprot entry
+
+    Parameters:
+        pdb_id: The PDB ID of the entry.
+        uniprot_chains: The UniProt chains associated with the PDB entry.
+        chain: The first chain from uniprot_chains.
+        uniprot_acc: The UniProt accession number associated with the PDB entry.
+        mmcif_file: The path to the mmCIF file for the PDB entry, or None if not retrieved yet.
+    """
+
+    pdb_id: str
+    uniprot_chains: str
+    chain: str
+    uniprot_acc: str
+    mmcif_file: Path | None
+
+
 def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
     """Load PDB entries from the database.
 
@@ -244,7 +264,7 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
     return [
         ProteinPdbRow(
             uniprot_acc=row[0],
-            id=row[1],
+            pdb_id=row[1],
             mmcif_file=Path(row[2]) if row[2] else None,
             uniprot_chains=row[3],
             chain=row[4],
@@ -409,28 +429,54 @@ def save_filter(filter_name: str, filter_options: dict, con: DuckDBPyConnection)
     return result[0]
 
 
-def save_single_chain_pdb_files(files: list[SingleChainResult], query: SingleChainQuery, con: DuckDBPyConnection):
+def save_single_chain_pdb_files(
+    input_pdbs: list[ProteinPdbRow],
+    chain_filtered: list[tuple[str, str, Path | None]],
+    residue_filtered: list[FilterStat],
+    min_residues: int,
+    max_residues: int,
+    con: DuckDBPyConnection,
+):
     """Save single chain PDB files to the database.
 
     Args:
-        files: A list of objects containing the PDB file paths and metadata.
-        query: The single chain query parameters.
+        input_pdbs: A list of ProteinPdbRow objects representing the input PDB files.
+        chain_filtered: A list of tuples containing the chain filtering results.
+        residue_filtered: A list of FilterStat objects containing the residue filtering results.
+        min_residues: The minimum number of residues for the filtering.
+        max_residues: The maximum number of residues for the filtering.
         con: The DuckDB connection to use for saving the data.
 
     """
-    filter_options = unstructure(query)
-    filter_id = save_filter(filter_options, con)
+    filter_options = {
+        "min_residues": min_residues,
+        "max_residues": max_residues,
+    }
+    filter_id = save_filter("chain+residue", filter_options, con)
 
-    if len(files) == 0:
+    if len(residue_filtered) == 0:
         return
     rows = []
-    for file in files:
+
+    chain_filtered_lookup = {(f[0], f[1]): f[2] for f in chain_filtered}
+    residue_filtered_lookup = {f.input_file: f for f in residue_filtered}
+    for input_pdb in input_pdbs:
+        uniprot_acc = input_pdb.uniprot_acc
+        pdb_id = input_pdb.pdb_id
+        chain = input_pdb.chain
+        intermediate_file = chain_filtered_lookup.get((pdb_id, chain))
+        stat = None
+        if intermediate_file is not None:
+            stat = residue_filtered_lookup.get(intermediate_file)
+        nr_residues = 0
         output_file = None
-        if file.passed:
-            output_file = str(file.output_file)
-        rows.append(
-            (filter_id, file.uniprot_acc, file.pdb_id, {"nr_residues": file.nr_residues}, file.passed, output_file)
-        )
+        passed = False
+        if stat is not None:
+            nr_residues = stat.residue_count
+            passed = stat.passed
+            if stat.output_file is not None:
+                output_file = str(stat.output_file)
+        rows.append((filter_id, uniprot_acc, pdb_id, {"nr_residues": nr_residues}, passed, output_file))
     con.executemany(
         """INSERT OR IGNORE INTO filtered_pdbs
         (filter_id, uniprot_acc, pdb_id, filter_stats, passed, output_file)
