@@ -64,4 +64,4 @@ jobs:
         run: |
           find docs/ -name "*.ipynb" -exec uv run --no-sources --group docs-type marimo convert {} -o {}.py \;
       - name: Run type checkers on docs
-        run: uv run --extra atomium --no-sources --group docs-type pyrefly check docs/*.ipynb.py
+        run: uv run --with atomium --no-sources --group docs-type pyrefly check docs/*.ipynb.py
