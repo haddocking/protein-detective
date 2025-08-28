@@ -14,10 +14,10 @@ from pandas import DataFrame
 from protein_quest.alphafold.confidence import ConfidenceFilterQuery, ConfidenceFilterResult
 from protein_quest.alphafold.entry_summary import EntrySummary
 from protein_quest.alphafold.fetch import AlphaFoldEntry
+from protein_quest.uniprot import PdbResult, Query
 
 from protein_detective.pdbe.io import ProteinPdbRow, SingleChainQuery, SingleChainResult
 from protein_detective.powerfit.options import PowerfitOptions
-from protein_detective.uniprot import PdbResult, Query
 
 logger = logging.getLogger(__name__)
 converter = make_converter()
@@ -175,7 +175,7 @@ def save_pdbs(
     for uniprot_acc, pdb_results in uniprot2pdbs.items():
         prot2pdb_data.extend(
             [
-                {"uniprot_acc": uniprot_acc, "pdb_id": pdb.id, "uniprot_chains": pdb.uniprot_chains}
+                {"uniprot_acc": uniprot_acc, "pdb_id": pdb.id, "uniprot_chains": pdb.uniprot_chains, "chain": pdb.chain}
                 for pdb in pdb_results
             ]
         )
@@ -185,7 +185,9 @@ def save_pdbs(
         return nr_pdbs, nr_prot2pdbs
 
     prot2pdb_df = DataFrame(prot2pdb_data)  # noqa: F841
-    con.execute("INSERT OR IGNORE INTO proteins_pdbs (uniprot_acc, pdb_id, uniprot_chains) SELECT * FROM prot2pdb_df")
+    con.execute(
+        "INSERT OR IGNORE INTO proteins_pdbs (uniprot_acc, pdb_id, uniprot_chains, chain) SELECT * FROM prot2pdb_df"
+    )
     return nr_pdbs, nr_prot2pdbs
 
 
@@ -233,7 +235,8 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
         uniprot_acc,
         pdb_id,
         if(length(mmcif_file), concat_ws('/', getvariable('session_dir'), mmcif_file), NULL) AS mmcif_file,
-        uniprot_chains
+        uniprot_chains,
+        chain
     FROM proteins_pdbs AS pp
     JOIN pdbs AS p USING (pdb_id)
     """
@@ -244,6 +247,7 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
             id=row[1],
             mmcif_file=Path(row[2]) if row[2] else None,
             uniprot_chains=row[3],
+            chain=row[4],
         )
         for row in rows
     ]

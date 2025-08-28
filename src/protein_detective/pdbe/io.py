@@ -107,12 +107,14 @@ class ProteinPdbRow:
     Parameters:
         id: The PDB ID of the entry.
         uniprot_chains: The UniProt chains associated with the PDB entry.
+        chain: The first chain from uniprot_chains.
         uniprot_acc: The UniProt accession number associated with the PDB entry.
         mmcif_file: The path to the mmCIF file for the PDB entry, or None if not retrieved yet.
     """
 
     id: str
     uniprot_chains: str
+    chain: str
     uniprot_acc: str
     mmcif_file: Path | None
 
@@ -197,7 +199,7 @@ def write_single_chain_pdb_file(
         )
 
     mmcif_file = proteinpdb.mmcif_file
-    chain2keep = first_chain_from_uniprot_chains(proteinpdb.uniprot_chains)
+    chain2keep = proteinpdb.chain
     uniprot_acc = proteinpdb.uniprot_acc
     output_file = single_chain_dir / f"{uniprot_acc}_{mmcif_file.stem}_{chain2keep}2A.pdb"
 

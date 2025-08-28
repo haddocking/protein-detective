@@ -9,6 +9,7 @@ from protein_quest.alphafold.confidence import ConfidenceFilterQuery, filter_fil
 from protein_quest.alphafold.fetch import DownloadableFormat
 from protein_quest.alphafold.fetch import fetch_many as af_fetch
 from protein_quest.alphafold.fetch import relative_to as af_relative_to
+from protein_quest.uniprot import Query, search4af, search4pdb, search4uniprot
 
 from protein_detective.db import (
     connect,
@@ -27,7 +28,6 @@ from protein_detective.db import (
 )
 from protein_detective.pdbe.fetch import fetch as pdbe_fetch
 from protein_detective.pdbe.io import SingleChainQuery, write_single_chain_pdb_files
-from protein_detective.uniprot import Query, search4af, search4pdb, search4uniprot
 
 logger = logging.getLogger(__name__)
 

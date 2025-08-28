@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS proteins_pdbs (
     uniprot_acc TEXT NOT NULL,
     pdb_id TEXT NOT NULL,
     uniprot_chains TEXT NOT NULL,
+    chain TEXT NOT NULL,
     FOREIGN KEY (uniprot_acc) REFERENCES proteins (uniprot_acc),
     FOREIGN KEY (pdb_id) REFERENCES pdbs (pdb_id),
     PRIMARY KEY (uniprot_acc, pdb_id)

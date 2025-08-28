@@ -4,6 +4,7 @@ from pathlib import Path
 
 from protein_quest.alphafold.confidence import ConfidenceFilterQuery
 from protein_quest.alphafold.fetch import downloadable_formats
+from protein_quest.uniprot import Query
 from rich import print as rprint
 from rich.logging import RichHandler
 
@@ -13,7 +14,6 @@ from protein_detective.powerfit.cli import (
     add_powerfit_parser,
     handle_powerfit,
 )
-from protein_detective.uniprot import Query
 from protein_detective.workflow import (
     density_filter,
     prune_pdbs,
