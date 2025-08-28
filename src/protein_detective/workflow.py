@@ -107,12 +107,16 @@ def retrieve_structures(
     if "alphafold" in what:
         # AlphaFold entries for the given query
         af_ids = set()
+        if what_af_formats is None:
+            what_af_formats = {"cif"}
         with connect(session_dir) as con:
             af_ids = load_alphafold_ids(con)
 
             afs = af_fetch(af_ids, download_dir, what=what_af_formats)
 
             sr_afs = [af_relative_to(af, session_dir) for af in afs]
+            # the af_fetch downloads summaries as <uniprot_acc>.json files
+            # TODO do store summary in db and in *.json files, pick one
             save_alphafolds_files(sr_afs, con)
 
     return download_dir, len(sr_mmcif_files), len(afs)
@@ -155,13 +159,13 @@ def density_filter(session_dir: Path, query: ConfidenceFilterQuery) -> DensityFi
 
     with connect(session_dir) as con:
         afs = load_alphafolds(con)
-        alphafold_pdb_files = [e.pdb_file for e in afs if e.pdb_file is not None]
+        alphafold_cif_files = [e.cif_file for e in afs if e.cif_file is not None]
         uniproc_accs = [e.uniprot_acc for e in afs]
 
-        density_filtered = list(filter_files_on_confidence(alphafold_pdb_files, query, density_filtered_dir))
+        density_filtered = list(filter_files_on_confidence(alphafold_cif_files, query, density_filtered_dir))
         for e in density_filtered:
-            if e.density_filtered_file is not None:
-                e.density_filtered_file = e.density_filtered_file.relative_to(session_dir)
+            if e.filtered_file is not None:
+                e.filtered_file = e.filtered_file.relative_to(session_dir)
 
         save_density_filtered(
             query,
@@ -169,7 +173,7 @@ def density_filter(session_dir: Path, query: ConfidenceFilterQuery) -> DensityFi
             uniproc_accs,
             con,
         )
-        nr_kept = len([e for e in density_filtered if e.density_filtered_file is not None])
+        nr_kept = len([e for e in density_filtered if e.filtered_file is not None])
         nr_discarded = len(density_filtered) - nr_kept
         return DensityFilterSessionResult(
             density_filtered_dir=density_filtered_dir,

@@ -15,8 +15,10 @@ from protein_detective.powerfit.run import run as powerfit_run
 
 try:
     import pyopencl
+    from pyopencl import LogicError
 except ImportError:
     pyopencl = None
+    LogicError = RuntimeError
 
 
 logger = logging.getLogger(__name__)
@@ -85,7 +87,14 @@ def nr_gpus() -> int:
     """
     if pyopencl is None:
         return 0
-    platform = pyopencl.get_platforms()[0]
+
+    try:
+        platform = pyopencl.get_platforms()[0]
+    except LogicError as e:
+        if "PLATFORM_NOT_FOUND_KHR" in str(e):
+            logger.debug("No OpenCL platform found.")
+            return 0
+        raise
     gpus = platform.get_devices()
     return len(gpus)
 

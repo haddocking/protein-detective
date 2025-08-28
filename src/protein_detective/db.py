@@ -482,8 +482,8 @@ def save_density_filtered(
                 filter_id,
                 uniprot_accession,
                 file.count,
-                file.density_filtered_file is not None,
-                str(file.density_filtered_file) if file.density_filtered_file else None,
+                file.filtered_file is not None,
+                str(file.filtered_file) if file.filtered_file else None,
             )
         )
     con.executemany(

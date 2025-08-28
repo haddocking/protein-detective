@@ -93,7 +93,6 @@ def filter_and_write_single_chain_pdb_file(
         output_file,
         out_chain,
     )
-    # pyrefly: ignore  # noqa: ERA001
     chain.copy(out_chain).save(
         str(output_file),
     )

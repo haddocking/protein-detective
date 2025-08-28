@@ -2,12 +2,12 @@ import argparse
 import logging
 from pathlib import Path
 
+from protein_quest.alphafold.confidence import ConfidenceFilterQuery
+from protein_quest.alphafold.fetch import downloadable_formats
 from rich import print as rprint
 from rich.logging import RichHandler
 
 from protein_detective.__version__ import __version__
-from protein_detective.alphafold import downloadable_formats
-from protein_detective.alphafold.density import DensityFilterQuery
 from protein_detective.pdbe.io import SingleChainQuery
 from protein_detective.powerfit.cli import (
     add_powerfit_parser,
@@ -64,7 +64,7 @@ def add_retrieve_parser(subparsers):
         type=str,
         action="append",
         choices=sorted(downloadable_formats),
-        help="AlphaFold formats to retrieve. Can be specified multiple times. Default is 'pdb'.",
+        help="AlphaFold formats to retrieve. Can be specified multiple times. Default is 'cif'.",
     )
 
 
@@ -133,7 +133,7 @@ def handle_retrieve(args):
 
 
 def handle_density_filter(args):
-    query = DensityFilterQuery(
+    query = ConfidenceFilterQuery(
         confidence=args.confidence_threshold,
         min_threshold=args.min_residues,
         max_threshold=args.max_residues,
