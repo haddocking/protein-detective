@@ -388,20 +388,20 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     ]
 
 
-def save_filter(filter_options: dict, con: DuckDBPyConnection) -> int:
+def save_filter(filter_name: str, filter_options: dict, con: DuckDBPyConnection) -> int:
     result = con.execute(
         """
-        INSERT OR IGNORE INTO filters (filter_options) VALUES (?) RETURNING filter_id
+        INSERT OR IGNORE INTO filters (filter_name, filter_options) VALUES (?, ?) RETURNING filter_id
                          """,
-        (filter_options,),
+        (filter_name, filter_options),
     ).fetchone()
     if result is None:
         # Already exists, so just fetch the id
         result = con.execute(
             """
-            SELECT filter_id FROM filters WHERE filter_options = ?
+            SELECT filter_id FROM filters WHERE filter_name = ? AND filter_options = ?
             """,
-            (filter_options,),
+            (filter_name, filter_options),
         ).fetchone()
     if result is None or len(result) != 1:
         msg = "Failed to insert or retrieve filter"
@@ -477,7 +477,7 @@ def save_density_filtered(
         ValueError: If the density filter could not be inserted or retrieved.
     """
     filter_options = unstructure(query)
-    filter_id = save_filter(filter_options, con)
+    filter_id = save_filter("confidence", filter_options, con)
 
     values = []
     for file, uniprot_accession in zip(files, uniprot_accessions, strict=False):

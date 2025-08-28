@@ -33,8 +33,9 @@ CREATE TABLE IF NOT EXISTS proteins_pdbs (
 CREATE SEQUENCE IF NOT EXISTS id_filters START 1;
 CREATE TABLE IF NOT EXISTS filters (
     filter_id INTEGER DEFAULT nextval('id_filters') PRIMARY KEY,
+    filter_name TEXT NOT NULL,
     filter_options JSON NOT NULL, -- stores allowed nr residues range
-    UNIQUE (filter_options)
+    UNIQUE (filter_name, filter_options)
 );
 
 CREATE TABLE IF NOT EXISTS filtered_pdbs (
