@@ -79,9 +79,6 @@ nav:
   - CLI Reference: cli.md
   - Notebooks:
     - Prepare EM map: em_prepare.ipynb
-    - Retrieve: uniprot.ipynb
-    - AlphaFold: alphafold.ipynb
-    - PDBe: pdbe.ipynb
     - Workflow: workflow.ipynb
     - Powerfit: powerfit.ipynb
     - Visualization: visualization.ipynb
