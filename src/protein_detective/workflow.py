@@ -192,7 +192,7 @@ def confidence_filter(session_dir: Path, query: ConfidenceFilterQuery) -> Confid
 
 
 def prune_pdbs(
-    session_dir: Path, min_residues: int, max_residues: int, scheduler_adress: str | Cluster | None
+    session_dir: Path, min_residues: int, max_residues: int, scheduler_address: str | Cluster | None
 ) -> tuple[Path, int]:
     """Prune the PDB files to only keep the first chain of the found Uniprot entries.
 
@@ -205,7 +205,7 @@ def prune_pdbs(
         session_dir: The directory where the session database is stored.
         min_residues: The minimum number of residues for the single chain.
         max_residues: The maximum number of residues for the single chain.
-        scheduler_adress: The address of the Dask scheduler.
+        scheduler_address: The address of the Dask scheduler.
 
     Returns:
         A tuple containing the directory where the single chain PDB files are stored,
@@ -229,7 +229,7 @@ def prune_pdbs(
         logger.debug("Writing intermediate files to %s", intermediate_dir)
 
         logger.info("Filtering PDB files on chain")
-        chain_filtered = filter_files_on_chain(path2chains, intermediate_path, scheduler_address=scheduler_adress)
+        chain_filtered = filter_files_on_chain(path2chains, intermediate_path, scheduler_address=scheduler_address)
         intermediate_files = [f.output_file for f in chain_filtered if f.output_file is not None]
         logger.info("Write %i files with just chain A", len(intermediate_files))
         logger.info("Filtering PDB files on number of residues in chain A")

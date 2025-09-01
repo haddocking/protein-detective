@@ -153,7 +153,7 @@ def handle_prune_pdbs(args):
         session_dir,
         min_residues=args.min_residues,
         max_residues=args.max_residues,
-        scheduler_adress=args.scheduler_address,
+        scheduler_address=args.scheduler_address,
     )
     rprint(f"Written {nr_files} PDB files to {single_chain_dir} directory.")
 
