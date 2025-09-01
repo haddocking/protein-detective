@@ -14,7 +14,7 @@ from protein_detective.powerfit.cli import (
     handle_powerfit,
 )
 from protein_detective.workflow import (
-    density_filter,
+    confidence_filter,
     prune_pdbs,
     retrieve_structures,
     search_structures_in_uniprot,
@@ -67,8 +67,8 @@ def add_retrieve_parser(subparsers):
     )
 
 
-def add_density_filter_parser(subparsers):
-    parser = subparsers.add_parser("density-filter", help="Filter AlphaFoldDB structures based on density confidence")
+def add_confidence_filter_parser(subparsers):
+    parser = subparsers.add_parser("confidence-filter", help="Filter AlphaFoldDB structures based on confidence")
     parser.add_argument("session_dir", help="Session directory for input and output")
     parser.add_argument("--confidence-threshold", type=float, default=70.0, help="pLDDT confidence threshold (0-100)")
     parser.add_argument(
@@ -135,16 +135,16 @@ def handle_retrieve(args):
     )
 
 
-def handle_density_filter(args):
+def handle_confidence_filter(args):
     query = ConfidenceFilterQuery(
         confidence=args.confidence_threshold,
         min_threshold=args.min_residues,
         max_threshold=args.max_residues,
     )
     session_dir = Path(args.session_dir)
-    result = density_filter(session_dir, query)
-    rprint(f"Filtered {result.nr_kept} structures, written to {result.density_filtered_dir} directory.")
-    rprint(f"Discarded {result.nr_discarded} structures based on density confidence.")
+    result = confidence_filter(session_dir, query)
+    rprint(f"Filtered {result.nr_kept} structures, written to {result.filtered_dir} directory.")
+    rprint(f"Discarded {result.nr_discarded} structures based on confidence.")
 
 
 def handle_prune_pdbs(args):
@@ -166,7 +166,7 @@ def make_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     add_search_parser(subparsers)
     add_retrieve_parser(subparsers)
-    add_density_filter_parser(subparsers)
+    add_confidence_filter_parser(subparsers)
     add_prune_pdbs_parser(subparsers)
     add_powerfit_parser(subparsers)
     return parser
@@ -183,8 +183,8 @@ def main():
         handle_search(args)
     elif args.command == "retrieve":
         handle_retrieve(args)
-    elif args.command == "density-filter":
-        handle_density_filter(args)
+    elif args.command == "confidence-filter":
+        handle_confidence_filter(args)
     elif args.command == "prune-pdbs":
         handle_prune_pdbs(args)
     elif args.command == "powerfit":

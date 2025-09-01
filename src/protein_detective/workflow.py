@@ -1,7 +1,6 @@
 """Workflow steps"""
 
 import asyncio
-import itertools
 import logging
 import tempfile
 from dataclasses import dataclass
@@ -25,7 +24,7 @@ from protein_detective.db import (
     load_pdbs,
     save_alphafolds,
     save_alphafolds_files,
-    save_density_filtered,
+    save_confidence_filtered,
     save_pdb_files,
     save_pdbs,
     save_query,
@@ -133,60 +132,60 @@ def retrieve_structures(
 
 
 @dataclass
-class DensityFilterSessionResult:
-    """Stats of density filtering.
+class ConfidenceFilterSessionResult:
+    """Stats of confidence filtering.
 
     Parameters:
-        density_filtered_dir: The directory where the filtered PDB files are stored.
+        filtered_dir: The directory where the filtered PDB files are stored.
         nr_kept: The number of structures that were kept after filtering.
         nr_discarded: The number of structures that were discarded after filtering.
     """
 
-    density_filtered_dir: Path
+    filtered_dir: Path
     nr_kept: int
     nr_discarded: int
 
 
-def density_filter(session_dir: Path, query: ConfidenceFilterQuery) -> DensityFilterSessionResult:
-    """Filter the AlphaFoldDB structures based on density confidence.
+def confidence_filter(session_dir: Path, query: ConfidenceFilterQuery) -> ConfidenceFilterSessionResult:
+    """Filter the AlphaFoldDB structures based on confidence.
 
     In AlphaFold PDB files, the b-factor column has the
     predicted local distance difference test (pLDDT).
     All residues with a b-factor above the confidence threshold are counted.
     Then if the count is outside the min and max threshold, the structure is filtered out.
     The remaining structures have the residues with a b-factor below the confidence threshold removed.
-    And are written to the session_dir / "density_filtered" directory.
+    And are written to the session_dir / "confidence_filtered" directory.
 
     Args:
         session_dir: The directory where the session database is stored.
-        query: The density filter query containing the confidence thresholds.
+        query: The confidence filter query containing the confidence thresholds.
 
     Returns:
-        Stats of density filtering.
+        Stats of confidence filtering.
     """
-    density_filtered_dir = session_dir / "density_filtered"
-    density_filtered_dir.mkdir(parents=True, exist_ok=True)
+    filtered_dir = session_dir / "confidence_filtered"
+    filtered_dir.mkdir(parents=True, exist_ok=True)
 
     with connect(session_dir) as con:
         afs = load_alphafolds(con)
         alphafold_cif_files = [e.cif_file for e in afs if e.cif_file is not None]
-        uniproc_accs = [e.uniprot_acc for e in afs]
+        uniprot_accs = [e.uniprot_acc for e in afs]
 
-        density_filtered = list(filter_files_on_confidence(alphafold_cif_files, query, density_filtered_dir))
-        for e in density_filtered:
+        filtered = list(filter_files_on_confidence(alphafold_cif_files, query, filtered_dir))
+        for e in filtered:
             if e.filtered_file is not None:
                 e.filtered_file = e.filtered_file.relative_to(session_dir)
 
-        save_density_filtered(
+        save_confidence_filtered(
             query,
-            density_filtered,
-            uniproc_accs,
+            filtered,
+            uniprot_accs,
             con,
         )
-        nr_kept = len([e for e in density_filtered if e.filtered_file is not None])
-        nr_discarded = len(density_filtered) - nr_kept
-        return DensityFilterSessionResult(
-            density_filtered_dir=density_filtered_dir,
+        nr_kept = len([e for e in filtered if e.filtered_file is not None])
+        nr_discarded = len(filtered) - nr_kept
+        return ConfidenceFilterSessionResult(
+            filtered_dir=filtered_dir,
             nr_kept=nr_kept,
             nr_discarded=nr_discarded,
         )

@@ -506,7 +506,7 @@ def load_single_chain_pdb_files(con: DuckDBPyConnection) -> list[Path]:
     return [Path(row[0]) for row in rows]
 
 
-def save_density_filtered(
+def save_confidence_filtered(
     query: ConfidenceFilterQuery,
     files: list[ConfidenceFilterResult],
     uniprot_accessions: list[str],
