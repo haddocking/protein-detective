@@ -17,6 +17,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
       - name: Install the project
+      # Using -no-sources otherwise uv tries to install ../protein-quest
         run: uv sync --dev --no-sources
       - name: Install pocl
         run: uv pip install pocl-binary-distribution==3.0
@@ -64,4 +65,4 @@ jobs:
         run: |
           find docs/ -name "*.ipynb" -exec uv run --no-sources --group docs-type marimo convert {} -o {}.py \;
       - name: Run type checkers on docs
-        run: uv run --with atomium --no-sources --group docs-type pyrefly check docs/*.ipynb.py
+        run: uv run --no-sources --group docs-type pyrefly check docs/*.ipynb.py
