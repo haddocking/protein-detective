@@ -15,7 +15,7 @@ from pandas import DataFrame
 from protein_quest.alphafold.confidence import ConfidenceFilterQuery, ConfidenceFilterResult
 from protein_quest.alphafold.entry_summary import EntrySummary
 from protein_quest.alphafold.fetch import AlphaFoldEntry
-from protein_quest.filters import FilterStat
+from protein_quest.filters import ChainFilterStatistics, ResidueFilterStatistics
 from protein_quest.uniprot import PdbResult, Query
 
 from protein_detective.powerfit.options import PowerfitOptions
@@ -431,8 +431,8 @@ def save_filter(filter_name: str, filter_options: dict, con: DuckDBPyConnection)
 
 def save_single_chain_pdb_files(
     input_pdbs: list[ProteinPdbRow],
-    chain_filtered: list[tuple[str, str, Path | None]],
-    residue_filtered: list[FilterStat],
+    chain_filtered: list[ChainFilterStatistics],
+    residue_filtered: list[ResidueFilterStatistics],
     min_residues: int,
     max_residues: int,
     con: DuckDBPyConnection,
@@ -458,13 +458,14 @@ def save_single_chain_pdb_files(
         return
     rows = []
 
-    chain_filtered_lookup = {(f[0], f[1]): f[2] for f in chain_filtered}
+    chain_filtered_lookup = {f.input_file: f.output_file for f in chain_filtered}
     residue_filtered_lookup = {f.input_file: f for f in residue_filtered}
     for input_pdb in input_pdbs:
+        if input_pdb.mmcif_file is None:
+            continue
         uniprot_acc = input_pdb.uniprot_acc
         pdb_id = input_pdb.pdb_id
-        chain = input_pdb.chain
-        intermediate_file = chain_filtered_lookup.get((pdb_id, chain))
+        intermediate_file = chain_filtered_lookup.get(input_pdb.mmcif_file)
         stat = None
         if intermediate_file is not None:
             stat = residue_filtered_lookup.get(intermediate_file)

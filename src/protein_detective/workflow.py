@@ -223,24 +223,15 @@ def prune_pdbs(
     # but in protein-detective we keep track which
     # pdb+chain belongs to which uniprot entry
     # so there is a lot of bookkeeping needed
-    input_dirs = {p.mmcif_file.parent for p in proteinpdbs if p.mmcif_file is not None}
-    # TODO allow to write chain B and C from same pdb
-    id2chains = {p.pdb_id: p.chain for p in proteinpdbs}
+    path2chains = {(p.mmcif_file, p.chain) for p in proteinpdbs if p.mmcif_file is not None}
 
     with tempfile.TemporaryDirectory() as intermediate_dir:
         intermediate_path = Path(intermediate_dir)
         logger.debug("Writing intermediate files to %s", intermediate_dir)
 
         logger.info("Filtering PDB files on chain")
-        chain_filtered = list(
-            itertools.chain.from_iterable(
-                [
-                    filter_files_on_chain(input_dir, id2chains, intermediate_path, scheduler_address=scheduler_adress)
-                    for input_dir in input_dirs
-                ]
-            )
-        )
-        intermediate_files = [f[2] for f in chain_filtered if f[2] is not None]
+        chain_filtered = filter_files_on_chain(path2chains, intermediate_path, scheduler_address=scheduler_adress)
+        intermediate_files = [f.output_file for f in chain_filtered if f.output_file is not None]
         logger.info("Write %i files with just chain A", len(intermediate_files))
         logger.info("Filtering PDB files on number of residues in chain A")
         residue_filtered = list(
