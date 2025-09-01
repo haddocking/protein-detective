@@ -2,20 +2,19 @@ import argparse
 import logging
 from pathlib import Path
 
+from protein_quest.alphafold.confidence import ConfidenceFilterQuery
+from protein_quest.alphafold.fetch import downloadable_formats
+from protein_quest.uniprot import Query
 from rich import print as rprint
 from rich.logging import RichHandler
 
 from protein_detective.__version__ import __version__
-from protein_detective.alphafold import downloadable_formats
-from protein_detective.alphafold.density import DensityFilterQuery
-from protein_detective.pdbe.io import SingleChainQuery
 from protein_detective.powerfit.cli import (
     add_powerfit_parser,
     handle_powerfit,
 )
-from protein_detective.uniprot import Query
 from protein_detective.workflow import (
-    density_filter,
+    confidence_filter,
     prune_pdbs,
     retrieve_structures,
     search_structures_in_uniprot,
@@ -64,12 +63,12 @@ def add_retrieve_parser(subparsers):
         type=str,
         action="append",
         choices=sorted(downloadable_formats),
-        help="AlphaFold formats to retrieve. Can be specified multiple times. Default is 'pdb'.",
+        help="AlphaFold formats to retrieve. Can be specified multiple times. Default is 'cif'.",
     )
 
 
-def add_density_filter_parser(subparsers):
-    parser = subparsers.add_parser("density-filter", help="Filter AlphaFoldDB structures based on density confidence")
+def add_confidence_filter_parser(subparsers):
+    parser = subparsers.add_parser("confidence-filter", help="Filter AlphaFoldDB structures based on confidence")
     parser.add_argument("session_dir", help="Session directory for input and output")
     parser.add_argument("--confidence-threshold", type=float, default=70.0, help="pLDDT confidence threshold (0-100)")
     parser.add_argument(
@@ -99,6 +98,10 @@ def add_prune_pdbs_parser(subparsers):
         type=int,
         default=1_000_000,
         help="Maximum number of residues in chain. PDBe files with more residues will be discarded.",
+    )
+    parser.add_argument(
+        "--scheduler-address",
+        help="Address of the Dask scheduler to connect to. If not provided, will create a local cluster.",
     )
 
 
@@ -132,27 +135,25 @@ def handle_retrieve(args):
     )
 
 
-def handle_density_filter(args):
-    query = DensityFilterQuery(
+def handle_confidence_filter(args):
+    query = ConfidenceFilterQuery(
         confidence=args.confidence_threshold,
         min_threshold=args.min_residues,
         max_threshold=args.max_residues,
     )
     session_dir = Path(args.session_dir)
-    result = density_filter(session_dir, query)
-    rprint(f"Filtered {result.nr_kept} structures, written to {result.density_filtered_dir} directory.")
-    rprint(f"Discarded {result.nr_discarded} structures based on density confidence.")
+    result = confidence_filter(session_dir, query)
+    rprint(f"Filtered {result.nr_kept} structures, written to {result.filtered_dir} directory.")
+    rprint(f"Discarded {result.nr_discarded} structures based on confidence.")
 
 
 def handle_prune_pdbs(args):
     session_dir = Path(args.session_dir)
-    query = SingleChainQuery(
-        min_residues=args.min_residues,
-        max_residues=args.max_residues,
-    )
     single_chain_dir, nr_files = prune_pdbs(
         session_dir,
-        query,
+        min_residues=args.min_residues,
+        max_residues=args.max_residues,
+        scheduler_address=args.scheduler_address,
     )
     rprint(f"Written {nr_files} PDB files to {single_chain_dir} directory.")
 
@@ -165,7 +166,7 @@ def make_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     add_search_parser(subparsers)
     add_retrieve_parser(subparsers)
-    add_density_filter_parser(subparsers)
+    add_confidence_filter_parser(subparsers)
     add_prune_pdbs_parser(subparsers)
     add_powerfit_parser(subparsers)
     return parser
@@ -182,8 +183,8 @@ def main():
         handle_search(args)
     elif args.command == "retrieve":
         handle_retrieve(args)
-    elif args.command == "density-filter":
-        handle_density_filter(args)
+    elif args.command == "confidence-filter":
+        handle_confidence_filter(args)
     elif args.command == "prune-pdbs":
         handle_prune_pdbs(args)
     elif args.command == "powerfit":

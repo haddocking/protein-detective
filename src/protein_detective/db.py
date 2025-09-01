@@ -3,24 +3,23 @@
 import logging
 from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
+from dataclasses import dataclass
 from importlib.resources import read_text
 from pathlib import Path
 
 from cattrs import unstructure
-from cattrs.preconf.json import make_converter
 from duckdb import ConstraintException, DuckDBPyConnection, InvalidInputException
 from duckdb import connect as duckdb_connect
 from pandas import DataFrame
+from protein_quest.alphafold.confidence import ConfidenceFilterQuery, ConfidenceFilterResult
+from protein_quest.alphafold.entry_summary import EntrySummary
+from protein_quest.alphafold.fetch import AlphaFoldEntry, converter
+from protein_quest.filters import ChainFilterStatistics, ResidueFilterStatistics
+from protein_quest.uniprot import PdbResult, Query
 
-from protein_detective.alphafold import AlphaFoldEntry
-from protein_detective.alphafold.density import DensityFilterQuery, DensityFilterResult
-from protein_detective.alphafold.entry_summary import EntrySummary
-from protein_detective.pdbe.io import ProteinPdbRow, SingleChainQuery, SingleChainResult
 from protein_detective.powerfit.options import PowerfitOptions
-from protein_detective.uniprot import PdbResult, Query
 
 logger = logging.getLogger(__name__)
-converter = make_converter()
 
 
 ddl: str = read_text("protein_detective", "ddl.sql")
@@ -175,7 +174,7 @@ def save_pdbs(
     for uniprot_acc, pdb_results in uniprot2pdbs.items():
         prot2pdb_data.extend(
             [
-                {"uniprot_acc": uniprot_acc, "pdb_id": pdb.id, "uniprot_chains": pdb.uniprot_chains}
+                {"uniprot_acc": uniprot_acc, "pdb_id": pdb.id, "uniprot_chains": pdb.uniprot_chains, "chain": pdb.chain}
                 for pdb in pdb_results
             ]
         )
@@ -185,7 +184,9 @@ def save_pdbs(
         return nr_pdbs, nr_prot2pdbs
 
     prot2pdb_df = DataFrame(prot2pdb_data)  # noqa: F841
-    con.execute("INSERT OR IGNORE INTO proteins_pdbs (uniprot_acc, pdb_id, uniprot_chains) SELECT * FROM prot2pdb_df")
+    con.execute(
+        "INSERT OR IGNORE INTO proteins_pdbs (uniprot_acc, pdb_id, uniprot_chains, chain) SELECT * FROM prot2pdb_df"
+    )
     return nr_pdbs, nr_prot2pdbs
 
 
@@ -219,6 +220,25 @@ def load_pdb_ids(con: DuckDBPyConnection) -> set[str]:
     return {row[0] for row in rows}
 
 
+@dataclass(frozen=True)
+class ProteinPdbRow:
+    """Info about PDB entry and its relation to an Uniprot entry
+
+    Parameters:
+        pdb_id: The PDB ID of the entry.
+        uniprot_chains: The UniProt chains associated with the PDB entry.
+        chain: The first chain from uniprot_chains.
+        uniprot_acc: The UniProt accession number associated with the PDB entry.
+        mmcif_file: The path to the mmCIF file for the PDB entry, or None if not retrieved yet.
+    """
+
+    pdb_id: str
+    uniprot_chains: str
+    chain: str
+    uniprot_acc: str
+    mmcif_file: Path | None
+
+
 def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
     """Load PDB entries from the database.
 
@@ -233,7 +253,8 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
         uniprot_acc,
         pdb_id,
         if(length(mmcif_file), concat_ws('/', getvariable('session_dir'), mmcif_file), NULL) AS mmcif_file,
-        uniprot_chains
+        uniprot_chains,
+        chain
     FROM proteins_pdbs AS pp
     JOIN pdbs AS p USING (pdb_id)
     """
@@ -241,9 +262,10 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
     return [
         ProteinPdbRow(
             uniprot_acc=row[0],
-            id=row[1],
+            pdb_id=row[1],
             mmcif_file=Path(row[2]) if row[2] else None,
             uniprot_chains=row[3],
+            chain=row[4],
         )
         for row in rows
     ]
@@ -384,20 +406,20 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     ]
 
 
-def save_filter(filter_options: dict, con: DuckDBPyConnection) -> int:
+def save_filter(filter_name: str, filter_options: dict, con: DuckDBPyConnection) -> int:
     result = con.execute(
         """
-        INSERT OR IGNORE INTO filters (filter_options) VALUES (?) RETURNING filter_id
+        INSERT OR IGNORE INTO filters (filter_name, filter_options) VALUES (?, ?) RETURNING filter_id
                          """,
-        (filter_options,),
+        (filter_name, filter_options),
     ).fetchone()
     if result is None:
         # Already exists, so just fetch the id
         result = con.execute(
             """
-            SELECT filter_id FROM filters WHERE filter_options = ?
+            SELECT filter_id FROM filters WHERE filter_name = ? AND filter_options = ?
             """,
-            (filter_options,),
+            (filter_name, filter_options),
         ).fetchone()
     if result is None or len(result) != 1:
         msg = "Failed to insert or retrieve filter"
@@ -405,28 +427,55 @@ def save_filter(filter_options: dict, con: DuckDBPyConnection) -> int:
     return result[0]
 
 
-def save_single_chain_pdb_files(files: list[SingleChainResult], query: SingleChainQuery, con: DuckDBPyConnection):
+def save_single_chain_pdb_files(
+    input_pdbs: list[ProteinPdbRow],
+    chain_filtered: list[ChainFilterStatistics],
+    residue_filtered: list[ResidueFilterStatistics],
+    min_residues: int,
+    max_residues: int,
+    con: DuckDBPyConnection,
+):
     """Save single chain PDB files to the database.
 
     Args:
-        files: A list of objects containing the PDB file paths and metadata.
-        query: The single chain query parameters.
+        input_pdbs: A list of ProteinPdbRow objects representing the input PDB files.
+        chain_filtered: A list of tuples containing the chain filtering results.
+        residue_filtered: A list of FilterStat objects containing the residue filtering results.
+        min_residues: The minimum number of residues for the filtering.
+        max_residues: The maximum number of residues for the filtering.
         con: The DuckDB connection to use for saving the data.
 
     """
-    filter_options = unstructure(query)
-    filter_id = save_filter(filter_options, con)
+    filter_options = {
+        "min_residues": min_residues,
+        "max_residues": max_residues,
+    }
+    filter_id = save_filter("chain+residue", filter_options, con)
 
-    if len(files) == 0:
+    if len(residue_filtered) == 0:
         return
     rows = []
-    for file in files:
+
+    chain_filtered_lookup = {f.input_file: f.output_file for f in chain_filtered}
+    residue_filtered_lookup = {f.input_file: f for f in residue_filtered}
+    for input_pdb in input_pdbs:
+        if input_pdb.mmcif_file is None:
+            continue
+        uniprot_acc = input_pdb.uniprot_acc
+        pdb_id = input_pdb.pdb_id
+        intermediate_file = chain_filtered_lookup.get(input_pdb.mmcif_file)
+        stat = None
+        if intermediate_file is not None:
+            stat = residue_filtered_lookup.get(intermediate_file)
+        nr_residues = 0
         output_file = None
-        if file.passed:
-            output_file = str(file.output_file)
-        rows.append(
-            (filter_id, file.uniprot_acc, file.pdb_id, {"nr_residues": file.nr_residues}, file.passed, output_file)
-        )
+        passed = False
+        if stat is not None:
+            nr_residues = stat.residue_count
+            passed = stat.passed
+            if stat.output_file is not None:
+                output_file = str(stat.output_file)
+        rows.append((filter_id, uniprot_acc, pdb_id, {"nr_residues": nr_residues}, passed, output_file))
     con.executemany(
         """INSERT OR IGNORE INTO filtered_pdbs
         (filter_id, uniprot_acc, pdb_id, filter_stats, passed, output_file)
@@ -455,9 +504,9 @@ def load_single_chain_pdb_files(con: DuckDBPyConnection) -> list[Path]:
     return [Path(row[0]) for row in rows]
 
 
-def save_density_filtered(
-    query: DensityFilterQuery,
-    files: list[DensityFilterResult],
+def save_confidence_filtered(
+    query: ConfidenceFilterQuery,
+    files: list[ConfidenceFilterResult],
     uniprot_accessions: list[str],
     con: DuckDBPyConnection,
 ):
@@ -473,7 +522,7 @@ def save_density_filtered(
         ValueError: If the density filter could not be inserted or retrieved.
     """
     filter_options = unstructure(query)
-    filter_id = save_filter(filter_options, con)
+    filter_id = save_filter("confidence", filter_options, con)
 
     values = []
     for file, uniprot_accession in zip(files, uniprot_accessions, strict=False):
@@ -482,8 +531,8 @@ def save_density_filtered(
                 filter_id,
                 uniprot_accession,
                 file.count,
-                file.density_filtered_file is not None,
-                str(file.density_filtered_file) if file.density_filtered_file else None,
+                file.filtered_file is not None,
+                str(file.filtered_file) if file.filtered_file else None,
             )
         )
     con.executemany(

@@ -15,15 +15,17 @@ from protein_detective.powerfit.run import run as powerfit_run
 
 try:
     import pyopencl
+    from pyopencl import LogicError
 except ImportError:
     pyopencl = None
+    LogicError = RuntimeError
 
 
 logger = logging.getLogger(__name__)
 
 
 def configure_dask_scheduler(
-    scheduler_adress: str | Cluster | None,
+    scheduler_address: str | Cluster | None,
     name: str,
     workers_per_gpu: int = 0,
     nproc: int = 1,
@@ -34,7 +36,7 @@ def configure_dask_scheduler(
     it will start workers which each can only see a single GPU.
 
     Args:
-        scheduler_adress: Address of the Dask scheduler to connect to, or None for local cluster.
+        scheduler_address: Address of the Dask scheduler to connect to, or None for local cluster.
         name: Name for the Dask cluster.
         workers_per_gpu: Number of workers per GPU.
             If > 0, a GPU cluster will be configured otherwise a CPU cluster.
@@ -47,12 +49,12 @@ def configure_dask_scheduler(
     Returns:
         A Dask Cluster instance or a string address for the scheduler.
     """
-    if scheduler_adress is None:
+    if scheduler_address is None:
         if workers_per_gpu > 0:
-            scheduler_adress = _configure_gpu_dask_scheduler(workers_per_gpu, name)
+            scheduler_address = _configure_gpu_dask_scheduler(workers_per_gpu, name)
         else:
-            scheduler_adress = _configure_cpu_dask_scheduler(nproc, name)
-        logger.info(f"Using local Dask cluster: {scheduler_adress}")
+            scheduler_address = _configure_cpu_dask_scheduler(nproc, name)
+        logger.info(f"Using local Dask cluster: {scheduler_address}")
     else:
         if workers_per_gpu > 0:
             if pyopencl is None:
@@ -64,7 +66,7 @@ def configure_dask_scheduler(
                     "CUDA_VISIBLE_DEVICES or ROCR_VISIBLE_DEVICES environment variables."
                 )
 
-    return scheduler_adress
+    return scheduler_address
 
 
 def _configure_cpu_dask_scheduler(nproc: int, name: str) -> LocalCluster:
@@ -85,7 +87,14 @@ def nr_gpus() -> int:
     """
     if pyopencl is None:
         return 0
-    platform = pyopencl.get_platforms()[0]
+
+    try:
+        platform = pyopencl.get_platforms()[0]
+    except LogicError as e:
+        if "PLATFORM_NOT_FOUND_KHR" in str(e):
+            logger.debug("No OpenCL platform found.")
+            return 0
+        raise
     gpus = platform.get_devices()
     return len(gpus)
 
@@ -140,7 +149,7 @@ def _configure_gpu_dask_scheduler(workers_per_gpu: int, cluster_name: str) -> Sp
                 },
             }
             worker_specs[f"gpu-worker-{i}-{j}"] = worker_spec
-    scheduler_adress = SpecCluster(
+    scheduler_address = SpecCluster(
         workers=worker_specs,
         scheduler={
             "cls": Scheduler,
@@ -151,7 +160,7 @@ def _configure_gpu_dask_scheduler(workers_per_gpu: int, cluster_name: str) -> Sp
         name=cluster_name,
     )
     logger.info(f"Found {n_gpus} GPUs, using {workers_per_gpu} workers per GPU.")
-    return scheduler_adress
+    return scheduler_address
 
 
 def powerfit_worker(pdb_file: Path, density_map_target: Path, powerfit_run_root_dir: Path, options: PowerfitOptions):
