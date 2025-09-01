@@ -8,20 +8,18 @@ from importlib.resources import read_text
 from pathlib import Path
 
 from cattrs import unstructure
-from cattrs.preconf.json import make_converter
 from duckdb import ConstraintException, DuckDBPyConnection, InvalidInputException
 from duckdb import connect as duckdb_connect
 from pandas import DataFrame
 from protein_quest.alphafold.confidence import ConfidenceFilterQuery, ConfidenceFilterResult
 from protein_quest.alphafold.entry_summary import EntrySummary
-from protein_quest.alphafold.fetch import AlphaFoldEntry
+from protein_quest.alphafold.fetch import AlphaFoldEntry, converter
 from protein_quest.filters import ChainFilterStatistics, ResidueFilterStatistics
 from protein_quest.uniprot import PdbResult, Query
 
 from protein_detective.powerfit.options import PowerfitOptions
 
 logger = logging.getLogger(__name__)
-converter = make_converter()
 
 
 ddl: str = read_text("protein_detective", "ddl.sql")
