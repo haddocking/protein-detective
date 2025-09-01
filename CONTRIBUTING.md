@@ -49,7 +49,7 @@ In case you feel like you've made a valuable contribution, but you don't know ho
 To create a release you need write permission on the repository.
 
 1. Check the author list in [`CITATION.cff`](CITATION.cff)
-1. Bump the version in [pyproject.toml](pyproject.toml).
+1. Bump the version in [src/protein_detective/__version__.py](src/protein_detective/__version__.py).
 1. Go to the [GitHub release page](https://github.com/haddocking/protein-detective/releases)
 1. Press draft a new release button
 1. Fill tag, title and description field. For tag use version from pyproject.toml and prepend with "v" character. For description use "Python package to detect proteins in EM density maps." line plus press "Generate release notes" button.
