@@ -76,6 +76,19 @@ CREATE TABLE IF NOT EXISTS density_filtered_alphafolds (
     FOREIGN KEY (uniprot_acc) REFERENCES alphafolds (uniprot_acc),
 );
 
+CREATE TABLE IF NOT EXISTS secondary_structure_filtered (
+    filter_id INTEGER NOT NULL,
+    uniprot_acc TEXT NOT NULL, 
+    pdb_id TEXT,
+    filter_stats JSON NOT NULL,
+    passed BOOLEAN,
+    output_file TEXT,
+    PRIMARY KEY (filter_id, uniprot_acc),
+    FOREIGN KEY (filter_id) REFERENCES filters (filter_id),
+    FOREIGN KEY (uniprot_acc) REFERENCES alphafolds (uniprot_acc),
+    FOREIGN KEY (uniprot_acc, pdb_id) REFERENCES proteins_pdbs (uniprot_acc, pdb_id),
+)
+
 CREATE SEQUENCE IF NOT EXISTS id_powerfit_runs START 1;
 CREATE TABLE IF NOT EXISTS powerfit_runs (
     powerfit_run_id INTEGER DEFAULT nextval('id_powerfit_runs') PRIMARY KEY,

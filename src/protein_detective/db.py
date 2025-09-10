@@ -13,8 +13,10 @@ from duckdb import connect as duckdb_connect
 from pandas import DataFrame
 from protein_quest.alphafold.confidence import ConfidenceFilterQuery, ConfidenceFilterResult
 from protein_quest.alphafold.entry_summary import EntrySummary
-from protein_quest.alphafold.fetch import AlphaFoldEntry, converter
+from protein_quest.alphafold.fetch import AlphaFoldEntry
+from protein_quest.converter import converter
 from protein_quest.filters import ChainFilterStatistics, ResidueFilterStatistics
+from protein_quest.ss import SecondaryStructureFilterQuery, SecondaryStructureFilterResult
 from protein_quest.uniprot import PdbResult, Query
 
 from protein_detective.powerfit.options import PowerfitOptions
@@ -562,6 +564,16 @@ def load_density_filtered_alphafolds_files(
     """
     rows = con.execute(query).fetchall()
     return [Path(row[0]) for row in rows]
+
+
+def save_secondary_structure_filtered(
+    query: SecondaryStructureFilterQuery,
+    results: list[tuple[Path, SecondaryStructureFilterResult, Path | None]],
+    con: DuckDBPyConnection,
+):
+    filter_options = unstructure(query)
+    filter_id = save_filter("secondary_structure", filter_options, con)
+    # TODO store results in db
 
 
 def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> int:

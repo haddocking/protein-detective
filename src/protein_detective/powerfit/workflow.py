@@ -39,6 +39,7 @@ def _initialize_powerfit_run(session_dir, options):
     # Load the PDB files from the session directory
     pdb_files = []
     with connect(session_dir, read_only=True) as con:
+        # TODO if secondary structure filtering was applied, use those files
         pdbe_files = load_single_chain_pdb_files(con)
         af_files = load_density_filtered_alphafolds_files(con)
         pdb_files = pdbe_files + af_files

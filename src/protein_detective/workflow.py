@@ -14,7 +14,14 @@ from protein_quest.alphafold.fetch import fetch_many as af_fetch
 from protein_quest.alphafold.fetch import relative_to as af_relative_to
 from protein_quest.filters import filter_files_on_chain, filter_files_on_residues
 from protein_quest.pdbe.fetch import fetch as pdbe_fetch
+from protein_quest.pdbe.io import glob_structure_files
+from protein_quest.ss import (
+    SecondaryStructureFilterQuery,
+    SecondaryStructureFilterResult,
+    filter_files_on_secondary_structure,
+)
 from protein_quest.uniprot import Query, search4af, search4pdb, search4uniprot
+from protein_quest.utils import copyfile
 
 from protein_detective.db import (
     connect,
@@ -28,6 +35,7 @@ from protein_detective.db import (
     save_pdb_files,
     save_pdbs,
     save_query,
+    save_secondary_structure_filtered,
     save_single_chain_pdb_files,
     save_uniprot_accessions,
 )
@@ -132,8 +140,8 @@ def retrieve_structures(
 
 
 @dataclass
-class ConfidenceFilterSessionResult:
-    """Stats of confidence filtering.
+class FilterSessionResult:
+    """Result of filtering.
 
     Parameters:
         filtered_dir: The directory where the filtered PDB files are stored.
@@ -146,7 +154,31 @@ class ConfidenceFilterSessionResult:
     nr_discarded: int
 
 
-def confidence_filter(session_dir: Path, query: ConfidenceFilterQuery) -> ConfidenceFilterSessionResult:
+# TODO move to protein_quest.ss.SecondaryStructureFilterQuery
+def is_actionable_ss_query(query: SecondaryStructureFilterQuery) -> bool:
+    """Check if the secondary structure query has any actionable filters.
+
+    Args:
+        query: The secondary structure filter query.
+
+    Returns:
+        True if any of the filters are set, False otherwise.
+    """
+    return any(
+        [
+            query.abs_min_helix_residues is not None,
+            query.abs_max_helix_residues is not None,
+            query.abs_min_sheet_residues is not None,
+            query.abs_max_sheet_residues is not None,
+            query.ratio_min_helix_residues is not None,
+            query.ratio_max_helix_residues is not None,
+            query.ratio_min_sheet_residues is not None,
+            query.ratio_max_sheet_residues is not None,
+        ]
+    )
+
+
+def confidence_filter(session_dir: Path, cf_query: ConfidenceFilterQuery) -> FilterSessionResult:
     """Filter the AlphaFoldDB structures based on confidence.
 
     In AlphaFold PDB files, the b-factor column has the
@@ -158,10 +190,10 @@ def confidence_filter(session_dir: Path, query: ConfidenceFilterQuery) -> Confid
 
     Args:
         session_dir: The directory where the session database is stored.
-        query: The confidence filter query containing the confidence thresholds.
+        cf_query: The confidence filter query containing the confidence thresholds.
 
     Returns:
-        Stats of confidence filtering.
+        Stats of confidence and secondary structure filtering.
     """
     filtered_dir = session_dir / "confidence_filtered"
     filtered_dir.mkdir(parents=True, exist_ok=True)
@@ -171,20 +203,20 @@ def confidence_filter(session_dir: Path, query: ConfidenceFilterQuery) -> Confid
         alphafold_cif_files = [e.cif_file for e in afs if e.cif_file is not None]
         uniprot_accs = [e.uniprot_acc for e in afs]
 
-        filtered = list(filter_files_on_confidence(alphafold_cif_files, query, filtered_dir))
+        filtered = list(filter_files_on_confidence(alphafold_cif_files, cf_query, filtered_dir))
         for e in filtered:
             if e.filtered_file is not None:
                 e.filtered_file = e.filtered_file.relative_to(session_dir)
 
         save_confidence_filtered(
-            query,
+            cf_query,
             filtered,
             uniprot_accs,
             con,
         )
         nr_kept = len([e for e in filtered if e.filtered_file is not None])
         nr_discarded = len(filtered) - nr_kept
-        return ConfidenceFilterSessionResult(
+        return FilterSessionResult(
             filtered_dir=filtered_dir,
             nr_kept=nr_kept,
             nr_discarded=nr_discarded,
@@ -246,3 +278,42 @@ def prune_pdbs(
         save_single_chain_pdb_files(proteinpdbs, chain_filtered, residue_filtered, min_residues, max_residues, con)
 
     return single_chain_dir, len([f for f in residue_filtered if f.passed])
+
+
+def secondary_structure_filter(
+    session_dir: Path, input_dir: Path, sf_query: SecondaryStructureFilterQuery
+) -> FilterSessionResult:
+    """Filter the structure files based on secondary structure content.
+
+    Args:
+        session_dir: The directory where the session database is stored.
+        input_dir: The directory containing the structure files to filter.
+        sf_query: The secondary structure filter query containing the secondary structure thresholds.
+
+    Returns:
+        Stats of secondary structure filtering.
+    """
+    filtered_dir = session_dir / "ss_filtered"
+    filtered_dir.mkdir(parents=True, exist_ok=True)
+    input_files = sorted(glob_structure_files(input_dir))
+    nr_kept = 0
+    # TODO if slow then add progress bar?
+    results: list[tuple[Path, SecondaryStructureFilterResult, Path | None]] = []
+    for input_file, result in filter_files_on_secondary_structure(file_paths=input_files, query=sf_query):
+        output_file: Path | None = None
+        if result.passed:
+            output_file = filtered_dir / input_file.name
+            copyfile(input_file, output_file, "symlink")
+            # Prepare output file for database (relative to session_dir)
+            output_file = output_file.relative_to(session_dir)
+            nr_kept += 1
+        results.append((input_file, result, output_file))
+
+    with connect(session_dir) as con:
+        save_secondary_structure_filtered(sf_query, results, con)
+
+    return FilterSessionResult(
+        filtered_dir=filtered_dir,
+        nr_kept=nr_kept,
+        nr_discarded=len(input_files) - nr_kept,
+    )
