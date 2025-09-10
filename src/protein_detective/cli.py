@@ -138,8 +138,8 @@ def handle_retrieve(args):
 def handle_confidence_filter(args):
     query = ConfidenceFilterQuery(
         confidence=args.confidence_threshold,
-        min_threshold=args.min_residues,
-        max_threshold=args.max_residues,
+        min_residues=args.min_residues,
+        max_residues=args.max_residues,
     )
     session_dir = Path(args.session_dir)
     result = confidence_filter(session_dir, query)
