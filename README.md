@@ -19,10 +19,9 @@ An example workflow:
 graph LR;
     search{Search UniprotKB} --> |uniprot_accessions|fetchpdbe{Retrieve PDBe}
     search{Search UniprotKB} --> |uniprot_accessions|fetchad{Retrieve AlphaFold}
-    fetchpdbe -->|mmcif_files| residuefilter{Filter on nr residues + write chain A}
-    fetchad -->|pdb_files| densityfilter{Filter out low confidence}
-    residuefilter -->|pdb_files| powerfit
-    densityfilter -->|pdb_files| powerfit
+    fetchpdbe -->|mmcif_files| filter{Filter structures}
+    fetchad -->|mmcif_files| filter
+    filter -->|mmcif_files| powerfit
     powerfit -->|*/solutions.out| solutions{Best scoring solutions}
     solutions -->|dataframe| fitmodels{Fit models}
 ```
@@ -69,26 +68,19 @@ protein-detective retrieve ./mysession
 
 In `./mysession` directory, you will find mmCIF files from PDBe and PDB files and AlphaFold DB.
 
-### To filter AlphaFold structures on confidence
+### To filter structure
 
-Filter AlphaFoldDB structures based on confidence.
-Keeps entries with requested number of residues which have a confidence score above the threshold.
-Also writes pdb files with only those residues.
+Filter structures based on
+                         
+- For PDBe structures the chain of Uniprot protein is written as chain A.
+- For AlphaFold structures filter by confidence (pLDDT) threshold
+- Number of residues in chain A
+  - For AlphaFold structures writes new files with low confidence residues (below threshold) removed
+- Number of residues in secondary structure (helices and sheets)
 
 ```shell
-protein-detective confidence-filter \
+protein-detective filter \
     --confidence-threshold 50 \
-    --min-residues 100 \
-    --max-residues 1000 \
-    ./mysession
-```
-
-### To prune PDBe files
-
-Make PDBe files smaller by only keeping first chain of found uniprot entry and renaming to chain A.
-
-```shell
-protein-detective prune-pdbs \
     --min-residues 100 \
     --max-residues 1000 \
     ./mysession

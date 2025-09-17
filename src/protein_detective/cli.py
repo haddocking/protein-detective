@@ -1,6 +1,7 @@
 import argparse
 import logging
 from pathlib import Path
+from textwrap import dedent
 
 from protein_quest.alphafold.confidence import ConfidenceFilterQuery
 from protein_quest.alphafold.fetch import downloadable_formats
@@ -17,6 +18,7 @@ from protein_detective.powerfit.cli import (
 )
 from protein_detective.workflow import (
     confidence_filter,
+    filter_structures,
     is_actionable_ss_query,
     prune_pdbs,
     retrieve_structures,
@@ -71,51 +73,56 @@ def add_retrieve_parser(subparsers):
     )
 
 
-def _add_secondary_structure_residue_arguments(parser: argparse.ArgumentParser):
-    parser.add_argument("--abs-min-helix-residues", type=int, help="Min residues in helices")
-    parser.add_argument("--abs-max-helix-residues", type=int, help="Max residues in helices")
-    parser.add_argument("--abs-min-sheet-residues", type=int, help="Min residues in sheets")
-    parser.add_argument("--abs-max-sheet-residues", type=int, help="Max residues in sheets")
-    parser.add_argument("--ratio-min-helix-residues", type=float, help="Min residues in helices (relative)")
-    parser.add_argument("--ratio-max-helix-residues", type=float, help="Max residues in helices (relative)")
-    parser.add_argument("--ratio-min-sheet-residues", type=float, help="Min residues in sheets (relative)")
-    parser.add_argument("--ratio-max-sheet-residues", type=float, help="Max residues in sheets (relative)")
-
-
-def add_confidence_filter_parser(subparsers: argparse._SubParsersAction):
-    parser = subparsers.add_parser("confidence-filter", help="Filter AlphaFoldDB structures based on confidence")
-    parser.add_argument("session_dir", help="Session directory for input and output")
-    parser.add_argument("--confidence-threshold", type=float, default=70.0, help="pLDDT confidence threshold (0-100)")
-    parser.add_argument(
-        "--min-residues", type=int, default=0, help="Minimum number of residues above confidence threshold"
-    )
-    parser.add_argument(
-        "--max-residues",
-        type=int,
-        default=1_000_000,
-        help="Maximum number of residues above confidence threshold.",
-    )
-    _add_secondary_structure_residue_arguments(parser)
-
-
-def add_prune_pdbs_parser(subparsers):
+def add_filter_parser(subparsers: argparse._SubParsersAction):
+    description = dedent("""\
+    Filter structures based on
+                         
+    - For PDBe structures the chain of Uniprot protein is written as chain A.
+    - For AlphaFold structures filter by confidence (pLDDT) threshold
+    - Number of residues in chain A
+      - For AlphaFold structures writes new files with low confidence residues (below threshold) removed
+    - Number of residues in secondary structure (helices and sheets)
+    """)
     parser = subparsers.add_parser(
-        "prune-pdbs", help="Prune PDBe files to keep only the first chain and rename it to A"
+        "filter",
+        help="Filter structures",
+        description=description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("session_dir", help="Session directory containing PDB files")
+    parser.add_argument("session_dir", type=Path, help="Session directory to store results")
+
     parser.add_argument(
-        "--min-residues",
-        type=int,
-        default=0,
-        help="Minimum number of residues in chain. PDBe files with fewer residues will be discarded.",
+        "--confidence-threshold",
+        type=float,
+        default=70.0,
+        help="pLDDT confidence threshold (0-100) for AlphaFold structures",
     )
+
+    parser.add_argument("--min-residues", type=int, default=0, help="Minimum number of residues in chain A")
     parser.add_argument(
         "--max-residues",
         type=int,
         default=1_000_000,
-        help="Maximum number of residues in chain. PDBe files with more residues will be discarded.",
+        help="Maximum number of residues in chain A",
     )
-    _add_secondary_structure_residue_arguments(parser)
+
+    parser.add_argument("--abs-min-helix-residues", type=int, help="Minimum number residues in helices")
+    parser.add_argument("--abs-max-helix-residues", type=int, help="Maximum number residues in helices")
+    parser.add_argument("--abs-min-sheet-residues", type=int, help="Minimum number residues in sheets")
+    parser.add_argument("--abs-max-sheet-residues", type=int, help="Maximum number residues in sheets")
+    parser.add_argument(
+        "--ratio-min-helix-residues", type=float, help="Minimum number residues in helices (fraction of total)"
+    )
+    parser.add_argument(
+        "--ratio-max-helix-residues", type=float, help="Maximum number residues in helices (fraction of total)"
+    )
+    parser.add_argument(
+        "--ratio-min-sheet-residues", type=float, help="Minimum number residues in sheets (fraction of total)"
+    )
+    parser.add_argument(
+        "--ratio-max-sheet-residues", type=float, help="Maximum number residues in sheets (fraction of total)"
+    )
+
     parser.add_argument(
         "--scheduler-address",
         help="Address of the Dask scheduler to connect to. If not provided, will create a local cluster.",
@@ -150,6 +157,30 @@ def handle_retrieve(args):
         "Structures retrieved successfully: "
         f"{nr_pdbes} PDBe structures, {nr_afs} AlphaFold structures downloaded to {download_dir}"
     )
+
+
+def handle_filter(args):
+    session_dir: Path = args.session_dir
+    cf_query = ConfidenceFilterQuery(
+        confidence=args.confidence_threshold,
+        min_residues=args.min_residues,
+        max_residues=args.max_residues,
+    )
+    ss_query = converter.structure(
+        {
+            "abs_min_helix_residues": args.abs_min_helix_residues,
+            "abs_max_helix_residues": args.abs_max_helix_residues,
+            "abs_min_sheet_residues": args.abs_min_sheet_residues,
+            "abs_max_sheet_residues": args.abs_max_sheet_residues,
+            "ratio_min_helix_residues": args.ratio_min_helix_residues,
+            "ratio_max_helix_residues": args.ratio_max_helix_residues,
+            "ratio_min_sheet_residues": args.ratio_min_sheet_residues,
+            "ratio_max_sheet_residues": args.ratio_max_sheet_residues,
+        },
+        SecondaryStructureFilterQuery,
+    )
+    scheduler_address: None | str = args.scheduler_address
+    filter_structures(session_dir, cf_query, ss_query, scheduler_address)
 
 
 def handle_confidence_filter(args):
@@ -236,19 +267,13 @@ def make_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     add_search_parser(subparsers)
     add_retrieve_parser(subparsers)
-    # TODO replace filter subcommands with single filter sub command that does
-    # 1. confidence filter
-    # 2. prune pdbs
-    # 3. secondary structure filter
-    # in one go
-    # TODO with a dask scheduler
-    add_confidence_filter_parser(subparsers)
-    add_prune_pdbs_parser(subparsers)
+    add_filter_parser(subparsers)
     add_powerfit_parser(subparsers)
     return parser
 
 
 def main():
+    # TODO add rich-argparse
     parser = make_parser()
 
     args = parser.parse_args()
@@ -259,10 +284,8 @@ def main():
         handle_search(args)
     elif args.command == "retrieve":
         handle_retrieve(args)
-    elif args.command == "confidence-filter":
-        handle_confidence_filter(args)
-    elif args.command == "prune-pdbs":
-        handle_prune_pdbs(args)
+    elif args.command == "filter":
+        handle_filter(args)
     elif args.command == "powerfit":
         handle_powerfit(args)
 

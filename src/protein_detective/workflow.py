@@ -139,6 +139,29 @@ def retrieve_structures(
     return download_dir, len(sr_mmcif_files), len(afs)
 
 
+def filter_structures(
+    session_dir: Path,
+    confidence: ConfidenceFilterQuery,
+    secondary_structure: SecondaryStructureFilterQuery,
+    scheduler_address: str | Cluster | None = None,
+):
+    """Filter the structures in the session based on confidence, number of residues, and secondary structure."""
+    if not session_dir.exists() or not session_dir.is_dir():
+        raise NotADirectoryError(session_dir)
+    do_ss = is_actionable_ss_query(secondary_structure)
+    cf_result = confidence_filter(session_dir, confidence)
+    if cf_result.nr_kept > 0 and do_ss:
+        secondary_structure_filter(session_dir, cf_result.filtered_dir, secondary_structure)
+    sc_dir, nr_pruned = prune_pdbs(
+        session_dir,
+        min_residues=confidence.min_residues,
+        max_residues=confidence.max_residues,
+        scheduler_address=scheduler_address,
+    )
+    if nr_pruned > 0 and do_ss:
+        secondary_structure_filter(session_dir, sc_dir, secondary_structure)
+
+
 @dataclass
 class FilterSessionResult:
     """Result of filtering.
