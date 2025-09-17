@@ -10,8 +10,7 @@ from distributed.deploy.cluster import Cluster
 
 from protein_detective.db import (
     connect,
-    load_density_filtered_alphafolds_files,
-    load_single_chain_pdb_files,
+    load_filtered_structure_files,
     powerfit_solutions,
     save_fitted_models,
     save_powerfit_options,
@@ -39,10 +38,7 @@ def _initialize_powerfit_run(session_dir, options):
     # Load the PDB files from the session directory
     pdb_files = []
     with connect(session_dir, read_only=True) as con:
-        # TODO if secondary structure filtering was applied, use those files
-        pdbe_files = load_single_chain_pdb_files(con)
-        af_files = load_density_filtered_alphafolds_files(con)
-        pdb_files = pdbe_files + af_files
+        pdb_files = load_filtered_structure_files(con)
     return powerfit_run_id, powerfit_run_dir, density_map_target, pdb_files
 
 

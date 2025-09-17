@@ -76,10 +76,10 @@ Filter structures based on
 - For AlphaFold structures filter by confidence (pLDDT) threshold
 - Number of residues in chain A
   - For AlphaFold structures writes new files with low confidence residues (below threshold) removed
-- Number of residues in secondary structure (helices and sheets)
+- Number of residues in secondary structure (heliclses and sheets)
 
 ```shell
-protein-detective filter \
+protein-detective --log-level INFO filter \
     --confidence-threshold 50 \
     --min-residues 100 \
     --max-residues 1000 \
@@ -91,7 +91,7 @@ protein-detective filter \
 Rotate and translate the prepared structures to fit and score them into the EM density map using powerfit.
 
 ```shell
-protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 docs/session1
+protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession
 ```
 
 This will use [dask-distributed](https://distributed.dask.org/en/latest/) to run powerfit for each structure in parallel on multiple CPU cores or GPUs.

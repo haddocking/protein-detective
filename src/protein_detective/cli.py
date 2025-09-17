@@ -1,5 +1,6 @@
 import argparse
 import logging
+import sys
 from pathlib import Path
 from textwrap import dedent
 
@@ -12,18 +13,15 @@ from rich import print as rprint
 from rich.logging import RichHandler
 
 from protein_detective.__version__ import __version__
+from protein_detective.filter import FilterOptions
 from protein_detective.powerfit.cli import (
     add_powerfit_parser,
     handle_powerfit,
 )
 from protein_detective.workflow import (
-    confidence_filter,
     filter_structures,
-    is_actionable_ss_query,
-    prune_pdbs,
     retrieve_structures,
     search_structures_in_uniprot,
-    secondary_structure_filter,
     what_retrieve_choices,
 )
 
@@ -76,7 +74,7 @@ def add_retrieve_parser(subparsers):
 def add_filter_parser(subparsers: argparse._SubParsersAction):
     description = dedent("""\
     Filter structures based on
-                         
+
     - For PDBe structures the chain of Uniprot protein is written as chain A.
     - For AlphaFold structures filter by confidence (pLDDT) threshold
     - Number of residues in chain A
@@ -102,7 +100,7 @@ def add_filter_parser(subparsers: argparse._SubParsersAction):
     parser.add_argument(
         "--max-residues",
         type=int,
-        default=1_000_000,
+        default=sys.maxsize,
         help="Maximum number of residues in chain A",
     )
 
@@ -161,10 +159,13 @@ def handle_retrieve(args):
 
 def handle_filter(args):
     session_dir: Path = args.session_dir
-    cf_query = ConfidenceFilterQuery(
-        confidence=args.confidence_threshold,
-        min_residues=args.min_residues,
-        max_residues=args.max_residues,
+    cf_query = converter.structure(
+        {
+            "confidence": args.confidence_threshold,
+            "min_residues": args.min_residues,
+            "max_residues": args.max_residues,
+        },
+        ConfidenceFilterQuery,
     )
     ss_query = converter.structure(
         {
@@ -179,84 +180,13 @@ def handle_filter(args):
         },
         SecondaryStructureFilterQuery,
     )
+    query = FilterOptions(confidence=cf_query, secondary_structure=ss_query)
     scheduler_address: None | str = args.scheduler_address
-    filter_structures(session_dir, cf_query, ss_query, scheduler_address)
 
+    f_dir, total_results = filter_structures(session_dir, query, scheduler_address)
 
-def handle_confidence_filter(args):
-    cf_query = ConfidenceFilterQuery(
-        confidence=args.confidence_threshold,
-        min_residues=args.min_residues,
-        max_residues=args.max_residues,
-    )
-    session_dir = Path(args.session_dir)
-    ss_query = converter.structure(
-        {
-            "abs_min_helix_residues": args.abs_min_helix_residues,
-            "abs_max_helix_residues": args.abs_max_helix_residues,
-            "abs_min_sheet_residues": args.abs_min_sheet_residues,
-            "abs_max_sheet_residues": args.abs_max_sheet_residues,
-            "ratio_min_helix_residues": args.ratio_min_helix_residues,
-            "ratio_max_helix_residues": args.ratio_max_helix_residues,
-            "ratio_min_sheet_residues": args.ratio_min_sheet_residues,
-            "ratio_max_sheet_residues": args.ratio_max_sheet_residues,
-        },
-        SecondaryStructureFilterQuery,
-    )
-    if is_actionable_ss_query(ss_query):
-        rprint("Filtering on confidence")
-        result = confidence_filter(session_dir, cf_query)
-        rprint(f"Filtered {result.nr_kept} structures, written to {result.filtered_dir} directory.")
-        rprint(f"Discarded {result.nr_discarded} structures based on confidence.")
-        rprint("Filtering on secondary structure")
-        sresult = secondary_structure_filter(session_dir, result.filtered_dir, ss_query)
-        rprint(f"Filtered {sresult.nr_kept} structures, written to {sresult.filtered_dir} directory.")
-        rprint(f"Discarded {sresult.nr_discarded} structures based on secondary structure.")
-    else:
-        rprint("Filtering on confidence")
-        result = confidence_filter(session_dir, cf_query)
-        rprint(f"Filtered {result.nr_kept} structures, written to {result.filtered_dir} directory.")
-        rprint(f"Discarded {result.nr_discarded} structures based on confidence.")
-
-
-def handle_prune_pdbs(args):
-    session_dir = Path(args.session_dir)
-    ss_query = converter.structure(
-        {
-            "abs_min_helix_residues": args.abs_min_helix_residues,
-            "abs_max_helix_residues": args.abs_max_helix_residues,
-            "abs_min_sheet_residues": args.abs_min_sheet_residues,
-            "abs_max_sheet_residues": args.abs_max_sheet_residues,
-            "ratio_min_helix_residues": args.ratio_min_helix_residues,
-            "ratio_max_helix_residues": args.ratio_max_helix_residues,
-            "ratio_min_sheet_residues": args.ratio_min_sheet_residues,
-            "ratio_max_sheet_residues": args.ratio_max_sheet_residues,
-        },
-        SecondaryStructureFilterQuery,
-    )
-    if is_actionable_ss_query(ss_query):
-        rprint("Pruning PDBs")
-        single_chain_dir, nr_files = prune_pdbs(
-            session_dir,
-            min_residues=args.min_residues,
-            max_residues=args.max_residues,
-            scheduler_address=args.scheduler_address,
-        )
-        rprint(f"Written {nr_files} PDB files to {single_chain_dir} directory.")
-
-        rprint("Filtering on secondary structure")
-        sresult = secondary_structure_filter(session_dir, single_chain_dir, ss_query)
-        rprint(f"Filtered {sresult.nr_kept} structures based on secondary structure")
-        rprint(f"Discarded {sresult.nr_discarded} structures based on secondary structure.")
-        rprint(f"Written to {sresult.filtered_dir} directory.")
-    else:
-        single_chain_dir, nr_files = prune_pdbs(
-            session_dir,
-            min_residues=args.min_residues,
-            max_residues=args.max_residues,
-            scheduler_address=args.scheduler_address,
-        )
-        rprint(f"Written {nr_files} PDB files to {single_chain_dir} directory.")
+    nr_passed = len([r for r in total_results if r.passed])
+    rprint(f"Filtering complete, {nr_passed} structure files in {f_dir} directory.")
 
 
 def make_parser() -> argparse.ArgumentParser:

@@ -11,14 +11,13 @@ from cattrs import unstructure
 from duckdb import ConstraintException, DuckDBPyConnection, InvalidInputException
 from duckdb import connect as duckdb_connect
 from pandas import DataFrame
-from protein_quest.alphafold.confidence import ConfidenceFilterQuery, ConfidenceFilterResult
 from protein_quest.alphafold.entry_summary import EntrySummary
 from protein_quest.alphafold.fetch import AlphaFoldEntry
 from protein_quest.converter import converter
-from protein_quest.filters import ChainFilterStatistics, ResidueFilterStatistics
-from protein_quest.ss import SecondaryStructureFilterQuery, SecondaryStructureFilterResult
 from protein_quest.uniprot import PdbResult, Query
+from yarl import URL
 
+from protein_detective.filter import FilteredStructure, FilterOptions
 from protein_detective.powerfit.options import PowerfitOptions
 
 logger = logging.getLogger(__name__)
@@ -43,6 +42,9 @@ The views (table name without `raw_`) then prepend the session directory
 (using the DuckDB `session_dir` variable) to the paths,
 so the paths are pointing to the correct files.
 """
+
+# TODO move to quest package
+converter.register_unstructure_hook(URL, lambda u: str(u))
 
 
 def db_path(session_dir: Path) -> Path:
@@ -106,7 +108,7 @@ def connect(session_dir: Path, read_only: bool = False) -> Iterator[DuckDBPyConn
         initialize_db(session_dir, con)
     except InvalidInputException as e:
         if "read-only mode" in str(e):
-            logger.info("Database is in read-only mode, skipping initialization.")
+            logger.debug("Database is in read-only mode, skipping initialization.")
         else:
             raise
     yield con
@@ -305,7 +307,7 @@ def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
     """
     rows = [
         (
-            converter.dumps(af.summary, EntrySummary),
+            converter.dumps(af.summary, EntrySummary).decode(),
             str(af.bcif_file) if af.bcif_file else None,
             str(af.cif_file) if af.cif_file else None,
             str(af.pdb_file) if af.pdb_file else None,
@@ -394,7 +396,7 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     return [
         AlphaFoldEntry(
             uniprot_acc=row[0],
-            summary=converter.loads(row[1], EntrySummary) if row[0] else None,
+            summary=converter.loads(row[1], EntrySummary),
             bcif_file=Path(row[2]) if row[2] else None,
             cif_file=Path(row[3]) if row[3] else None,
             pdb_file=Path(row[4]) if row[4] else None,
@@ -408,82 +410,26 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     ]
 
 
-def save_filter(filter_name: str, filter_options: dict, con: DuckDBPyConnection) -> int:
+def save_filter(filter_options: FilterOptions, con: DuckDBPyConnection) -> int:
+    safe_filter_options = converter.unstructure(filter_options)
     result = con.execute(
         """
-        INSERT OR IGNORE INTO filters (filter_name, filter_options) VALUES (?, ?) RETURNING filter_id
+        INSERT OR IGNORE INTO filters (filter_options) VALUES (?) RETURNING filter_id
                          """,
-        (filter_name, filter_options),
+        (safe_filter_options,),
     ).fetchone()
     if result is None:
         # Already exists, so just fetch the id
         result = con.execute(
             """
-            SELECT filter_id FROM filters WHERE filter_name = ? AND filter_options = ?
+            SELECT filter_id FROM filters WHERE filter_options = ?
             """,
-            (filter_name, filter_options),
+            (safe_filter_options,),
         ).fetchone()
     if result is None or len(result) != 1:
         msg = "Failed to insert or retrieve filter"
         raise ValueError(msg)
     return result[0]
-
-
-def save_single_chain_pdb_files(
-    input_pdbs: list[ProteinPdbRow],
-    chain_filtered: list[ChainFilterStatistics],
-    residue_filtered: list[ResidueFilterStatistics],
-    min_residues: int,
-    max_residues: int,
-    con: DuckDBPyConnection,
-):
-    """Save single chain PDB files to the database.
-
-    Args:
-        input_pdbs: A list of ProteinPdbRow objects representing the input PDB files.
-        chain_filtered: A list of tuples containing the chain filtering results.
-        residue_filtered: A list of FilterStat objects containing the residue filtering results.
-        min_residues: The minimum number of residues for the filtering.
-        max_residues: The maximum number of residues for the filtering.
-        con: The DuckDB connection to use for saving the data.
-
-    """
-    filter_options = {
-        "min_residues": min_residues,
-        "max_residues": max_residues,
-    }
-    filter_id = save_filter("chain+residue", filter_options, con)
-
-    if len(residue_filtered) == 0:
-        return
-    rows = []
-
-    chain_filtered_lookup = {f.input_file: f.output_file for f in chain_filtered}
-    residue_filtered_lookup = {f.input_file: f for f in residue_filtered}
-    for input_pdb in input_pdbs:
-        if input_pdb.mmcif_file is None:
-            continue
-        uniprot_acc = input_pdb.uniprot_acc
-        pdb_id = input_pdb.pdb_id
-        intermediate_file = chain_filtered_lookup.get(input_pdb.mmcif_file)
-        stat = None
-        if intermediate_file is not None:
-            stat = residue_filtered_lookup.get(intermediate_file)
-        nr_residues = 0
-        output_file = None
-        passed = False
-        if stat is not None:
-            nr_residues = stat.residue_count
-            passed = stat.passed
-            if stat.output_file is not None:
-                output_file = str(stat.output_file)
-        rows.append((filter_id, uniprot_acc, pdb_id, {"nr_residues": nr_residues}, passed, output_file))
-    con.executemany(
-        """INSERT OR IGNORE INTO filtered_pdbs
-        (filter_id, uniprot_acc, pdb_id, filter_stats, passed, output_file)
-        VALUES (?, ?, ?, ?, ?, ?)""",
-        rows,
-    )
 
 
 def load_single_chain_pdb_files(con: DuckDBPyConnection) -> list[Path]:
@@ -506,74 +452,55 @@ def load_single_chain_pdb_files(con: DuckDBPyConnection) -> list[Path]:
     return [Path(row[0]) for row in rows]
 
 
-def save_confidence_filtered(
-    query: ConfidenceFilterQuery,
-    files: list[ConfidenceFilterResult],
-    uniprot_accessions: list[str],
-    con: DuckDBPyConnection,
-):
-    """Save density filtered AlphaFold results to the database.
+def save_filtered_structures(results: list[FilteredStructure], filter_id: int, con: DuckDBPyConnection) -> int:
+    """Save filtering results to the database.
 
     Args:
-        query: The density filter query parameters.
-        files: A list of the results.
-        uniprot_accessions: A list of UniProt accessions corresponding to the results.
+        results: A list of FilterResultRow objects representing the filtering results.
+        filter_id: The ID of the filter used for the filtering.
         con: The DuckDB connection to use for saving the data.
 
-    Raises:
-        ValueError: If the density filter could not be inserted or retrieved.
+    Returns:
+        The number of filtering results saved to the database.
     """
-    filter_options = unstructure(query)
-    filter_id = save_filter("confidence", filter_options, con)
-
-    values = []
-    for file, uniprot_accession in zip(files, uniprot_accessions, strict=False):
-        values.append(
-            (
-                filter_id,
-                uniprot_accession,
-                file.count,
-                file.filtered_file is not None,
-                str(file.filtered_file) if file.filtered_file else None,
-            )
-        )
-    con.executemany(
-        """INSERT OR IGNORE INTO density_filtered_alphafolds
-        (filter_id, uniprot_acc, filter_stats, keep, pdb_file)
-        VALUES (?, ?, ?, ?, ?)""",
-        values,
+    if len(results) == 0:
+        return 0
+    data = [
+        {
+            "filter_id": filter_id,
+            "uniprot_acc": r.uniprot_accession,
+            "pdb_id": r.pdb_id,
+            "filter_stats": converter.unstructure(r),
+            "passed": r.passed,
+            "output_file": str(r.output_file) if r.output_file else None,
+        }
+        for r in results
+    ]
+    df = DataFrame(data)
+    con.execute(
+        """INSERT INTO filtered_structures (filter_id, uniprot_acc, pdb_id, filter_stats, passed, output_file)
+        SELECT * FROM df"""
     )
+    return len(df)
 
 
-def load_density_filtered_alphafolds_files(
-    con: DuckDBPyConnection,
-) -> list[Path]:
-    """Load density filtered AlphaFold PDB files from the database.
+def load_filtered_structure_files(con: DuckDBPyConnection) -> list[Path]:
+    """Load filtered structure files from the database.
 
     Args:
         con: The DuckDB connection to use for fetching the data.
-
     Returns:
-        A list of paths to the density filtered AlphaFold PDB files.
+        A list of paths to the filtered structure files.
+
     """
     query = """
     SELECT
-        concat_ws('/', getvariable('session_dir'), pdb_file) AS pdb_file
-    FROM density_filtered_alphafolds
-    WHERE keep = TRUE AND pdb_file IS NOT NULL
+        concat_ws('/', getvariable('session_dir'), output_file)
+    FROM filtered_structures
+    WHERE output_file IS NOT NULL AND passed = TRUE
     """
     rows = con.execute(query).fetchall()
     return [Path(row[0]) for row in rows]
-
-
-def save_secondary_structure_filtered(
-    query: SecondaryStructureFilterQuery,
-    results: list[tuple[Path, SecondaryStructureFilterResult, Path | None]],
-    con: DuckDBPyConnection,
-):
-    filter_options = unstructure(query)
-    filter_id = save_filter("secondary_structure", filter_options, con)
-    # TODO store results in db
 
 
 def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> int:
