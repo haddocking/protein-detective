@@ -7,7 +7,7 @@ from typing import Literal
 
 from distributed.deploy.cluster import Cluster
 from protein_quest.alphafold.fetch import DownloadableFormat
-from protein_quest.alphafold.fetch import fetch_many as af_fetch
+from protein_quest.alphafold.fetch import fetch_many_async as af_fetch
 from protein_quest.alphafold.fetch import relative_to as af_relative_to
 from protein_quest.pdbe.fetch import fetch as pdbe_fetch
 from protein_quest.uniprot import Query, search4af, search4pdb, search4uniprot
@@ -85,6 +85,26 @@ def retrieve_structures(
         A tuple containing the download directory, the number of PDBe mmCIF files downloaded,
         and the number of AlphaFold files downloaded.
     """
+    return asyncio.run(async_retrieve_structures(session_dir, what, what_af_formats))
+
+
+async def async_retrieve_structures(
+    session_dir: Path, what: set[WhatRetrieve] | None = None, what_af_formats: set[DownloadableFormat] | None = None
+) -> tuple[Path, int, int]:
+    """
+    Retrieve structure files from PDBe and AlphaFold databases for the Uniprot entries in the session asynchronously.
+
+    Args:
+        session_dir: The directory to store downloaded files and the session database.
+        what: A set of strings indicating which databases to retrieve files from ("pdbe", "alphafold").
+        what_af_formats: A set of formats to download from AlphaFold (e.g., "pdb", "cif").
+
+    Returns:
+        A tuple containing:
+            - The download directory (Path)
+            - The number of PDBe mmCIF files downloaded (int)
+            - The number of AlphaFold files downloaded (int)
+    """
     if not session_dir.exists() or not session_dir.is_dir():
         raise NotADirectoryError(session_dir)
     download_dir = session_dir / "downloads"
@@ -104,10 +124,7 @@ def retrieve_structures(
         pdb_ids = set()
         with connect(session_dir) as con:
             pdb_ids = load_pdb_ids(con)
-
-            # TODO use sync version
-            mmcif_files = asyncio.run(pdbe_fetch(pdb_ids, download_pdbe_dir))
-
+            mmcif_files = await pdbe_fetch(pdb_ids, download_pdbe_dir)
             # make paths relative to session_dir, so db stores paths relative to session_dir
             sr_mmcif_files = {pdb_id: mmcif_file.relative_to(session_dir) for pdb_id, mmcif_file in mmcif_files.items()}
             save_pdb_files(sr_mmcif_files, con)
@@ -118,14 +135,11 @@ def retrieve_structures(
         af_ids = set()
         if what_af_formats is None:
             what_af_formats = {"cif"}
-
         download_af_dir = download_dir / "alphafold"
         download_af_dir.mkdir(parents=True, exist_ok=True)
         with connect(session_dir) as con:
             af_ids = load_alphafold_ids(con)
-
-            afs = af_fetch(af_ids, download_af_dir, what=what_af_formats)
-
+            afs = [entry async for entry in af_fetch(af_ids, download_af_dir, what_af_formats)]
             sr_afs = [af_relative_to(af, session_dir) for af in afs]
             save_alphafolds_files(sr_afs, con)
 

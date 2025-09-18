@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS proteins_pdbs (
 
 CREATE TABLE IF NOT EXISTS alphafolds (
     uniprot_acc TEXT PRIMARY KEY,
-    summary JSON NOT NULL,
+    summary JSON,
     bcif_file TEXT,
     cif_file TEXT,
     pdb_file TEXT,

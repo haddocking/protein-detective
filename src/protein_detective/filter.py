@@ -3,7 +3,9 @@
 In protein_quest package the filters are more granular, here we combine them into coarse grained methods.
 """
 
+import gzip
 import logging
+import shutil
 import sys
 from copy import deepcopy
 from dataclasses import dataclass
@@ -99,6 +101,26 @@ class FilteredStructure:
             if self.confidence is not None and self.confidence.filtered_file is not None:
                 return self.confidence.filtered_file
         return None
+
+    @output_file.setter
+    def output_file(self, path: Path) -> None:
+        """Set the output file of the last filter that was applied.
+
+        Only valid if the structure passed all filters.
+        """
+        if self.passed:
+            if self.secondary_structure is not None:
+                p1, ssr, _ = self.secondary_structure
+                self.secondary_structure = (p1, ssr, path)
+            elif self.residue is not None:
+                self.residue.output_file = path
+            elif self.chain is not None:
+                self.chain.output_file = path
+            elif self.confidence is not None:
+                self.confidence.filtered_file = path
+        else:
+            msg = "Cannot set output file for a structure that did not pass all filters."
+            raise ValueError(msg)
 
     def make_relative_to(self, session_dir: Path) -> "FilteredStructure":
         """Make all file paths relative to the given session directory.
@@ -268,6 +290,8 @@ def filter_pdbe_structures(
 ) -> FilterResults:
     """Filter PDBe structures in the session directory based on chain, number of residues, and secondary structure.
 
+    Also uncompresses any *.cif.gz files to *.cif files for use in powerfit.
+
     Args:
         proteinpdbs: The list of ProteinPdbRow entries to filter.
         session_dir: The directory containing the session data, including PDBe structure files.
@@ -313,6 +337,7 @@ def filter_pdbe_structures(
     logger.info("Kept %i files after chain filtering in %s", len(chain_filtered_files), pdb_chain_dir)
 
     residue_filtered = []
+    residue_filtered_files = []
     if do_pdb_residue:
         logger.info("Filtering PDBe files on number of residues")
         residue_filtered = list(
@@ -352,4 +377,20 @@ def filter_pdbe_structures(
             residue_filtered=residue_filtered,
             residue_filtered_files=residue_filtered_files,
         )
+
+    _uncompress_gz_files(pdbe_total_results)
+
     return pdbe_total_results
+
+
+def _uncompress_gz_files(pdbe_total_results: FilterResults) -> None:
+    # protein-quest downloaded and filtered *.cif.gz files however powerfit only understands *.pdb and *.cif files
+    for r in pdbe_total_results.values():
+        orig_output_file = r.output_file
+        if orig_output_file is None or orig_output_file.suffix != ".gz":
+            continue
+        new_output_file = orig_output_file.with_suffix("")
+        with gzip.open(orig_output_file, "rb") as f_in, new_output_file.open("wb") as f_out:
+            shutil.copyfileobj(f_in, f_out)  # pyright: ignore[reportArgumentType]
+        orig_output_file.unlink()
+        r.output_file = new_output_file
