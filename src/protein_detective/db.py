@@ -520,7 +520,7 @@ def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> 
         result = con.execute(
             """INSERT INTO powerfit_runs (options)
             VALUES (?) RETURNING powerfit_run_id""",
-            (converter.dumps(options, PowerfitOptions),),
+            (converter.dumps(options, PowerfitOptions).decode(),),
         ).fetchone()
         if result is None or len(result) != 1:
             msg = "Failed to insert powerfit options"
@@ -531,7 +531,7 @@ def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> 
         result = con.execute(
             """SELECT powerfit_run_id FROM powerfit_runs
             WHERE options = ?""",
-            (converter.dumps(options, PowerfitOptions),),
+            (converter.dumps(options, PowerfitOptions).decode(),),
         ).fetchone()
         if result is None or len(result) != 1:
             msg = "Failed to retrieve existing powerfit run ID"

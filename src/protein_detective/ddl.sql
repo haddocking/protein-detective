@@ -117,11 +117,12 @@ SELECT
     relz,
     translation,
     rotation,
+    concat_ws('/', getvariable('session_dir'), output_file) AS pdb_file,
     uniprot_acc,
     pdb_id
 FROM raw_solutions
 LEFT JOIN (
-    SELECT uniprot_acc, pdb_id, parse_filename(output_file, true) AS structure
+    SELECT output_file, uniprot_acc, pdb_id, parse_filename(output_file, true) AS structure
     FROM filtered_structures WHERE output_file IS NOT NULL
 ) AS a USING (structure)
 ORDER BY cc DESC;
@@ -130,8 +131,7 @@ CREATE TABLE IF NOT EXISTS raw_fitted_models (
     powerfit_run_id INTEGER NOT NULL,
     structure TEXT NOT NULL,
     rank INTEGER NOT NULL,
-    -- unfitted_model_file is either foreign key of density_filtered_alphafolds.pdb_file
-    -- or filtered_pdbs.output_file
+    -- unfitted_model_file is foreign key of filtererd_structures.output_file
     unfitted_model_file TEXT NOT NULL,
     fitted_model_file TEXT PRIMARY KEY,
 );
