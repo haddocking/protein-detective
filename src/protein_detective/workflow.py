@@ -153,14 +153,17 @@ def filter_structures(
 ) -> tuple[Path, list[FilteredStructure]]:
     """Filter the structures in the session based on confidence, number of residues, and secondary structure.
 
+    Also uncompresses *.cif.gz files to *.cif files for compatibility with powerfit.
+
     Args:
         session_dir: The directory containing the session data, including structure files.
         options: The filter options containing confidence and secondary structure filter queries.
-        scheduler_address: Address of the Dask scheduler for distributed filtering. If None then local cluster is used.
+        scheduler_address: Address of the Dask scheduler for distributed filtering.
+            If None then a local cluster is used.
 
     Returns:
         A tuple containing:
-            - The directory containing the filtered structures.
+            - The directory with the filtered structures.
             - A list of FilteredStructure objects containing the filtering results for each structure.
     """
     if not session_dir.exists() or not session_dir.is_dir():

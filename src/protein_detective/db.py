@@ -470,7 +470,7 @@ def save_filtered_structures(results: list[FilteredStructure], filter_id: int, c
             "filter_id": filter_id,
             "uniprot_acc": r.uniprot_accession,
             "pdb_id": r.pdb_id,
-            "filter_stats": converter.unstructure(r),
+            "filter_stats": converter.dumps(r).decode(),
             "passed": r.passed,
             "output_file": str(r.output_file) if r.output_file else None,
         }

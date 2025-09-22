@@ -80,6 +80,8 @@ def add_filter_parser(subparsers: argparse._SubParsersAction):
     - Number of residues in chain A
       - For AlphaFold structures writes new files with low confidence residues (below threshold) removed
     - Number of residues in secondary structure (helices and sheets)
+
+    Also uncompresses *.cif.gz files to *.cif files for compatibility with powerfit.
     """)
     parser = subparsers.add_parser(
         "filter",
@@ -93,7 +95,7 @@ def add_filter_parser(subparsers: argparse._SubParsersAction):
         "--confidence-threshold",
         type=float,
         default=70.0,
-        help="pLDDT confidence threshold (0-100) for AlphaFold structures",
+        help="pLDDT confidence threshold (0-100) for AlphaFold structures. Default is 70.0.",
     )
 
     parser.add_argument("--min-residues", type=int, default=0, help="Minimum number of residues in chain A")

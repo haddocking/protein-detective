@@ -129,7 +129,7 @@ class FilteredStructure:
             session_dir: The session directory to make paths relative to.
 
         Returns:
-            A new FilterResultRow with paths made relative to the session directory.
+            A new FilterResultRow object with paths made relative to the session directory.
         """
         new_row = deepcopy(self)
         if new_row.confidence is not None and new_row.confidence.filtered_file is not None:
@@ -148,7 +148,7 @@ class FilteredStructure:
 
 
 type FilterResults = dict[tuple[str, str | None], FilteredStructure]
-"""Type alias for filter results mapping (uniprot_accession, pdb_id) to FilteredStructure."""
+"""Type alias for filter results mapping (uniprot_accession, pdb_id?) to FilteredStructure."""
 
 
 # TODO move to protein_quest.ss.SecondaryStructureFilterQuery
@@ -175,6 +175,32 @@ def is_actionable_ss_query(query: SecondaryStructureFilterQuery) -> bool:
     )
 
 
+def _filter_alphafolds_on_secondary_structure(
+    secondary_structure: SecondaryStructureFilterQuery,
+    cf_out_files: list[Path],
+    final_dir: Path,
+    af_total_results: FilterResults,
+    alphafold_cif_files2upid: dict[str, tuple[str, None]],
+):
+    cf_ss_results = []
+    logger.info("Filtering AlphaFold files on secondary structure")
+    for cf_out_file, ss_result in filter_files_on_secondary_structure(cf_out_files, secondary_structure):
+        ss_out_file: Path | None = None
+        if ss_result.passed:
+            ss_out_file = final_dir / cf_out_file.name
+            if ss_out_file is None:
+                raise ValueError
+            copyfile(cf_out_file, ss_out_file, "symlink")
+        cf_ss_results.append((cf_out_file, ss_result, ss_out_file))
+        upid = alphafold_cif_files2upid[cf_out_file.name]
+        if upid not in af_total_results:
+            msg = f"Confidence filter result not found for {cf_out_file} aka {upid}"
+            raise ValueError(msg)
+        af_total_results[upid].secondary_structure = (cf_out_file, ss_result, ss_out_file)
+    nr_ss_kept = len([r for r in cf_ss_results if r[2] is not None])
+    logger.info("Kept %i files after secondary structure filtering in %s", nr_ss_kept, final_dir)
+
+
 def filter_alphafold_structures(
     afs: list[AlphaFoldEntry], session_dir: Path, options: FilterOptions, final_dir: Path
 ) -> FilterResults:
@@ -196,7 +222,7 @@ def filter_alphafold_structures(
     secondary_structure = options.secondary_structure
     do_ss = is_actionable_ss_query(secondary_structure)
 
-    af_total_results: dict[tuple[str, str | None], FilteredStructure] = {}
+    af_total_results: FilterResults = {}
 
     alphafold_cif_files = [e.cif_file for e in afs if e.cif_file is not None]
     alphafold_cif_files2upid = {e.cif_file.name: (e.uniprot_acc, None) for e in afs if e.cif_file is not None}
@@ -212,39 +238,31 @@ def filter_alphafold_structures(
     nr_cf_kept = len(cf_out_files)
     logger.info("Kept %i files after confidence filtering in %s", nr_cf_kept, cf_dir)
 
-    cf_ss_results = []
     if nr_cf_kept > 0 and do_ss:
-        logger.info("Filtering AlphaFold files on secondary structure")
-        for cf_out_file, ss_result in filter_files_on_secondary_structure(cf_out_files, secondary_structure):
-            ss_out_file: Path | None = None
-            if ss_result.passed:
-                ss_out_file = final_dir / cf_out_file.name
-                if ss_out_file is None:
-                    raise ValueError
-                copyfile(cf_out_file, ss_out_file, "symlink")
-                ss_out_file = ss_out_file.relative_to(session_dir)
-            cf_ss_results.append((cf_out_file, ss_result, ss_out_file))
-            upid = alphafold_cif_files2upid[cf_out_file.name]
-            if upid not in af_total_results:
-                msg = f"Confidence filter result not found for {cf_out_file} aka {upid}"
-                raise ValueError(msg)
-            af_total_results[upid].secondary_structure = (cf_out_file, ss_result, ss_out_file)
-        nr_ss_kept = len([r for r in cf_ss_results if r[2] is not None])
-        logger.info("Kept %i files after secondary structure filtering in %s", nr_ss_kept, final_dir)
+        _filter_alphafolds_on_secondary_structure(
+            secondary_structure=secondary_structure,
+            cf_out_files=cf_out_files,
+            final_dir=final_dir,
+            af_total_results=af_total_results,
+            alphafold_cif_files2upid=alphafold_cif_files2upid,
+        )
     return af_total_results
 
 
-def _filter_pdb_structurs_on_secondary_structure(
-    session_dir,
-    final_dir,
-    secondary_structure,
-    pdbe_total_results,
-    pc2upid,
-    do_pdb_residue,
-    chain_filtered,
-    chain_filtered_files,
-    residue_filtered,
-    residue_filtered_files,
+type FileNameChain2UniprotPdb = dict[tuple[str, str], tuple[str, str]]
+"""Type alias for mapping (pdb_file_name, chain) to (uniprot_accession, pdb_id)."""
+
+
+def _filter_pdb_structures_on_secondary_structure(
+    final_dir: Path,
+    secondary_structure: SecondaryStructureFilterQuery,
+    pdbe_total_results: FilterResults,
+    pc2upid: FileNameChain2UniprotPdb,
+    do_pdb_residue: bool,
+    chain_filtered: list[ChainFilterStatistics],
+    chain_filtered_files: list[Path],
+    residue_filtered: list[ResidueFilterStatistics],
+    residue_filtered_files: list[Path],
 ):
     pdb_ss_in_files = residue_filtered_files if do_pdb_residue else chain_filtered_files
     pdb_chain_out_file2upid = {
@@ -264,27 +282,77 @@ def _filter_pdb_structurs_on_secondary_structure(
         file_paths=pdb_ss_in_files, query=secondary_structure
     ):
         output_file: Path | None = None
+        upid = pdb_chain_out_file2upid[input_file]
+        if upid not in pdbe_total_results:
+            msg = f"Residue filter result not found for {input_file} aka {upid}"
+            raise ValueError(msg)
         if result.passed:
             output_file = final_dir / input_file.name
             if output_file is None:
                 raise ValueError
             copyfile(input_file, output_file, "symlink")
-            # Prepare output file for database (relative to session_dir)
-            output_file = output_file.relative_to(session_dir)
-            upid = pdb_chain_out_file2upid[input_file]
-            if upid not in pdbe_total_results:
-                msg = f"Residue filter result not found for {input_file} aka {upid}"
-                raise ValueError(msg)
-            pdbe_total_results[upid].secondary_structure = (input_file, result, output_file)
+        pdbe_total_results[upid].secondary_structure = (input_file, result, output_file)
         pdb_ss_results.append((input_file, result, output_file))
     nr_pdb_ss_kept = len([r for r in pdb_ss_results if r[2] is not None])
     logger.info("Kept %i files after secondary structure filtering in %s", nr_pdb_ss_kept, final_dir)
 
 
+def _filter_pdb_structures_by_residue_count(
+    confidence: ConfidenceFilterQuery,
+    chain_filtered_files: list[Path],
+    chain_filtered: list[ChainFilterStatistics],
+    output_dir: Path,
+    pdbe_total_results: FilterResults,
+    pc2upid: FileNameChain2UniprotPdb,
+):
+    logger.info("Filtering PDBe files on number of residues")
+    residue_filtered = list(
+        filter_files_on_residues(
+            chain_filtered_files,
+            output_dir,
+            confidence.min_residues,
+            confidence.max_residues,
+            copy_method="symlink",
+        )
+    )
+    input_file2residue_filtered = {f.input_file: f for f in residue_filtered}
+    for f in chain_filtered:
+        upid = pc2upid[(f.input_file.name, f.chain_id)]
+        rc = pdbe_total_results[upid].chain
+        if rc is None:
+            msg = f"Chain filter result not found for {f.input_file} {f.chain_id}"
+            raise ValueError(msg)
+        rc_out = rc.output_file
+        if rc_out is None:
+            continue
+        residue_out = input_file2residue_filtered[rc_out]
+        pdbe_total_results[upid].residue = residue_out
+    residue_filtered_files = [f.output_file for f in residue_filtered if f.output_file is not None]
+    logger.info("Kept %i files after residue filtering in %s", len(residue_filtered_files), output_dir)
+    return residue_filtered, residue_filtered_files
+
+
+def _uncompress_gz_files(pdbe_total_results: FilterResults) -> None:
+    # protein-quest downloaded and filtered *.cif.gz files however powerfit only understands *.pdb and *.cif files
+    logger.info("Uncompressing *.cif.gz files to *.cif files")
+    i = 0
+    for r in pdbe_total_results.values():
+        orig_output_file = r.output_file
+        if orig_output_file is None or orig_output_file.suffix != ".gz":
+            continue
+        i += 1
+        new_output_file = orig_output_file.with_suffix("")
+        with gzip.open(orig_output_file, "rb") as f_in, new_output_file.open("wb") as f_out:
+            shutil.copyfileobj(f_in, f_out)  # pyright: ignore[reportArgumentType]
+        orig_output_file.unlink()
+        r.output_file = new_output_file
+    logger.info("Uncompression of %i files complete", i)
+
+
 def filter_pdbe_structures(
     proteinpdbs: list[ProteinPdbRow],
     session_dir: Path,
-    options,
+    options: FilterOptions,
     final_dir: Path,
     scheduler_address: str | Cluster | None,
 ) -> FilterResults:
@@ -302,13 +370,14 @@ def filter_pdbe_structures(
     Returns:
         A dictionary mapping (uniprot_accession, pdb_id) to FilteredStructure objects
     """
-    # this code looks more complicated than I want to because:
     # In protein-quest we are just working with pdb files,
     # but in protein-detective we keep track which
     # pdb+chain belongs to which uniprot entry
     # so there is a lot of bookkeeping needed
     path2chains = {(p.mmcif_file, p.chain) for p in proteinpdbs if p.mmcif_file is not None}
-    pc2upid = {(p.mmcif_file.name, p.chain): (p.uniprot_acc, p.pdb_id) for p in proteinpdbs if p.mmcif_file is not None}
+    pc2upid: FileNameChain2UniprotPdb = {
+        (p.mmcif_file.name, p.chain): (p.uniprot_acc, p.pdb_id) for p in proteinpdbs if p.mmcif_file is not None
+    }
 
     confidence = options.confidence
     do_pdb_residue = not (confidence.min_residues == 0 and confidence.max_residues == sys.maxsize)
@@ -326,6 +395,7 @@ def filter_pdbe_structures(
     )
     pdbe_total_results: FilterResults = {}
     for f in chain_filtered:
+        # upid = (uniprot_acc, pdb_id)
         upid = pc2upid[(f.input_file.name, f.chain_id)]
         if upid not in pdbe_total_results:
             pdbe_total_results[upid] = FilteredStructure(
@@ -339,34 +409,17 @@ def filter_pdbe_structures(
     residue_filtered = []
     residue_filtered_files = []
     if do_pdb_residue:
-        logger.info("Filtering PDBe files on number of residues")
-        residue_filtered = list(
-            filter_files_on_residues(
-                chain_filtered_files,
-                pdb_residue_dir,
-                confidence.min_residues,
-                confidence.max_residues,
-                copy_method="symlink",
-            )
+        residue_filtered, residue_filtered_files = _filter_pdb_structures_by_residue_count(
+            confidence=confidence,
+            chain_filtered_files=chain_filtered_files,
+            chain_filtered=chain_filtered,
+            output_dir=pdb_residue_dir,
+            pdbe_total_results=pdbe_total_results,
+            pc2upid=pc2upid,
         )
-        input_file2residue_filtered = {f.input_file: f for f in residue_filtered}
-        for f in chain_filtered:
-            upid = pc2upid[(f.input_file.name, f.chain_id)]
-            rc = pdbe_total_results[upid].chain
-            if rc is None:
-                msg = f"Chain filter result not found for {f.input_file} {f.chain_id}"
-                raise ValueError(msg)
-            rc_out = rc.output_file
-            if rc_out is None:
-                continue
-            residue_out = input_file2residue_filtered[rc_out]
-            pdbe_total_results[upid].residue = residue_out
-        residue_filtered_files = [f.output_file for f in residue_filtered if f.output_file is not None]
-        logger.info("Kept %i files after residue filtering in %s", len(residue_filtered_files), pdb_residue_dir)
 
     if do_ss:
-        _filter_pdb_structurs_on_secondary_structure(
-            session_dir=session_dir,
+        _filter_pdb_structures_on_secondary_structure(
             final_dir=final_dir,
             secondary_structure=secondary_structure,
             pdbe_total_results=pdbe_total_results,
@@ -381,16 +434,3 @@ def filter_pdbe_structures(
     _uncompress_gz_files(pdbe_total_results)
 
     return pdbe_total_results
-
-
-def _uncompress_gz_files(pdbe_total_results: FilterResults) -> None:
-    # protein-quest downloaded and filtered *.cif.gz files however powerfit only understands *.pdb and *.cif files
-    for r in pdbe_total_results.values():
-        orig_output_file = r.output_file
-        if orig_output_file is None or orig_output_file.suffix != ".gz":
-            continue
-        new_output_file = orig_output_file.with_suffix("")
-        with gzip.open(orig_output_file, "rb") as f_in, new_output_file.open("wb") as f_out:
-            shutil.copyfileobj(f_in, f_out)  # pyright: ignore[reportArgumentType]
-        orig_output_file.unlink()
-        r.output_file = new_output_file

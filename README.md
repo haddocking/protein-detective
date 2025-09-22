@@ -78,12 +78,17 @@ Filter structures based on
   - For AlphaFold structures writes new files with low confidence residues (below threshold) removed
 - Number of residues in secondary structure (heliclses and sheets)
 
+Also uncompresses *.cif.gz files to *.cif files for compatibility with powerfit.
+
 ```shell
 protein-detective --log-level INFO filter \
     --confidence-threshold 50 \
     --min-residues 100 \
     --max-residues 1000 \
     ./mysession
+
+# or to filter only on secondary structure having some helices
+protein-detective filter mysession --abs-min-helix-residues 40
 ```
 
 ### Powerfit
