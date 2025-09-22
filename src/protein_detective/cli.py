@@ -11,6 +11,7 @@ from protein_quest.ss import SecondaryStructureFilterQuery
 from protein_quest.uniprot import Query
 from rich import print as rprint
 from rich.logging import RichHandler
+from rich_argparse import RawDescriptionRichHelpFormatter, RichHelpFormatter
 
 from protein_detective.__version__ import __version__
 from protein_detective.filter import FilterOptions
@@ -27,7 +28,7 @@ from protein_detective.workflow import (
 
 
 def add_search_parser(subparsers):
-    parser = subparsers.add_parser("search", help="Search UniProt for structures")
+    parser = subparsers.add_parser("search", help="Search UniProt for structures", formatter_class=RichHelpFormatter)
     parser.add_argument("session_dir", help="Session directory to store results")
     parser.add_argument("--taxon-id", type=str, help="NCBI Taxon ID")
     parser.add_argument(
@@ -53,7 +54,7 @@ def add_search_parser(subparsers):
 
 
 def add_retrieve_parser(subparsers):
-    parser = subparsers.add_parser("retrieve", help="Retrieve structures")
+    parser = subparsers.add_parser("retrieve", help="Retrieve structures", formatter_class=RichHelpFormatter)
     parser.add_argument("session_dir", help="Session directory to store results")
     parser.add_argument(
         "--what",
@@ -87,7 +88,7 @@ def add_filter_parser(subparsers: argparse._SubParsersAction):
         "filter",
         help="Filter structures",
         description=description,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=RawDescriptionRichHelpFormatter,
     )
     parser.add_argument("session_dir", type=Path, help="Session directory to store results")
 
@@ -192,7 +193,9 @@ def handle_filter(args):
 
 
 def make_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Protein Detective CLI", prog="protein-detective")
+    parser = argparse.ArgumentParser(
+        description="Protein Detective CLI", prog="protein-detective", formatter_class=RichHelpFormatter
+    )
     parser.add_argument("--log-level", default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
@@ -205,7 +208,6 @@ def make_parser() -> argparse.ArgumentParser:
 
 
 def main():
-    # TODO add rich-argparse
     parser = make_parser()
 
     args = parser.parse_args()
