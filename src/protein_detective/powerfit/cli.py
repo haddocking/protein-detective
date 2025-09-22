@@ -36,7 +36,11 @@ def _copy_powerfit_parser_arguments(parser: argparse.ArgumentParser, borrowed_ar
 
 def add_powerfit_commands_parser(subparsers):
     # Add the commands sub-command
-    parser = subparsers.add_parser("commands", help="Generate PowerFit commands for PDB files in the session directory", formatter_class=RichHelpFormatter)
+    parser = subparsers.add_parser(
+        "commands",
+        help="Generate PowerFit commands for PDB files in the session directory",
+        formatter_class=RichHelpFormatter,
+    )
 
     _copy_powerfit_parser_arguments(parser)
 
@@ -76,7 +80,7 @@ def add_powerfit_run_parser(subparsers):
         "run",
         help="Run PowerFit on PDB files in the session directory",
         description="Run PowerFit on PDB files in the session directory and store results.",
-        formatter_class=RichHelpFormatter
+        formatter_class=RichHelpFormatter,
     )
 
     _copy_powerfit_parser_arguments(parser)
@@ -101,9 +105,7 @@ def add_powerfit_run_parser(subparsers):
 
 def add_powerfit_report_parser(subparsers):
     parser = subparsers.add_parser(
-        "report",
-        help="Generate a report of the best PowerFit solutions.",
-        formatter_class=RichHelpFormatter
+        "report", help="Generate a report of the best PowerFit solutions.", formatter_class=RichHelpFormatter
     )
     parser.add_argument("session_dir", help="Session directory containing PowerFit results")
     parser.add_argument("--powerfit_run_id", type=int, default=None, help="ID of the PowerFit run to report on")
@@ -118,7 +120,9 @@ def add_powerfit_report_parser(subparsers):
 
 def add_powerfit_fit_models_parser(subparsers):
     # TODO be consistent in docs with PowerFit vs powerfit
-    parser = subparsers.add_parser("fit-models", help="Fit models based on PowerFit solutions", formatter_class=RichHelpFormatter)
+    parser = subparsers.add_parser(
+        "fit-models", help="Fit models based on PowerFit solutions", formatter_class=RichHelpFormatter
+    )
     parser.add_argument("session_dir", help="Session directory containing PowerFit results")
     parser.add_argument(
         "--powerfit_run_id",
@@ -136,12 +140,18 @@ def add_powerfit_fit_models_parser(subparsers):
 
 
 def add_powerfit_list_runs_parser(subparsers):
-    parser = subparsers.add_parser("list-runs", help="List all PowerFit runs in the session directory", formatter_class=RichHelpFormatter)
+    parser = subparsers.add_parser(
+        "list-runs", help="List all PowerFit runs in the session directory", formatter_class=RichHelpFormatter
+    )
     parser.add_argument("session_dir", help="Session directory containing PowerFit results")
 
 
 def add_powerfit_list_lcc_parser(subparsers):
-    parser = subparsers.add_parser("list-lcc", help="List Local Cross Validation (lcc.mrc) files for PowerFit runs", formatter_class=RichHelpFormatter)
+    parser = subparsers.add_parser(
+        "list-lcc",
+        help="List Local Cross Validation (lcc.mrc) files for PowerFit runs",
+        formatter_class=RichHelpFormatter,
+    )
     parser.add_argument("session_dir", help="Session directory containing PowerFit results")
 
 
