@@ -76,7 +76,7 @@ Filter structures based on
 - For AlphaFold structures filter by confidence (pLDDT) threshold
 - Number of residues in chain A
   - For AlphaFold structures writes new files with low confidence residues (below threshold) removed
-- Number of residues in secondary structure (heliclses and sheets)
+- Number of residues in secondary structure (helices and sheets)
 
 Also uncompresses *.cif.gz files to *.cif files for compatibility with powerfit.
 
