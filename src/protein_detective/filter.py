@@ -395,7 +395,7 @@ def filter_pdbe_structures(
     )
     pdbe_total_results: FilterResults = {}
     for f in chain_filtered:
-        # upid = (uniprot_acc, pdb_id)
+        # upid is tuple of uniprot_acc and pdb_id
         upid = pc2upid[(f.input_file.name, f.chain_id)]
         if upid not in pdbe_total_results:
             pdbe_total_results[upid] = FilteredStructure(
