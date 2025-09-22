@@ -2,17 +2,13 @@
 
 import asyncio
 import logging
-import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 from distributed.deploy.cluster import Cluster
-from protein_quest.alphafold.confidence import ConfidenceFilterQuery, filter_files_on_confidence
 from protein_quest.alphafold.fetch import DownloadableFormat
-from protein_quest.alphafold.fetch import fetch_many as af_fetch
+from protein_quest.alphafold.fetch import fetch_many_async as af_fetch
 from protein_quest.alphafold.fetch import relative_to as af_relative_to
-from protein_quest.filters import filter_files_on_chain, filter_files_on_residues
 from protein_quest.pdbe.fetch import fetch as pdbe_fetch
 from protein_quest.uniprot import Query, search4af, search4pdb, search4uniprot
 
@@ -24,12 +20,18 @@ from protein_detective.db import (
     load_pdbs,
     save_alphafolds,
     save_alphafolds_files,
-    save_confidence_filtered,
+    save_filter,
+    save_filtered_structures,
     save_pdb_files,
     save_pdbs,
     save_query,
-    save_single_chain_pdb_files,
     save_uniprot_accessions,
+)
+from protein_detective.filter import (
+    FilteredStructure,
+    FilterOptions,
+    filter_alphafold_structures,
+    filter_pdbe_structures,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,7 +85,28 @@ def retrieve_structures(
         A tuple containing the download directory, the number of PDBe mmCIF files downloaded,
         and the number of AlphaFold files downloaded.
     """
-    session_dir.mkdir(parents=True, exist_ok=True)
+    return asyncio.run(async_retrieve_structures(session_dir, what, what_af_formats))
+
+
+async def async_retrieve_structures(
+    session_dir: Path, what: set[WhatRetrieve] | None = None, what_af_formats: set[DownloadableFormat] | None = None
+) -> tuple[Path, int, int]:
+    """
+    Retrieve structure files from PDBe and AlphaFold databases for the Uniprot entries in the session asynchronously.
+
+    Args:
+        session_dir: The directory to store downloaded files and the session database.
+        what: A set of strings indicating which databases to retrieve files from ("pdbe", "alphafold").
+        what_af_formats: A set of formats to download from AlphaFold (e.g., "pdb", "cif").
+
+    Returns:
+        A tuple containing:
+            - The download directory (Path)
+            - The number of PDBe mmCIF files downloaded (int)
+            - The number of AlphaFold files downloaded (int)
+    """
+    if not session_dir.exists() or not session_dir.is_dir():
+        raise NotADirectoryError(session_dir)
     download_dir = session_dir / "downloads"
     download_dir.mkdir(parents=True, exist_ok=True)
 
@@ -101,10 +124,7 @@ def retrieve_structures(
         pdb_ids = set()
         with connect(session_dir) as con:
             pdb_ids = load_pdb_ids(con)
-
-            # TODO use sync version
-            mmcif_files = asyncio.run(pdbe_fetch(pdb_ids, download_pdbe_dir))
-
+            mmcif_files = await pdbe_fetch(pdb_ids, download_pdbe_dir)
             # make paths relative to session_dir, so db stores paths relative to session_dir
             sr_mmcif_files = {pdb_id: mmcif_file.relative_to(session_dir) for pdb_id, mmcif_file in mmcif_files.items()}
             save_pdb_files(sr_mmcif_files, con)
@@ -115,134 +135,68 @@ def retrieve_structures(
         af_ids = set()
         if what_af_formats is None:
             what_af_formats = {"cif"}
-
         download_af_dir = download_dir / "alphafold"
         download_af_dir.mkdir(parents=True, exist_ok=True)
         with connect(session_dir) as con:
             af_ids = load_alphafold_ids(con)
-
-            afs = af_fetch(af_ids, download_af_dir, what=what_af_formats)
-
+            afs = [entry async for entry in af_fetch(af_ids, download_af_dir, what_af_formats)]
             sr_afs = [af_relative_to(af, session_dir) for af in afs]
-            # the af_fetch downloads summaries as <uniprot_acc>.json files
-            # TODO do store summary in db and in *.json files, pick one
             save_alphafolds_files(sr_afs, con)
 
     return download_dir, len(sr_mmcif_files), len(afs)
 
 
-@dataclass
-class ConfidenceFilterSessionResult:
-    """Stats of confidence filtering.
+def filter_structures(
+    session_dir: Path,
+    options: FilterOptions,
+    scheduler_address: str | Cluster | None = None,
+) -> tuple[Path, list[FilteredStructure]]:
+    """Filter the structures in the session based on confidence, number of residues, and secondary structure.
 
-    Parameters:
-        filtered_dir: The directory where the filtered PDB files are stored.
-        nr_kept: The number of structures that were kept after filtering.
-        nr_discarded: The number of structures that were discarded after filtering.
-    """
-
-    filtered_dir: Path
-    nr_kept: int
-    nr_discarded: int
-
-
-def confidence_filter(session_dir: Path, query: ConfidenceFilterQuery) -> ConfidenceFilterSessionResult:
-    """Filter the AlphaFoldDB structures based on confidence.
-
-    In AlphaFold PDB files, the b-factor column has the
-    predicted local distance difference test (pLDDT).
-    All residues with a b-factor above the confidence threshold are counted.
-    Then if the count is outside the min and max threshold, the structure is filtered out.
-    The remaining structures have the residues with a b-factor below the confidence threshold removed.
-    And are written to the session_dir / "confidence_filtered" directory.
+    Also uncompresses *.cif.gz files to *.cif files for compatibility with powerfit.
 
     Args:
-        session_dir: The directory where the session database is stored.
-        query: The confidence filter query containing the confidence thresholds.
+        session_dir: The directory containing the session data, including structure files.
+        options: The filter options containing confidence and secondary structure filter queries.
+        scheduler_address: Address of the Dask scheduler for distributed filtering.
+            If None then a local cluster is used.
 
     Returns:
-        Stats of confidence filtering.
+        A tuple containing:
+            - The directory with the filtered structures.
+            - A list of FilteredStructure objects containing the filtering results for each structure.
     """
-    filtered_dir = session_dir / "confidence_filtered"
-    filtered_dir.mkdir(parents=True, exist_ok=True)
+    if not session_dir.exists() or not session_dir.is_dir():
+        raise NotADirectoryError(session_dir)
+    final_dir = session_dir / "filtered"
+    final_dir.mkdir(parents=True, exist_ok=True)
 
-    with connect(session_dir) as con:
-        afs = load_alphafolds(con)
-        alphafold_cif_files = [e.cif_file for e in afs if e.cif_file is not None]
-        uniprot_accs = [e.uniprot_acc for e in afs]
-
-        filtered = list(filter_files_on_confidence(alphafold_cif_files, query, filtered_dir))
-        for e in filtered:
-            if e.filtered_file is not None:
-                e.filtered_file = e.filtered_file.relative_to(session_dir)
-
-        save_confidence_filtered(
-            query,
-            filtered,
-            uniprot_accs,
-            con,
-        )
-        nr_kept = len([e for e in filtered if e.filtered_file is not None])
-        nr_discarded = len(filtered) - nr_kept
-        return ConfidenceFilterSessionResult(
-            filtered_dir=filtered_dir,
-            nr_kept=nr_kept,
-            nr_discarded=nr_discarded,
-        )
-
-
-def prune_pdbs(
-    session_dir: Path, min_residues: int, max_residues: int, scheduler_address: str | Cluster | None
-) -> tuple[Path, int]:
-    """Prune the PDB files to only keep the first chain of the found Uniprot entries.
-
-    Only writes PDB files that have a single chain with a number of residues
-    between `min_residues` and `max_residues` (inclusive).
-
-    Also rename that chain to A.
-
-    Args:
-        session_dir: The directory where the session database is stored.
-        min_residues: The minimum number of residues for the single chain.
-        max_residues: The maximum number of residues for the single chain.
-        scheduler_address: The address of the Dask scheduler.
-
-    Returns:
-        A tuple containing the directory where the single chain PDB files are stored,
-        and the number of PDB files that passed the residue filter and where written.
-    """
-    single_chain_dir = session_dir / "single_chain"
-    single_chain_dir.mkdir(parents=True, exist_ok=True)
-
+    # Filter AlphaFolds
     with connect(session_dir, read_only=True) as con:
+        logger.info("Gathering AlphaFold files from session in %s", session_dir)
+        afs = load_alphafolds(con)
+        logger.info("Found %i AlphaFold files", len(afs))
+    total_results = filter_alphafold_structures(afs, session_dir, options, final_dir)
+
+    # Filter PDBe structures
+    with connect(session_dir, read_only=True) as con:
+        logger.info("Gathering PDBe files from session in %s", session_dir)
         proteinpdbs = load_pdbs(con)
+        logger.info("Found %i PDBe files", len(proteinpdbs))
+    pdbe_total_results = filter_pdbe_structures(
+        proteinpdbs=proteinpdbs,
+        session_dir=session_dir,
+        options=options,
+        final_dir=final_dir,
+        scheduler_address=scheduler_address,
+    )
+    total_results.update(pdbe_total_results)
 
-    # this code looks more complicated than I want to because:
-    # In protein-quest we are just working with pdb files,
-    # but in protein-detective we keep track which
-    # pdb+chain belongs to which uniprot entry
-    # so there is a lot of bookkeeping needed
-    path2chains = {(p.mmcif_file, p.chain) for p in proteinpdbs if p.mmcif_file is not None}
-
-    with tempfile.TemporaryDirectory() as intermediate_dir:
-        intermediate_path = Path(intermediate_dir)
-        logger.debug("Writing intermediate files to %s", intermediate_dir)
-
-        logger.info("Filtering PDB files on chain")
-        chain_filtered = filter_files_on_chain(path2chains, intermediate_path, scheduler_address=scheduler_address)
-        intermediate_files = [f.output_file for f in chain_filtered if f.output_file is not None]
-        logger.info("Write %i files with just chain A", len(intermediate_files))
-        logger.info("Filtering PDB files on number of residues in chain A")
-        residue_filtered = list(
-            filter_files_on_residues(intermediate_files, single_chain_dir, min_residues, max_residues)
-        )
-
-    # make paths relative to session_dir, so db stores paths relative to session_dir
-    for r in residue_filtered:
-        if r.output_file is not None:
-            r.output_file = r.output_file.relative_to(session_dir)
-
+    # Save filtering results to database
+    logger.info("Saving filtering results to database in %s", session_dir)
+    total_results_values = [r.make_relative_to(session_dir) for r in total_results.values()]
     with connect(session_dir) as con:
-        save_single_chain_pdb_files(proteinpdbs, chain_filtered, residue_filtered, min_residues, max_residues, con)
+        filter_id = save_filter(options, con)
+        save_filtered_structures(total_results_values, filter_id, con)
 
-    return single_chain_dir, len([f for f in residue_filtered if f.passed])
+    return final_dir, total_results_values

@@ -30,27 +30,6 @@ CREATE TABLE IF NOT EXISTS proteins_pdbs (
     PRIMARY KEY (uniprot_acc, pdb_id)
 );
 
-CREATE SEQUENCE IF NOT EXISTS id_filters START 1;
-CREATE TABLE IF NOT EXISTS filters (
-    filter_id INTEGER DEFAULT nextval('id_filters') PRIMARY KEY,
-    filter_name TEXT NOT NULL,
-    filter_options JSON NOT NULL, -- stores allowed nr residues range
-    UNIQUE (filter_name, filter_options)
-);
-
-CREATE TABLE IF NOT EXISTS filtered_pdbs (
-    filter_id INTEGER NOT NULL,
-    uniprot_acc TEXT NOT NULL,
-    pdb_id TEXT NOT NULL,
-    filter_stats JSON NOT NULL,  -- stores nr_residues
-    passed BOOLEAN,
-    output_file TEXT, -- if kept then this is the path to the output file
-    PRIMARY KEY (filter_id, uniprot_acc, pdb_id),
-    FOREIGN KEY (filter_id) REFERENCES filters (filter_id),
-    FOREIGN KEY (uniprot_acc, pdb_id) REFERENCES proteins_pdbs (uniprot_acc, pdb_id),
-    FOREIGN KEY (pdb_id) REFERENCES pdbs (pdb_id)
-);
-
 CREATE TABLE IF NOT EXISTS alphafolds (
     uniprot_acc TEXT PRIMARY KEY,
     summary JSON,
@@ -65,15 +44,25 @@ CREATE TABLE IF NOT EXISTS alphafolds (
     FOREIGN KEY (uniprot_acc) REFERENCES proteins (uniprot_acc)
 );
 
-CREATE TABLE IF NOT EXISTS density_filtered_alphafolds (
+CREATE SEQUENCE IF NOT EXISTS id_filters START 1;
+CREATE TABLE IF NOT EXISTS filters (
+    filter_id INTEGER DEFAULT nextval('id_filters') PRIMARY KEY,
+    filter_options JSON NOT NULL, -- stores allowed nr residues range
+    created_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (filter_options)
+);
+
+CREATE TABLE IF NOT EXISTS filtered_structures (
     filter_id INTEGER NOT NULL,
-    uniprot_acc TEXT NOT NULL,
-    filter_stats JSON NOT NULL,  -- store nr_residues_above_confidence
-    keep BOOLEAN,
-    pdb_file TEXT,
-    PRIMARY KEY (filter_id, uniprot_acc),
+    uniprot_acc TEXT NOT NULL, 
+    pdb_id TEXT,
+    filter_stats JSON NOT NULL,
+    passed BOOLEAN,
+    output_file TEXT,
+    -- PRIMARY KEY (filter_id, uniprot_acc, pdb_id), #-- pdb_id can be NULL so cannot use as part of primary key
     FOREIGN KEY (filter_id) REFERENCES filters (filter_id),
     FOREIGN KEY (uniprot_acc) REFERENCES alphafolds (uniprot_acc),
+    FOREIGN KEY (uniprot_acc, pdb_id) REFERENCES proteins_pdbs (uniprot_acc, pdb_id),
 );
 
 CREATE SEQUENCE IF NOT EXISTS id_powerfit_runs START 1;
@@ -128,32 +117,21 @@ SELECT
     relz,
     translation,
     rotation,
-    af_id,
-    pdb_id,
-    concat_ws(
-        '/',
-        getvariable('session_dir'),
-        coalesce(a.pdb_file, p.output_file)
-    ) AS pdb_file,
-    coalesce(uniprot_acc, af_id) AS uniprot_acc,
+    concat_ws('/', getvariable('session_dir'), output_file) AS pdb_file,
+    uniprot_acc,
+    pdb_id
 FROM raw_solutions
 LEFT JOIN (
-    SELECT uniprot_acc AS af_id, pdb_file, parse_filename(pdb_file, true) AS structure
-    FROM density_filtered_alphafolds WHERE keep=True
+    SELECT output_file, uniprot_acc, pdb_id, parse_filename(output_file, true) AS structure
+    FROM filtered_structures WHERE output_file IS NOT NULL
 ) AS a USING (structure)
-LEFT JOIN (
-    SELECT uniprot_acc, pdb_id, output_file, parse_filename(output_file, true) AS structure
-    FROM filtered_pdbs
-    WHERE output_file IS NOT NULL
-) AS p USING (structure)
 ORDER BY cc DESC;
 
 CREATE TABLE IF NOT EXISTS raw_fitted_models (
     powerfit_run_id INTEGER NOT NULL,
     structure TEXT NOT NULL,
     rank INTEGER NOT NULL,
-    -- unfitted_model_file is either foreign key of density_filtered_alphafolds.pdb_file
-    -- or filtered_pdbs.output_file
+    -- unfitted_model_file is foreign key of filtererd_structures.output_file
     unfitted_model_file TEXT NOT NULL,
     fitted_model_file TEXT PRIMARY KEY,
 );
