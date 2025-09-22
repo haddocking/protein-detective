@@ -151,30 +151,6 @@ type FilterResults = dict[tuple[str, str | None], FilteredStructure]
 """Type alias for filter results mapping (uniprot_accession, pdb_id?) to FilteredStructure."""
 
 
-# TODO move to protein_quest.ss.SecondaryStructureFilterQuery
-def is_actionable_ss_query(query: SecondaryStructureFilterQuery) -> bool:
-    """Check if the secondary structure query has any actionable filters.
-
-    Args:
-        query: The secondary structure filter query.
-
-    Returns:
-        True if any of the filters are set, False otherwise.
-    """
-    return any(
-        [
-            query.abs_min_helix_residues is not None,
-            query.abs_max_helix_residues is not None,
-            query.abs_min_sheet_residues is not None,
-            query.abs_max_sheet_residues is not None,
-            query.ratio_min_helix_residues is not None,
-            query.ratio_max_helix_residues is not None,
-            query.ratio_min_sheet_residues is not None,
-            query.ratio_max_sheet_residues is not None,
-        ]
-    )
-
-
 def _filter_alphafolds_on_secondary_structure(
     secondary_structure: SecondaryStructureFilterQuery,
     cf_out_files: list[Path],
@@ -220,7 +196,7 @@ def filter_alphafold_structures(
     """
     confidence = options.confidence
     secondary_structure = options.secondary_structure
-    do_ss = is_actionable_ss_query(secondary_structure)
+    do_ss = secondary_structure.is_actionable()
 
     af_total_results: FilterResults = {}
 
@@ -382,7 +358,7 @@ def filter_pdbe_structures(
     confidence = options.confidence
     do_pdb_residue = not (confidence.min_residues == 0 and confidence.max_residues == sys.maxsize)
     secondary_structure = options.secondary_structure
-    do_ss = is_actionable_ss_query(secondary_structure)
+    do_ss = secondary_structure.is_actionable()
     pdb_residue_dir = session_dir / "pdb_residue_filtered" if do_ss else final_dir
     pdb_residue_dir.mkdir(parents=True, exist_ok=True)
     pdb_chain_dir = session_dir / "pdb_chain_filtered"

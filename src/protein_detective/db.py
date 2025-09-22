@@ -15,7 +15,6 @@ from protein_quest.alphafold.entry_summary import EntrySummary
 from protein_quest.alphafold.fetch import AlphaFoldEntry
 from protein_quest.converter import converter
 from protein_quest.uniprot import PdbResult, Query
-from yarl import URL
 
 from protein_detective.filter import FilteredStructure, FilterOptions
 from protein_detective.powerfit.options import PowerfitOptions
@@ -42,9 +41,6 @@ The views (table name without `raw_`) then prepend the session directory
 (using the DuckDB `session_dir` variable) to the paths,
 so the paths are pointing to the correct files.
 """
-
-# TODO move to quest package
-converter.register_unstructure_hook(URL, lambda u: str(u))
 
 
 def db_path(session_dir: Path) -> Path:
