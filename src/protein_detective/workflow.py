@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -11,7 +11,7 @@ from protein_quest.alphafold.fetch import DownloadableFormat
 from protein_quest.alphafold.fetch import fetch_many_async as af_fetch
 from protein_quest.alphafold.fetch import relative_to as af_relative_to
 from protein_quest.pdbe.fetch import fetch as pdbe_fetch
-from protein_quest.uniprot import Query, search4af, search4macromolecular_complexes, search4pdb, search4uniprot
+from protein_quest.uniprot import search4af, search4pdb, search4uniprot
 
 from protein_detective.db import (
     connect,
@@ -34,21 +34,9 @@ from protein_detective.filter import (
     filter_alphafold_structures,
     filter_pdbe_structures,
 )
+from protein_detective.search import UniprotQuery, search_for_interaction_partners
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class UniprotQuery(Query):
-    """A UniProt search query with interaction partner options.
-
-    Parameters:
-        interaction_partner_seeds: A set of UniProt accessions to search for interaction partners.
-        interaction_partners_excludes: A set of UniProt accessions to exclude from interaction partner results.
-    """
-
-    interaction_partner_seeds: set[str] = field(default_factory=set)
-    interaction_partner_excludes: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -86,7 +74,7 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
     session_dir.mkdir(parents=True, exist_ok=True)
     uniprot_accessions = search4uniprot(query, limit)
     logger.debug(uniprot_accessions)
-    uniprot_accessions_of_partners = _search_for_interaction_partners(query, limit)
+    uniprot_accessions_of_partners = search_for_interaction_partners(query, limit)
     logger.debug(uniprot_accessions_of_partners)
     nr_interaction_partners = len(uniprot_accessions_of_partners)
     uniprot_accessions.update(uniprot_accessions_of_partners)
@@ -106,30 +94,6 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
         nr_afs=nr_afs,
         nr_interaction_partners=nr_interaction_partners,
     )
-
-
-def _search_for_interaction_partners(query: UniprotQuery, limit: int) -> set[str]:
-    if not query.interaction_partner_seeds:
-        logger.info("No interaction partner seeds provided; skipping search for interaction partners.")
-        return set()
-    logger.info("Searching for interaction partners of seeds %s", query.interaction_partner_seeds)
-    uniprot_accessions_of_partners: set[str] = set()
-
-    complexes = search4macromolecular_complexes(query.interaction_partner_seeds, limit)
-    for complex_entry in complexes:
-        uniprot_accessions_of_partners.update(complex_entry.members)
-
-    # Exclude seeds and excludes from results
-    uniprot_accessions_of_partners.difference_update(query.interaction_partner_seeds)
-    uniprot_accessions_of_partners.difference_update(query.interaction_partner_excludes)
-
-    logger.info(
-        "Found %d unique interaction partners in %d macromolecular complexes after excluding %d accessions",
-        len(uniprot_accessions_of_partners),
-        len(complexes),
-        len(query.interaction_partner_excludes),
-    )
-    return uniprot_accessions_of_partners
 
 
 WhatRetrieve = Literal["pdbe", "alphafold"]

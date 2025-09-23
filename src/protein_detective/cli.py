@@ -18,8 +18,8 @@ from protein_detective.powerfit.cli import (
     add_powerfit_parser,
     handle_powerfit,
 )
+from protein_detective.search import UniprotQuery
 from protein_detective.workflow import (
-    UniprotQuery,
     filter_structures,
     retrieve_structures,
     search_structures_in_uniprot,

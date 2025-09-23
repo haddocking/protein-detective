@@ -64,7 +64,7 @@ In `./mysession` directory, you will find session.db file, which is a [DuckDB](h
 <summary>You can also include interaction partners in the search</summary>
 
 ```shell
-protein-detective INFO search \
+protein-detective --log-level INFO search \
     --taxon-id 9606 \
     --reviewed \
     --subcellular-location-uniprot nucleus \

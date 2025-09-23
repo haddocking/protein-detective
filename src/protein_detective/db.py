@@ -6,7 +6,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from importlib.resources import read_text
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from duckdb import ConstraintException, DuckDBPyConnection, InvalidInputException
 from duckdb import connect as duckdb_connect
@@ -18,11 +17,7 @@ from protein_quest.uniprot import PdbResult
 
 from protein_detective.filter import FilteredStructure, FilterOptions
 from protein_detective.powerfit.options import PowerfitOptions
-
-if TYPE_CHECKING:
-    from protein_detective.workflow import UniprotQuery
-else:
-    UniprotQuery = object
+from protein_detective.search import UniprotQuery
 
 logger = logging.getLogger(__name__)
 
