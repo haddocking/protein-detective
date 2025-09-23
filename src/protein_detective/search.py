@@ -1,10 +1,11 @@
 """Module with search logic."""
 
+import logging
 from dataclasses import dataclass, field
 
 from protein_quest.uniprot import Query, search4macromolecular_complexes
 
-from protein_detective.workflow import logger
+logger = logging.getLogger(__name__)
 
 
 @dataclass
