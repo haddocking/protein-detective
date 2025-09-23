@@ -60,6 +60,26 @@ protein-detective search \
 
 In `./mysession` directory, you will find session.db file, which is a [DuckDB](https://duckdb.org/) database with search results.
 
+<details>
+<summary>You can also include interaction partners in the search</summary>
+
+```shell
+protein-detective INFO search \
+    --taxon-id 9606 \
+    --reviewed \
+    --subcellular-location-uniprot nucleus \
+    --subcellular-location-go GO:0005634 \
+    --molecular-function-go GO:0003677 \
+    --interaction-partner-seed A8MT69 \
+    --interaction-partner-exclude B1APH4 \
+    --limit 100 \
+    ./mysession2
+```
+
+Which will add `Q96H22` which is an interaction partner of `A8MT69` in a macromolecular complex.
+
+</details>
+
 ### To retrieve a bunch of structures
 
 ```shell
