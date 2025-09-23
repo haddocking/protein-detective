@@ -167,6 +167,8 @@ def handle_search(args):
         f"{result.nr_pdbs} PDBe structures, {result.nr_prot2pdb} UniProt to PDB mappings, "
         f"{result.nr_afs} AlphaFold structures."
     )
+    if query.interaction_partner_seeds:
+        rprint(f"Included {result.nr_interaction_partners} Uniprot entries found as interaction partners.")
 
 
 def handle_retrieve(args):
