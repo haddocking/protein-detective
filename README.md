@@ -10,7 +10,7 @@ Python package to detect proteins in EM density maps.
 
 It uses
 
-- [Uniprot Sparql endpoint](https://sparql.uniprot.org/) to search for proteins and their measured or predicted 3D structures.
+- [protein-quest](https://github.com/haddocking/protein-quest) to search, retrieve and filter protein structures from Uniprot, PDBe and AlphaFold DB.
 - [powerfit](https://pypi.org/project/powerfit-em/) to fit protein structure in a Electron Microscopy (EM) density map.
 
 An example workflow:
