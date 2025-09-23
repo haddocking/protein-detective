@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -10,7 +11,7 @@ from protein_quest.alphafold.fetch import DownloadableFormat
 from protein_quest.alphafold.fetch import fetch_many_async as af_fetch
 from protein_quest.alphafold.fetch import relative_to as af_relative_to
 from protein_quest.pdbe.fetch import fetch as pdbe_fetch
-from protein_quest.uniprot import Query, search4af, search4pdb, search4uniprot
+from protein_quest.uniprot import search4af, search4pdb, search4uniprot
 
 from protein_detective.db import (
     connect,
@@ -33,11 +34,31 @@ from protein_detective.filter import (
     filter_alphafold_structures,
     filter_pdbe_structures,
 )
+from protein_detective.search import UniprotQuery, search_for_interaction_partners
 
 logger = logging.getLogger(__name__)
 
 
-def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 10_000) -> tuple[int, int, int, int]:
+@dataclass
+class UniprotSearchResult:
+    """Result of a UniProt search.
+
+    Parameters:
+        nr_uniprot_accessions: Number of UniProt accessions found.
+        nr_pdbs: Number of PDB structures found.
+        nr_prot2pdb: Number of UniProt to PDB mappings found.
+        nr_afs: Number of AlphaFold structures found.
+        nr_interaction_partners: Number of interaction partners found.
+    """
+
+    nr_uniprot_accessions: int
+    nr_pdbs: int
+    nr_prot2pdb: int
+    nr_afs: int
+    nr_interaction_partners: int
+
+
+def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: int = 10_000) -> UniprotSearchResult:
     """Searches for protein structures in UniProt database.
 
     Args:
@@ -51,8 +72,12 @@ def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 1
         and the number of AlphaFold structures found.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
-
     uniprot_accessions = search4uniprot(query, limit)
+    logger.debug(uniprot_accessions)
+    uniprot_accessions_of_partners = search_for_interaction_partners(query, limit)
+    logger.debug(uniprot_accessions_of_partners)
+    nr_interaction_partners = len(uniprot_accessions_of_partners)
+    uniprot_accessions.update(uniprot_accessions_of_partners)
     pdbs = search4pdb(uniprot_accessions, limit=limit)
     af_result = search4af(uniprot_accessions, limit=limit)
 
@@ -62,7 +87,13 @@ def search_structures_in_uniprot(query: Query, session_dir: Path, limit: int = 1
         nr_pdbs, nr_prot2pdb = save_pdbs(pdbs, con)
         nr_afs = save_alphafolds(af_result, con)
 
-    return len(uniprot_accessions), nr_pdbs, nr_prot2pdb, nr_afs
+    return UniprotSearchResult(
+        nr_uniprot_accessions=len(uniprot_accessions),
+        nr_pdbs=nr_pdbs,
+        nr_prot2pdb=nr_prot2pdb,
+        nr_afs=nr_afs,
+        nr_interaction_partners=nr_interaction_partners,
+    )
 
 
 WhatRetrieve = Literal["pdbe", "alphafold"]

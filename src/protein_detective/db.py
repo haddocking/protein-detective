@@ -7,17 +7,17 @@ from dataclasses import dataclass
 from importlib.resources import read_text
 from pathlib import Path
 
-from cattrs import unstructure
 from duckdb import ConstraintException, DuckDBPyConnection, InvalidInputException
 from duckdb import connect as duckdb_connect
 from pandas import DataFrame
 from protein_quest.alphafold.entry_summary import EntrySummary
 from protein_quest.alphafold.fetch import AlphaFoldEntry
 from protein_quest.converter import converter
-from protein_quest.uniprot import PdbResult, Query
+from protein_quest.uniprot import PdbResult
 
 from protein_detective.filter import FilteredStructure, FilterOptions
 from protein_detective.powerfit.options import PowerfitOptions
+from protein_detective.search import UniprotQuery
 
 logger = logging.getLogger(__name__)
 
@@ -111,14 +111,15 @@ def connect(session_dir: Path, read_only: bool = False) -> Iterator[DuckDBPyConn
     con.close()
 
 
-def save_query(query: Query, con: DuckDBPyConnection):
+def save_query(query: UniprotQuery, con: DuckDBPyConnection):
     """Save a UniProt search query to the database.
 
     Args:
         query: The UniProt search query to save.
         con: The DuckDB connection to use for saving the data.
     """
-    con.execute("INSERT INTO uniprot_searches (query) VALUES (?)", (unstructure(query),))
+    value = converter.dumps(query).decode()
+    con.execute("INSERT INTO uniprot_searches (query) VALUES (?)", (value,))
 
 
 def save_uniprot_accessions(uniprot_accessions: Iterable[str], con: DuckDBPyConnection) -> int:

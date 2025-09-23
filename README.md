@@ -10,7 +10,7 @@ Python package to detect proteins in EM density maps.
 
 It uses
 
-- [Uniprot Sparql endpoint](https://sparql.uniprot.org/) to search for proteins and their measured or predicted 3D structures.
+- [protein-quest](https://github.com/haddocking/protein-quest) to search, retrieve and filter protein structures from Uniprot, PDBe and AlphaFold DB.
 - [powerfit](https://pypi.org/project/powerfit-em/) to fit protein structure in a Electron Microscopy (EM) density map.
 
 An example workflow:
@@ -59,6 +59,26 @@ protein-detective search \
 ([GO:0005634](https://www.ebi.ac.uk/QuickGO/term/GO:0005634) is "Nucleus" and [GO:0003677](https://www.ebi.ac.uk/QuickGO/term/GO:0003677) is  "DNA binding")
 
 In `./mysession` directory, you will find session.db file, which is a [DuckDB](https://duckdb.org/) database with search results.
+
+<details>
+<summary>You can also include interaction partners in the search</summary>
+
+```shell
+protein-detective --log-level INFO search \
+    --taxon-id 9606 \
+    --reviewed \
+    --subcellular-location-uniprot nucleus \
+    --subcellular-location-go GO:0005634 \
+    --molecular-function-go GO:0003677 \
+    --interaction-partner-seed A8MT69 \
+    --interaction-partner-exclude B1APH4 \
+    --limit 100 \
+    ./mysession2
+```
+
+Which will add `Q96H22` which is an interaction partner of `A8MT69` in a macromolecular complex.
+
+</details>
 
 ### To retrieve a bunch of structures
 

@@ -8,7 +8,6 @@ from protein_quest.alphafold.confidence import ConfidenceFilterQuery
 from protein_quest.alphafold.fetch import downloadable_formats
 from protein_quest.converter import converter
 from protein_quest.ss import SecondaryStructureFilterQuery
-from protein_quest.uniprot import Query
 from rich import print as rprint
 from rich.logging import RichHandler
 from rich_argparse import RawDescriptionRichHelpFormatter, RichHelpFormatter
@@ -19,6 +18,7 @@ from protein_detective.powerfit.cli import (
     add_powerfit_parser,
     handle_powerfit,
 )
+from protein_detective.search import UniprotQuery
 from protein_detective.workflow import (
     filter_structures,
     retrieve_structures,
@@ -50,6 +50,23 @@ def add_search_parser(subparsers):
         action="append",
         help="Molecular function (GO term, e.g. GO:0003677). Can be specified multiple times.",
     )
+    parser.add_argument(
+        "--interaction-partner-seed",
+        type=str,
+        action="append",
+        help=dedent("""\
+            UniProt ID to use as interaction partner seed.
+            The search will be expanded to include structures identifiers of the found interaction partners.
+            Can be specified multiple times.
+        """),
+    )
+    parser.add_argument(
+        "--interaction-partner-exclude",
+        type=str,
+        action="append",
+        help="UniProt ID to exclude as found interaction partners. Can be specified multiple times.",
+    )
+
     parser.add_argument("--limit", type=int, default=10_000, help="Limit number of results")
 
 
@@ -131,20 +148,27 @@ def add_filter_parser(subparsers: argparse._SubParsersAction):
 
 
 def handle_search(args):
-    query = Query(
-        taxon_id=args.taxon_id,
-        reviewed=args.reviewed,
-        subcellular_location_uniprot=args.subcellular_location_uniprot,
-        subcellular_location_go=args.subcellular_location_go,
-        molecular_function_go=args.molecular_function_go,
+    query = converter.structure(
+        {
+            "taxon_id": args.taxon_id,
+            "reviewed": args.reviewed,
+            "subcellular_location_uniprot": args.subcellular_location_uniprot,
+            "subcellular_location_go": args.subcellular_location_go,
+            "molecular_function_go": args.molecular_function_go,
+            "interaction_partner_seeds": args.interaction_partner_seed or [],
+            "interaction_partner_excludes": args.interaction_partner_exclude or [],
+        },
+        UniprotQuery,
     )
     session_dir = Path(args.session_dir)
-    nr_uniprot, nr_pdbes, nr_prot2pdbes, nr_afs = search_structures_in_uniprot(query, session_dir, limit=args.limit)
+    result = search_structures_in_uniprot(query, session_dir, limit=args.limit)
     rprint(
-        f"Search completed: {nr_uniprot} UniProt entries found, "
-        f"{nr_pdbes} PDBe structures, {nr_prot2pdbes} UniProt to PDB mappings, "
-        f"{nr_afs} AlphaFold structures."
+        f"Search completed: {result.nr_uniprot_accessions} UniProt entries found, "
+        f"{result.nr_pdbs} PDBe structures, {result.nr_prot2pdb} UniProt to PDB mappings, "
+        f"{result.nr_afs} AlphaFold structures."
     )
+    if query.interaction_partner_seeds:
+        rprint(f"Included {result.nr_interaction_partners} Uniprot entries found as interaction partners.")
 
 
 def handle_retrieve(args):
