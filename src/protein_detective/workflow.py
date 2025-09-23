@@ -109,14 +109,15 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
 
 
 def _search_for_interaction_partners(query: UniprotQuery, limit: int) -> set[str]:
+    if not query.interaction_partner_seeds:
+        logger.info("No interaction partner seeds provided; skipping search for interaction partners.")
+        return set()
     logger.info("Searching for interaction partners of seeds %s", query.interaction_partner_seeds)
     uniprot_accessions_of_partners: set[str] = set()
-    nr_complexes = 0
-    if query.interaction_partner_seeds:
-        complexes = search4macromolecular_complexes(query.interaction_partner_seeds, limit)
-        nr_complexes = len(complexes)
-        for complex_entry in complexes:
-            uniprot_accessions_of_partners.update(complex_entry.members)
+
+    complexes = search4macromolecular_complexes(query.interaction_partner_seeds, limit)
+    for complex_entry in complexes:
+        uniprot_accessions_of_partners.update(complex_entry.members)
 
     # Exclude seeds and excludes from results
     uniprot_accessions_of_partners.difference_update(query.interaction_partner_seeds)
@@ -125,7 +126,7 @@ def _search_for_interaction_partners(query: UniprotQuery, limit: int) -> set[str
     logger.info(
         "Found %d unique interaction partners in %d macromolecular complexes after excluding %d accessions",
         len(uniprot_accessions_of_partners),
-        nr_complexes,
+        len(complexes),
         len(query.interaction_partner_excludes),
     )
     return uniprot_accessions_of_partners
