@@ -191,20 +191,36 @@ def save_pdbs(
     return nr_pdbs, nr_prot2pdbs
 
 
-def save_pdb_files(mmcif_files: Mapping[str, Path], con: DuckDBPyConnection):
+def save_pdb_files(mmcif_files: Mapping[str, Path], con: DuckDBPyConnection) -> int:
     """Save PDB files to the database.
 
     Args:
         mmcif_files: A mapping of PDB IDs to their file paths.
         con: The DuckDB connection to use for saving the data.
+
+    Returns:
+        The number of PDB entries updated with file paths.
     """
-    rows = [(str(mmcif_file), pdb_id) for pdb_id, mmcif_file in mmcif_files.items()]
-    if len(rows) == 0:
-        return
-    con.executemany(
-        "UPDATE pdbs SET mmcif_file = ? WHERE pdb_id = ?",
-        rows,
+    if len(mmcif_files) == 0:
+        return 0
+
+    data = [
+        {
+            "mmcif_file": str(mmcif_file),
+            "pdb_id": pdb_id,
+        }
+        for pdb_id, mmcif_file in mmcif_files.items()
+    ]
+
+    df = DataFrame(data)
+    con.execute(
+        """UPDATE pdbs
+        SET mmcif_file = df.mmcif_file
+        FROM df
+        WHERE pdbs.pdb_id = df.pdb_id
+        """
     )
+    return len(df)
 
 
 def load_pdb_ids(con: DuckDBPyConnection) -> set[str]:
@@ -294,47 +310,53 @@ def save_alphafolds(afs: dict[str, set[str]], con: DuckDBPyConnection) -> int:
     return len(alphafold_df)
 
 
-def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
+def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection) -> int:
     """Save AlphaFold files to the database.
 
     Args:
         afs: A list of AlphaFold entries.
         con: The DuckDB connection to use for saving the data.
 
+    Returns:
+        The number of AlphaFold entries updated with file paths.
     """
-    rows = [
-        (
-            converter.dumps(af.summary, EntrySummary).decode(),
-            str(af.bcif_file) if af.bcif_file else None,
-            str(af.cif_file) if af.cif_file else None,
-            str(af.pdb_file) if af.pdb_file else None,
-            str(af.pae_image_file) if af.pae_image_file else None,
-            str(af.pae_doc_file) if af.pae_doc_file else None,
-            str(af.am_annotations_file) if af.am_annotations_file else None,
-            str(af.am_annotations_hg19_file) if af.am_annotations_hg19_file else None,
-            str(af.am_annotations_hg38_file) if af.am_annotations_hg38_file else None,
-            af.uniprot_acc,
-        )
+    if len(afs) == 0:
+        return 0
+
+    data = [
+        {
+            "summary": converter.dumps(af.summary, EntrySummary).decode(),
+            "bcif_file": str(af.bcif_file) if af.bcif_file else None,
+            "cif_file": str(af.cif_file) if af.cif_file else None,
+            "pdb_file": str(af.pdb_file) if af.pdb_file else None,
+            "pae_image_file": str(af.pae_image_file) if af.pae_image_file else None,
+            "pae_doc_file": str(af.pae_doc_file) if af.pae_doc_file else None,
+            "am_annotations_file": str(af.am_annotations_file) if af.am_annotations_file else None,
+            "am_annotations_hg19_file": str(af.am_annotations_hg19_file) if af.am_annotations_hg19_file else None,
+            "am_annotations_hg38_file": str(af.am_annotations_hg38_file) if af.am_annotations_hg38_file else None,
+            "uniprot_acc": af.uniprot_acc,
+        }
         for af in afs
     ]
-    if len(rows) == 0:
-        # executemany can not be called with an empty list, it raises error, so we return early
-        return
-    con.executemany(
-        """UPDATE alphafolds SET
-            summary = ?,
-            bcif_file = ?,
-            cif_file = ?,
-            pdb_file = ?,
-            pae_image_file = ?,
-            pae_doc_file = ?,
-            am_annotations_file = ?,
-            am_annotations_hg19_file = ?,
-            am_annotations_hg38_file = ?
-        WHERE uniprot_acc = ?
-        """,
-        rows,
+
+    df = DataFrame(data)
+    con.execute(
+        """UPDATE alphafolds
+        SET
+            summary = df.summary,
+            bcif_file = df.bcif_file,
+            cif_file = df.cif_file,
+            pdb_file = df.pdb_file,
+            pae_image_file = df.pae_image_file,
+            pae_doc_file = df.pae_doc_file,
+            am_annotations_file = df.am_annotations_file,
+            am_annotations_hg19_file = df.am_annotations_hg19_file,
+            am_annotations_hg38_file = df.am_annotations_hg38_file
+        FROM df
+        WHERE alphafolds.uniprot_acc = df.uniprot_acc
+        """
     )
+    return len(df)
 
 
 def load_alphafold_ids(con: DuckDBPyConnection) -> set[str]:
