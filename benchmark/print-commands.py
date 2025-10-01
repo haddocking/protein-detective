@@ -5,7 +5,6 @@ from pathlib import Path
 
 def create_run_script_content(row: dict, map_root: str, interaction_partner_seeds: set[str]) -> str:
     """Generate the content of a run.sh script from a CSV row."""
-    emdb_id = row["EMDB"]
     uniprot = row["Uniprot_id"]
     tax_id = row["Ncbi tax id"]
     subcellular_uniprot = row["First cellular location - Uniprot"].replace("\\", "")
@@ -15,11 +14,13 @@ def create_run_script_content(row: dict, map_root: str, interaction_partner_seed
     chain = row["Chain"]
     # Use a range around the modelled residues for filtering
     # TODO use better logic to determine min/max residues based on the volume of the unknown density
-    res_range_fraction = 0.1 # +- 10%
+    res_range_fraction = 0.1  # +- 10%
     min_res = int(float(row["Number of residues modelled"]) * (1 - res_range_fraction))
     max_res = int(float(row["Number of residues modelled"]) * (1 + res_range_fraction))
     interaction_partner_exclude = uniprot
-    interaction_partner_seed  = ' \\\n'.join(map(lambda s: f'    --interaction-partner-seed "{s}"', interaction_partner_seeds))
+    interaction_partner_seed = " \\\n".join(
+        f'    --interaction-partner-seed "{s}"' for s in interaction_partner_seeds
+    )
 
     resolution = float(row["Resolution"])
 
@@ -40,7 +41,7 @@ protein-detective search \\
 protein-detective search \\
     --taxon-id {tax_id} \\
     --interaction-partner-exclude "{interaction_partner_exclude}" \\
-{interaction_partner_seed} \\    
+{interaction_partner_seed} \\
     --limit {search_limit} \\
     .
 """
@@ -138,7 +139,11 @@ def main():
         output_dir = pdb_emdb_dir / chain_uniprot_dir
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        interaction_partner_seeds = {row["Uniprot_id"] for row in datasets if row["EMDB"] == dataset["EMDB"] and row["Uniprot_id"] != dataset["Uniprot_id"]}
+        interaction_partner_seeds = {
+            row["Uniprot_id"]
+            for row in datasets
+            if row["EMDB"] == dataset["EMDB"] and row["Uniprot_id"] != dataset["Uniprot_id"]
+        }
 
         # Generate and write run.sh
         script_content = create_run_script_content(dataset, map_root, interaction_partner_seeds)
