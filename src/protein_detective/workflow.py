@@ -156,9 +156,10 @@ async def async_retrieve_structures(
         download_pdbe_dir.mkdir(parents=True, exist_ok=True)
         # mmCIF files from PDBe for the Uniprot entries in the session.
         pdb_ids = set()
-        with connect(session_dir) as con:
+        with connect(session_dir, read_only=True) as con:
             pdb_ids = load_pdb_ids(con)
-            mmcif_files = await pdbe_fetch(pdb_ids, download_pdbe_dir, cacher=cacher)
+        mmcif_files = await pdbe_fetch(pdb_ids, download_pdbe_dir, cacher=cacher)
+        with connect(session_dir) as con:
             # make paths relative to session_dir, so db stores paths relative to session_dir
             sr_mmcif_files = {pdb_id: mmcif_file.relative_to(session_dir) for pdb_id, mmcif_file in mmcif_files.items()}
             save_pdb_files(sr_mmcif_files, con)
@@ -171,10 +172,11 @@ async def async_retrieve_structures(
             what_af_formats = {"cif", "summary"}
         download_af_dir = download_dir / "alphafold"
         download_af_dir.mkdir(parents=True, exist_ok=True)
-        with connect(session_dir) as con:
+        with connect(session_dir, read_only=True) as con:
             af_ids = load_alphafold_ids(con)
-            afs = [entry async for entry in af_fetch(af_ids, download_af_dir, what_af_formats, cacher=cacher)]
-            sr_afs = [af_relative_to(af, session_dir) for af in afs]
+        afs = [entry async for entry in af_fetch(af_ids, download_af_dir, what_af_formats, cacher=cacher)]
+        sr_afs = [af_relative_to(af, session_dir) for af in afs]
+        with connect(session_dir) as con:
             save_alphafolds_files(sr_afs, con)
 
     return download_dir, len(sr_mmcif_files), len(afs)
