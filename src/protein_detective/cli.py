@@ -85,7 +85,7 @@ def add_retrieve_parser(subparsers):
         type=str,
         action="append",
         choices=sorted(downloadable_formats),
-        help="AlphaFold formats to retrieve. Can be specified multiple times. Default is 'cif'.",
+        help="AlphaFold formats to retrieve. Can be specified multiple times. Default is 'summary' and 'cif'.",
     )
 
 

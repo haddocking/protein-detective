@@ -168,7 +168,7 @@ async def async_retrieve_structures(
         # AlphaFold entries for the given query
         af_ids = set()
         if what_af_formats is None:
-            what_af_formats = {"cif"}
+            what_af_formats = {"cif", "summary"}
         download_af_dir = download_dir / "alphafold"
         download_af_dir.mkdir(parents=True, exist_ok=True)
         with connect(session_dir) as con:
