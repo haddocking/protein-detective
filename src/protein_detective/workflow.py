@@ -12,6 +12,7 @@ from protein_quest.alphafold.fetch import fetch_many_async as af_fetch
 from protein_quest.alphafold.fetch import relative_to as af_relative_to
 from protein_quest.pdbe.fetch import fetch as pdbe_fetch
 from protein_quest.uniprot import search4af, search4pdb, search4uniprot
+from protein_quest.utils import DirectoryCacher
 
 from protein_detective.db import (
     connect,
@@ -141,6 +142,8 @@ async def async_retrieve_structures(
     download_dir = session_dir / "downloads"
     download_dir.mkdir(parents=True, exist_ok=True)
 
+    cacher = DirectoryCacher()
+
     if what is None:
         what = {"pdbe", "alphafold"}
     if not (what <= what_retrieve_choices):
@@ -155,7 +158,7 @@ async def async_retrieve_structures(
         pdb_ids = set()
         with connect(session_dir) as con:
             pdb_ids = load_pdb_ids(con)
-            mmcif_files = await pdbe_fetch(pdb_ids, download_pdbe_dir)
+            mmcif_files = await pdbe_fetch(pdb_ids, download_pdbe_dir, cacher=cacher)
             # make paths relative to session_dir, so db stores paths relative to session_dir
             sr_mmcif_files = {pdb_id: mmcif_file.relative_to(session_dir) for pdb_id, mmcif_file in mmcif_files.items()}
             save_pdb_files(sr_mmcif_files, con)
@@ -170,7 +173,7 @@ async def async_retrieve_structures(
         download_af_dir.mkdir(parents=True, exist_ok=True)
         with connect(session_dir) as con:
             af_ids = load_alphafold_ids(con)
-            afs = [entry async for entry in af_fetch(af_ids, download_af_dir, what_af_formats)]
+            afs = [entry async for entry in af_fetch(af_ids, download_af_dir, what_af_formats, cacher=cacher)]
             sr_afs = [af_relative_to(af, session_dir) for af in afs]
             save_alphafolds_files(sr_afs, con)
 

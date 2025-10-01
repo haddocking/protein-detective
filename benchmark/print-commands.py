@@ -18,9 +18,7 @@ def create_run_script_content(row: dict, map_root: str, interaction_partner_seed
     min_res = int(float(row["Number of residues modelled"]) * (1 - res_range_fraction))
     max_res = int(float(row["Number of residues modelled"]) * (1 + res_range_fraction))
     interaction_partner_exclude = uniprot
-    interaction_partner_seed = " \\\n".join(
-        f'    --interaction-partner-seed "{s}"' for s in interaction_partner_seeds
-    )
+    interaction_partner_seed = " \\\n".join(f'    --interaction-partner-seed "{s}"' for s in interaction_partner_seeds)
 
     resolution = float(row["Resolution"])
 
