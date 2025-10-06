@@ -214,6 +214,8 @@ def filter_alphafold_structures(
     nr_cf_kept = len(cf_out_files)
     logger.info("Kept %i files after confidence filtering in %s", nr_cf_kept, cf_dir)
 
+    # TODO gunzip *.cif.gz files, or add cif.gz suport to powerfit
+
     if nr_cf_kept > 0 and do_ss:
         _filter_alphafolds_on_secondary_structure(
             secondary_structure=secondary_structure,
