@@ -174,7 +174,9 @@ async def async_retrieve_structures(
         download_af_dir.mkdir(parents=True, exist_ok=True)
         with connect(session_dir, read_only=True) as con:
             af_ids = load_alphafold_ids(con)
-        afs = [entry async for entry in af_fetch(af_ids, download_af_dir, what_af_formats, cacher=cacher, gzip_files=True)]
+        afs = [
+            entry async for entry in af_fetch(af_ids, download_af_dir, what_af_formats, cacher=cacher, gzip_files=True)
+        ]
         sr_afs = [af_relative_to(af, session_dir) for af in afs]
         with connect(session_dir) as con:
             save_alphafolds_files(sr_afs, con)

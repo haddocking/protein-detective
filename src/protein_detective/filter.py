@@ -3,9 +3,7 @@
 In protein_quest package the filters are more granular, here we combine them into coarse grained methods.
 """
 
-import gzip
 import logging
-import shutil
 import sys
 from copy import deepcopy
 from dataclasses import dataclass
@@ -214,8 +212,6 @@ def filter_alphafold_structures(
     nr_cf_kept = len(cf_out_files)
     logger.info("Kept %i files after confidence filtering in %s", nr_cf_kept, cf_dir)
 
-    # TODO gunzip *.cif.gz files, or add cif.gz suport to powerfit
-
     if nr_cf_kept > 0 and do_ss:
         _filter_alphafolds_on_secondary_structure(
             secondary_structure=secondary_structure,
@@ -224,6 +220,7 @@ def filter_alphafold_structures(
             af_total_results=af_total_results,
             alphafold_cif_files2upid=alphafold_cif_files2upid,
         )
+
     return af_total_results
 
 
@@ -310,23 +307,6 @@ def _filter_pdb_structures_by_residue_count(
     return residue_filtered, residue_filtered_files
 
 
-def _uncompress_gz_files(pdbe_total_results: FilterResults) -> None:
-    # protein-quest downloaded and filtered *.cif.gz files however powerfit only understands *.pdb and *.cif files
-    logger.info("Uncompressing *.cif.gz files to *.cif files")
-    i = 0
-    for r in pdbe_total_results.values():
-        orig_output_file = r.output_file
-        if orig_output_file is None or orig_output_file.suffix != ".gz":
-            continue
-        i += 1
-        new_output_file = orig_output_file.with_suffix("")
-        with gzip.open(orig_output_file, "rb") as f_in, new_output_file.open("wb") as f_out:
-            shutil.copyfileobj(f_in, f_out)  # pyright: ignore[reportArgumentType]
-        orig_output_file.unlink()
-        r.output_file = new_output_file
-    logger.info("Uncompression of %i files complete", i)
-
-
 def filter_pdbe_structures(
     proteinpdbs: list[ProteinPdbRow],
     session_dir: Path,
@@ -408,7 +388,5 @@ def filter_pdbe_structures(
             residue_filtered=residue_filtered,
             residue_filtered_files=residue_filtered_files,
         )
-
-    _uncompress_gz_files(pdbe_total_results)
 
     return pdbe_total_results
