@@ -96,8 +96,9 @@ def add_filter_parser(subparsers: argparse._SubParsersAction):
     - For PDBe structures the chain of Uniprot protein is written as chain A.
     - For AlphaFold structures filter by confidence (pLDDT) threshold
     - Number of residues in chain A
-      - For AlphaFold structures writes new files with low confidence residues (below threshold) removed
+      For AlphaFold structures writes new files with low confidence residues (below threshold) removed
     - Number of residues in secondary structure (helices and sheets)
+    - For determining the fraction or number of Secondary Structure elements see the following notebook: https://www.bonvinlab.org/protein-detective/SSE_elements.html
 
     Also uncompresses *.cif.gz files to *.cif files for compatibility with powerfit.
     """)
