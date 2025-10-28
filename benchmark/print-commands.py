@@ -45,6 +45,9 @@ protein-detective search \\
     --taxon-id {tax_id} \\
     --interaction-partner-exclude "{interaction_partner_exclude}" \\
 {interaction_partner_seed} \\
+    --min_residues {soft_min_res} \\
+    --max_residues {soft_max_res} \\
+    --min-sequence-length {hard_min_res} \\
     --limit {search_limit} \\
     .
 """
