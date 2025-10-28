@@ -10,15 +10,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class UniprotQuery(Query):
-    """A UniProt search query with interaction partner options.
+    """A UniProt search query with interaction partner options and pdb residue length filters.
 
     Parameters:
         interaction_partner_seeds: A set of UniProt accessions to search for interaction partners.
         interaction_partners_excludes: A set of UniProt accessions to exclude from interaction partner results.
+        min_residues: Minimum number of residues required in the chain mapped to the UniProt accession.
+        max_residues: Maximum number of residues allowed in chain mapped to the UniProt accession.
     """
 
     interaction_partner_seeds: set[str] = field(default_factory=set)
     interaction_partner_excludes: set[str] = field(default_factory=set)
+    min_residues: int | None = None
+    max_residues: int | None = None
 
 
 def search_for_interaction_partners(query: UniprotQuery, limit: int) -> set[str]:

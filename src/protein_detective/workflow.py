@@ -11,7 +11,14 @@ from protein_quest.alphafold.fetch import DownloadableFormat
 from protein_quest.alphafold.fetch import fetch_many_async as af_fetch
 from protein_quest.alphafold.fetch import relative_to as af_relative_to
 from protein_quest.pdbe.fetch import fetch as pdbe_fetch
-from protein_quest.uniprot import search4af, search4pdb, search4uniprot
+from protein_quest.uniprot import (
+    filter_pdb_results_on_chain_length,
+    map_uniprot_accessions2uniprot_details,
+    search4af,
+    search4pdb,
+    search4uniprot,
+)
+from protein_quest.utils import DirectoryCacher
 
 from protein_detective.db import (
     connect,
@@ -27,6 +34,7 @@ from protein_detective.db import (
     save_pdbs,
     save_query,
     save_uniprot_accessions,
+    save_uniprot_details,
 )
 from protein_detective.filter import (
     FilteredStructure,
@@ -72,20 +80,37 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
         and the number of AlphaFold structures found.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
+    logger.info("Searching UniProt")
     uniprot_accessions = search4uniprot(query, limit)
+    logger.info(f"Found {len(uniprot_accessions)} UniProt accessions matching the query")
+    logger.info("Searching for interaction partners")
     logger.debug(uniprot_accessions)
     uniprot_accessions_of_partners = search_for_interaction_partners(query, limit)
     logger.debug(uniprot_accessions_of_partners)
     nr_interaction_partners = len(uniprot_accessions_of_partners)
+    logger.info(f"Found {nr_interaction_partners} interaction partners")
     uniprot_accessions.update(uniprot_accessions_of_partners)
+    logger.info("Searching for PDB references")
     pdbs = search4pdb(uniprot_accessions, limit=limit)
-    af_result = search4af(uniprot_accessions, limit=limit)
+    if query.min_residues or query.max_residues:
+        pdbs = filter_pdb_results_on_chain_length(pdbs, query.min_residues, query.max_residues)
+    logger.info("Searching for AlphaFold references")
+    af_result = search4af(
+        uniprot_accessions,
+        min_sequence_length=query.min_sequence_length,
+        max_sequence_length=query.max_sequence_length,
+        limit=limit,
+    )
+    logger.info(f"Fetching details for {len(uniprot_accessions)} UniProt accessions")
+    uniprot_details = list(map_uniprot_accessions2uniprot_details(uniprot_accessions))
+    logger.info(f"Saving results to session in {session_dir}")
 
     with connect(session_dir) as con:
         save_query(query, con)
         save_uniprot_accessions(uniprot_accessions, con)
         nr_pdbs, nr_prot2pdb = save_pdbs(pdbs, con)
         nr_afs = save_alphafolds(af_result, con)
+        save_uniprot_details(uniprot_details, con)
 
     return UniprotSearchResult(
         nr_uniprot_accessions=len(uniprot_accessions),
@@ -129,6 +154,7 @@ async def async_retrieve_structures(
         session_dir: The directory to store downloaded files and the session database.
         what: A set of strings indicating which databases to retrieve files from ("pdbe", "alphafold").
         what_af_formats: A set of formats to download from AlphaFold (e.g., "pdb", "cif").
+            If None, defaults to {"summary", "cif"}.
 
     Returns:
         A tuple containing:
@@ -140,6 +166,8 @@ async def async_retrieve_structures(
         raise NotADirectoryError(session_dir)
     download_dir = session_dir / "downloads"
     download_dir.mkdir(parents=True, exist_ok=True)
+
+    cacher = DirectoryCacher()
 
     if what is None:
         what = {"pdbe", "alphafold"}
@@ -155,7 +183,7 @@ async def async_retrieve_structures(
         pdb_ids = set()
         with connect(session_dir) as con:
             pdb_ids = load_pdb_ids(con)
-            mmcif_files = await pdbe_fetch(pdb_ids, download_pdbe_dir)
+            mmcif_files = await pdbe_fetch(pdb_ids, download_pdbe_dir, cacher=cacher)
             # make paths relative to session_dir, so db stores paths relative to session_dir
             sr_mmcif_files = {pdb_id: mmcif_file.relative_to(session_dir) for pdb_id, mmcif_file in mmcif_files.items()}
             save_pdb_files(sr_mmcif_files, con)
@@ -165,12 +193,15 @@ async def async_retrieve_structures(
         # AlphaFold entries for the given query
         af_ids = set()
         if what_af_formats is None:
-            what_af_formats = {"cif"}
+            what_af_formats = {"summary", "cif"}
         download_af_dir = download_dir / "alphafold"
         download_af_dir.mkdir(parents=True, exist_ok=True)
         with connect(session_dir) as con:
             af_ids = load_alphafold_ids(con)
-            afs = [entry async for entry in af_fetch(af_ids, download_af_dir, what_af_formats)]
+            afs = [
+                entry
+                async for entry in af_fetch(af_ids, download_af_dir, what_af_formats, gzip_files=True, cacher=cacher)
+            ]
             sr_afs = [af_relative_to(af, session_dir) for af in afs]
             save_alphafolds_files(sr_afs, con)
 
@@ -183,8 +214,6 @@ def filter_structures(
     scheduler_address: str | Cluster | None = None,
 ) -> tuple[Path, list[FilteredStructure]]:
     """Filter the structures in the session based on confidence, number of residues, and secondary structure.
-
-    Also uncompresses *.cif.gz files to *.cif files for compatibility with powerfit.
 
     Args:
         session_dir: The directory containing the session data, including structure files.
