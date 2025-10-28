@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS alphafolds (
     bcif_file TEXT,
     cif_file TEXT,
     pdb_file TEXT,
-    pae_image_file TEXT,
     pae_doc_file TEXT,
     am_annotations_file TEXT,
     am_annotations_hg19_file TEXT,

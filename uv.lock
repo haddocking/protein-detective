@@ -15,18 +15,6 @@ wheels = [
 ]
 
 [[package]]
-name = "aiofile"
-version = "3.9.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "caio" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/67/e2/d7cb819de8df6b5c1968a2756c3cb4122d4fa2b8fc768b53b7c9e5edb646/aiofile-3.9.0.tar.gz", hash = "sha256:e5ad718bb148b265b6df1b3752c4d1d83024b93da9bd599df74b9d9ffcf7919b", size = 17943, upload-time = "2024-10-08T10:39:35.846Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/50/25/da1f0b4dd970e52bf5a36c204c107e11a0c6d3ed195eba0bfbc664c312b2/aiofile-3.9.0-py3-none-any.whl", hash = "sha256:ce2f6c1571538cbdfa0143b04e16b208ecb0e9cb4148e528af8a640ed51cc8aa", size = 19539, upload-time = "2024-10-08T10:39:32.955Z" },
-]
-
-[[package]]
 name = "aiofiles"
 version = "24.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -95,19 +83,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9d/61/ebda4d8e3d8cfa1fd3db0fb428db2dd7461d5742cea35178277ad180b033/aiohttp_retry-2.9.1.tar.gz", hash = "sha256:8eb75e904ed4ee5c2ec242fefe85bf04240f685391c4879d8f541d6028ff01f1", size = 13608, upload-time = "2024-11-06T10:44:54.574Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1a/99/84ba7273339d0f3dfa57901b846489d2e5c2cd731470167757f1935fffbd/aiohttp_retry-2.9.1-py3-none-any.whl", hash = "sha256:66d2759d1921838256a05a3f80ad7e724936f083e35be5abb5e16eed6be6dc54", size = 9981, upload-time = "2024-11-06T10:44:52.917Z" },
-]
-
-[[package]]
-name = "aiopath"
-version = "0.7.7"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "aiofile" },
-    { name = "anyio" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a4/6f/b377e3eb293feb57e457b33961004cc3716794ef97428d2ae2a326599b1c/aiopath-0.7.7.tar.gz", hash = "sha256:ad4b9d09ae08ddf6d39dd06e7b0a353939e89528da571c0cd4f3fe071aefad4f", size = 16925, upload-time = "2023-10-16T22:37:11.381Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/97/df/6a3826363e4848ffa8972410ab5234d3802597ae92f4a6397600149112c7/aiopath-0.7.7-py2.py3-none-any.whl", hash = "sha256:cd5d18de8ede167e1db659f02ee448fe085f923cb8e194407ccc568bffc4fe4e", size = 12200, upload-time = "2023-10-16T22:37:09.595Z" },
 ]
 
 [[package]]
@@ -355,17 +330,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/cd/15/695b1409264143be3c933f708a3f81d53c4a1e1ebbc06f46331decbf6563/brotlicffi-1.1.0.0-cp37-abi3-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:84763dbdef5dd5c24b75597a77e1b30c66604725707565188ba54bab4f114820", size = 2851834, upload-time = "2023-09-14T14:22:03.571Z" },
     { url = "https://files.pythonhosted.org/packages/b4/40/b961a702463b6005baf952794c2e9e0099bde657d0d7e007f923883b907f/brotlicffi-1.1.0.0-cp37-abi3-win32.whl", hash = "sha256:1b12b50e07c3911e1efa3a8971543e7648100713d4e0971b13631cce22c587eb", size = 341731, upload-time = "2023-09-14T14:22:05.74Z" },
     { url = "https://files.pythonhosted.org/packages/1c/fa/5408a03c041114ceab628ce21766a4ea882aa6f6f0a800e04ee3a30ec6b9/brotlicffi-1.1.0.0-cp37-abi3-win_amd64.whl", hash = "sha256:994a4f0681bb6c6c3b0925530a1926b7a189d878e6e5e38fae8efa47c5d9c613", size = 366783, upload-time = "2023-09-14T14:22:07.096Z" },
-]
-
-[[package]]
-name = "caio"
-version = "0.9.24"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/98/04/ec9b6864135032fd454f6cd1d9444e0bb01040196ad0cd776c061fc92c6b/caio-0.9.24.tar.gz", hash = "sha256:5bcdecaea02a9aa8e3acf0364eff8ad9903d57d70cdb274a42270126290a77f1", size = 27174, upload-time = "2025-04-23T16:31:19.191Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/66/35/06e77837fc5455d330c5502460fc3743989d4ff840b61aa79af3a7ec5b19/caio-0.9.24-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:1d47ef8d76aca74c17cb07339a441c5530fc4b8dd9222dfb1e1abd7f9f9b814f", size = 42214, upload-time = "2025-04-23T16:31:12.272Z" },
-    { url = "https://files.pythonhosted.org/packages/e0/e2/c16aeaea4b2103e04fdc2e7088ede6313e1971704c87fcd681b58ab1c6b4/caio-0.9.24-cp313-cp313-manylinux_2_34_aarch64.whl", hash = "sha256:d15fc746c4bf0077d75df05939d1e97c07ccaa8e580681a77021d6929f65d9f4", size = 81557, upload-time = "2025-04-23T16:31:13.526Z" },
-    { url = "https://files.pythonhosted.org/packages/78/3b/adeb0cffe98dbe60661f316ec0060037a5209a5ed8be38ac8e79fdbc856d/caio-0.9.24-cp313-cp313-manylinux_2_34_x86_64.whl", hash = "sha256:9368eae0a9badd5f31264896c51b47431d96c0d46f1979018fb1d20c49f56156", size = 80242, upload-time = "2025-04-23T16:31:14.365Z" },
 ]
 
 [[package]]
@@ -763,6 +727,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/8b/02/0835e6ab9cfc03916fe3f78c0956cfcdb6ff2669ffa6651065d5ebf7fc98/fsspec-2025.7.0.tar.gz", hash = "sha256:786120687ffa54b8283d942929540d8bc5ccfa820deb555a2b5d0ed2b737bf58", size = 304432, upload-time = "2025-07-15T16:05:21.19Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2f/e0/014d5d9d7a4564cf1c40b5039bc882db69fd881111e03ab3657ac0b218e2/fsspec-2025.7.0-py3-none-any.whl", hash = "sha256:8b012e39f63c7d5f10474de957f3ab793b47b45ae7d39f2fb735f8bbe25c0e21", size = 199597, upload-time = "2025-07-15T16:05:19.529Z" },
+]
+
+[[package]]
+name = "future"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a7/b2/4140c69c6a66432916b26158687e821ba631a4c9273c474343badf84d3ba/future-1.0.0.tar.gz", hash = "sha256:bd2968309307861edae1458a4f8a4f3598c03be43b97521076aebf5d94c07b05", size = 1228490, upload-time = "2024-02-21T11:52:38.461Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/da/71/ae30dadffc90b9006d77af76b393cb9dfbfc9629f339fc1574a1c52e6806/future-1.0.0-py3-none-any.whl", hash = "sha256:929292d34f5872e70396626ef385ec22355a1fae8ad29e1a734c3e43f9fbc216", size = 491326, upload-time = "2024-02-21T11:52:35.956Z" },
 ]
 
 [[package]]
@@ -1505,6 +1478,24 @@ wheels = [
 ]
 
 [[package]]
+name = "mmcif"
+version = "0.92.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "future" },
+    { name = "msgpack" },
+    { name = "requests" },
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e5/11/c1dd3b992b8cab9bb539a6dbde9746d6c6470908d8d618810282d7b5a41c/mmcif-0.92.0.tar.gz", hash = "sha256:891879040fd63d417bd3752b26d19b3b8c2809fc5a48669346a7c60c7e319e1b", size = 1675875, upload-time = "2025-05-29T09:51:15.119Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/31/d6/09ae93505c5d0c3d3664df14bfe5ae7ba6eea66231f87631f5cc2958219f/mmcif-0.92.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:12070c1965fc08deec817b6069a14085bbd582ee97a9eec0556e99e8305f462e", size = 555364, upload-time = "2025-05-29T09:51:05.134Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/84/e31a0e532916705c37c7bcc929c106eb7dd56ff168cf18e2b618cbc7b275/mmcif-0.92.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:6a278f0b0b8c8bd848f56d0b6def930fdf41621d6a7ab468d335e9657bb6ab6e", size = 504359, upload-time = "2025-05-29T09:51:06.285Z" },
+    { url = "https://files.pythonhosted.org/packages/73/57/3be6763c1dda0da6d2cf71c3e196754543ff526d69064f861bbd28bc443a/mmcif-0.92.0-cp313-cp313-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:2c1f88939803a882930fe7473b1a3c62f492403839f628ae1288cdb3dd0d58d1", size = 637459, upload-time = "2025-05-29T10:01:26.695Z" },
+    { url = "https://files.pythonhosted.org/packages/01/b0/b5427faf2b2f1690be5dec169506570ed24b0a0d89a6426faead60a51515/mmcif-0.92.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1dd815ad57fa2d595a499bda75ceb3b468f7e6a9db7c3e02aaf8b1cfe11a5a20", size = 620268, upload-time = "2025-05-29T10:01:28.148Z" },
+]
+
+[[package]]
 name = "molviewspec"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2197,12 +2188,12 @@ dependencies = [
     { name = "aiofiles" },
     { name = "aiohttp", extra = ["speedups"] },
     { name = "aiohttp-retry" },
-    { name = "aiopath" },
     { name = "attrs" },
     { name = "cattrs", extra = ["orjson"] },
     { name = "dask" },
     { name = "distributed" },
     { name = "gemmi" },
+    { name = "mmcif" },
     { name = "platformdirs" },
     { name = "psutil" },
     { name = "rich" },
@@ -2217,16 +2208,16 @@ requires-dist = [
     { name = "aiofiles", specifier = ">=24.1.0" },
     { name = "aiohttp", extras = ["speedups"], specifier = ">=3.11.18" },
     { name = "aiohttp-retry", specifier = ">=2.9.1" },
-    { name = "aiopath", specifier = ">=0.7.7" },
     { name = "attrs", specifier = ">=25.3.0" },
     { name = "cattrs", extras = ["orjson"], specifier = ">=24.1.3" },
     { name = "dask", specifier = ">=2025.5.1" },
     { name = "distributed", specifier = ">=2025.5.1" },
     { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=2.11.3" },
     { name = "gemmi", specifier = ">=0.7.3" },
+    { name = "mmcif", specifier = ">=0.92.0" },
     { name = "platformdirs", specifier = ">=4.3.8" },
     { name = "psutil", specifier = ">=7.0.0" },
-    { name = "pydantic", marker = "extra == 'mcp'", specifier = ">=2.11.7" },
+    { name = "pydantic", marker = "extra == 'mcp'", specifier = ">=2.12.0" },
     { name = "rich", specifier = ">=14.0.0" },
     { name = "rich-argparse", specifier = ">=1.7.1" },
     { name = "sparqlwrapper", specifier = ">=2.0.0" },

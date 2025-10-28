@@ -308,12 +308,11 @@ def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
             str(af.bcif_file) if af.bcif_file else None,
             str(af.cif_file) if af.cif_file else None,
             str(af.pdb_file) if af.pdb_file else None,
-            str(af.pae_image_file) if af.pae_image_file else None,
             str(af.pae_doc_file) if af.pae_doc_file else None,
             str(af.am_annotations_file) if af.am_annotations_file else None,
             str(af.am_annotations_hg19_file) if af.am_annotations_hg19_file else None,
             str(af.am_annotations_hg38_file) if af.am_annotations_hg38_file else None,
-            af.uniprot_acc,
+            af.uniprot_accession,
         )
         for af in afs
     ]
@@ -326,7 +325,6 @@ def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
             bcif_file = ?,
             cif_file = ?,
             pdb_file = ?,
-            pae_image_file = ?,
             pae_doc_file = ?,
             am_annotations_file = ?,
             am_annotations_hg19_file = ?,
@@ -370,7 +368,6 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
         if(length(bcif_file), concat_ws('/', getvariable('session_dir'), bcif_file), NULL) AS bcif_file,
         if(length(cif_file), concat_ws('/', getvariable('session_dir'), cif_file), NULL) AS cif_file,
         if(length(pdb_file), concat_ws('/', getvariable('session_dir'), pdb_file), NULL) AS pdb_file,
-        if(length(pae_image_file), concat_ws('/', getvariable('session_dir'), pae_image_file), NULL) AS pae_image_file,
         if(length(pae_doc_file), concat_ws('/', getvariable('session_dir'), pae_doc_file), NULL) AS pae_doc_file,
         if(
             length(am_annotations_file),
@@ -392,12 +389,11 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     rows = con.execute(query).fetchall()
     return [
         AlphaFoldEntry(
-            uniprot_acc=row[0],
+            uniprot_accession=row[0],
             summary=converter.loads(row[1], EntrySummary),
             bcif_file=Path(row[2]) if row[2] else None,
             cif_file=Path(row[3]) if row[3] else None,
             pdb_file=Path(row[4]) if row[4] else None,
-            pae_image_file=Path(row[5]) if row[5] else None,
             pae_doc_file=Path(row[6]) if row[6] else None,
             am_annotations_file=Path(row[7]) if row[7] else None,
             am_annotations_hg19_file=Path(row[8]) if row[8] else None,

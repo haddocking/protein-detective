@@ -201,7 +201,7 @@ def filter_alphafold_structures(
     af_total_results: FilterResults = {}
 
     alphafold_cif_files = [e.cif_file for e in afs if e.cif_file is not None]
-    alphafold_cif_files2upid = {e.cif_file.name: (e.uniprot_acc, None) for e in afs if e.cif_file is not None}
+    alphafold_cif_files2upid = {e.cif_file.name: (e.uniprot_accession, None) for e in afs if e.cif_file is not None}
 
     logger.info("Filtering AlphaFold files on confidence")
     cf_dir = session_dir / "confidence_filtered" if do_ss else final_dir
