@@ -20,7 +20,7 @@ dependencies = [
     "pyopencl>=2025.2.5",
     "rich>=14.0.0",
     "rich-argparse>=1.7.1",
-    "tqdm>=4.67.1",
+    "tqdm>=4.67.1"
 ]
 
 [project.urls]
@@ -36,11 +36,14 @@ protein-detective = "protein_detective.cli:main"
 type = [
     "pyrefly>=0.39.1",
     "types-aiofiles>=24.1.0.20250326",
-    "types-tqdm>=4.67.0.20250513",
+    "types-tqdm>=4.67.0.20250513"
+]
+test = [
+    "pytest>=8.3.5",
 ]
 dev = [
-    "pytest>=8.3.5",
-    {include-group = "type"},
+    {include-group = "test"},
+    {include-group = "type"}
 ]
 docs = [
     "duckdb-engine>=0.17.0",
@@ -56,13 +59,15 @@ docs = [
     "mkdocs-rich-argparse>=0.1.2",
     "mkdocstrings[python]>=0.29.1",
     "nbconvert>=7.16.6",
-    "toml>=0.10.2",
+    "toml>=0.10.2"
+]
+marimo = [
+    "marimo[sql]>=0.13.15"
 ]
 docs-type = [
-    "marimo[sql]>=0.13.15",
-    "pyrefly>=0.39.1",
+    {include-group = "marimo"},
     {include-group = "type"},
-    {include-group = "docs"},
+    {include-group = "docs"}
 ]
 
 [build-system]
@@ -152,7 +157,7 @@ ignore = [
     # Allow generic variable name
     "PD901",
     # Allow suspicious-url-open-usage
-    "S310",
+    "S310"
 ]
 
 [tool.ruff.lint.pydocstyle]
