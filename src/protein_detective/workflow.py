@@ -11,7 +11,13 @@ from protein_quest.alphafold.fetch import DownloadableFormat
 from protein_quest.alphafold.fetch import fetch_many_async as af_fetch
 from protein_quest.alphafold.fetch import relative_to as af_relative_to
 from protein_quest.pdbe.fetch import fetch as pdbe_fetch
-from protein_quest.uniprot import map_uniprot_accessions2uniprot_details, search4af, search4pdb, search4uniprot
+from protein_quest.uniprot import (
+    filter_pdb_results_on_chain_length,
+    map_uniprot_accessions2uniprot_details,
+    search4af,
+    search4pdb,
+    search4uniprot,
+)
 from protein_quest.utils import DirectoryCacher
 
 from protein_detective.db import (
@@ -86,6 +92,8 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
     uniprot_accessions.update(uniprot_accessions_of_partners)
     logger.info(f"Searching for PDB references")
     pdbs = search4pdb(uniprot_accessions, limit=limit)
+    if query.min_residues or query.max_residues:
+        pdbs = filter_pdb_results_on_chain_length(pdbs, query.min_residues, query.max_residues)
     logger.info(f"Searching for AlphaFold references")
     af_result = search4af(
         uniprot_accessions,

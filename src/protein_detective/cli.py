@@ -71,6 +71,16 @@ def add_search_parser(subparsers):
         action="append",
         help="UniProt ID to exclude as found interaction partners. Can be specified multiple times.",
     )
+    parser.add_argument(
+        "--min-residues",
+        type=int,
+        help="Minimum number of residues required in the chain mapped to the UniProt accession.",
+    )
+    parser.add_argument(
+        "--max-residues",
+        type=int,
+        help="Maximum number of residues allowed in chain mapped to the UniProt accession.",
+    )
 
     parser.add_argument("--limit", type=int, default=10_000, help="Limit number of results")
 
@@ -164,6 +174,8 @@ def handle_search(args):
             "max_sequence_length": args.max_sequence_length,
             "interaction_partner_seeds": args.interaction_partner_seed or [],
             "interaction_partner_excludes": args.interaction_partner_exclude or [],
+            "min_residues": args.min_residues,
+            "max_residues": args.max_residues,
         },
         UniprotQuery,
     )
