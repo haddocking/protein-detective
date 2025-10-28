@@ -14,15 +14,17 @@ def create_run_script_content(row: dict, map_root: str, interaction_partner_seed
     chain = row["Chain"]
     # Use a range around the modelled residues for filtering
     # TODO use better logic to determine min/max residues based on the volume of the unknown density
-    res_range_fraction = 0.1  # +- 10%
-    min_res = int(float(row["Number of residues modelled"]) * (1 - res_range_fraction))
-    max_res = int(float(row["Number of residues modelled"]) * (1 + res_range_fraction))
+    sorf_res_range_fraction = 0.1  # +- 10%
+    hard_res_range_fraction = 0.2  # +- 20%
+    soft_min_res = int(float(row["Number of residues modelled"]) * (1 - sorf_res_range_fraction))
+    soft_max_res = int(float(row["Number of residues modelled"]) * (1 + sorf_res_range_fraction))
+    hard_min_res = int(float(row["Number of residues modelled"]) * (1 - hard_res_range_fraction))
     interaction_partner_exclude = uniprot
     interaction_partner_seed = " \\\n".join(f'    --interaction-partner-seed "{s}"' for s in interaction_partner_seeds)
 
     resolution = float(row["Resolution"])
 
-    powerfit_args = "--gpu 3"
+    powerfit_args = ""
 
     search = f"""\
 protein-detective search \\
@@ -31,6 +33,9 @@ protein-detective search \\
     --subcellular-location-go GO:{go_location} \\
     --interaction-partner-exclude "{interaction_partner_exclude}" \\
 {interaction_partner_seed} \\
+    --min_residues {soft_min_res} \\
+    --max_residues {soft_max_res} \\
+    --min-sequence-length {hard_min_res} \\
     --limit {search_limit} \\
     .
 """
@@ -62,13 +67,13 @@ fi
 # Is fitted model {pdb_id}:{chain} part of the search results?
 ls -1 downloads/pdbe/{pdb_id.lower()}.cif
 
-# use {min_res} to {max_res} as residue range
+# use {soft_min_res} to {soft_max_res} as residue range
 
 if [ ! -d "filtered" ]; then
 protein-detective filter \\
     --confidence-threshold 70 \\
-    --min-residues {min_res} \\
-    --max-residues {max_res} \\
+    --min-residues {soft_min_res} \\
+    --max-residues {soft_max_res} \\
     .
 fi
 
