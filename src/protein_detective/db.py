@@ -13,7 +13,7 @@ from pandas import DataFrame
 from protein_quest.alphafold.entry_summary import EntrySummary
 from protein_quest.alphafold.fetch import AlphaFoldEntry
 from protein_quest.converter import converter
-from protein_quest.uniprot import PdbResult
+from protein_quest.uniprot import PdbResult, UniprotDetails
 
 from protein_detective.filter import FilteredStructure, FilterOptions
 from protein_detective.powerfit.options import PowerfitOptions
@@ -138,6 +138,42 @@ def save_uniprot_accessions(uniprot_accessions: Iterable[str], con: DuckDBPyConn
     uniprot_df = DataFrame(uniprot_data)
     con.execute("INSERT OR IGNORE INTO proteins (uniprot_acc) SELECT * FROM uniprot_df")
     return len(uniprot_df)
+
+
+def save_uniprot_details(details: Iterable[UniprotDetails], con: DuckDBPyConnection) -> int:
+    """Save UniProt details to the database.
+
+    Args:
+        details: An iterable of UniprotDetails to save.
+        con: The DuckDB connection to use for saving the data.
+
+    Returns:
+        The number of UniProt details saved to the database.
+    """
+    detail_data = [
+        {
+            "uniprot_acc": detail.uniprot_accession,
+            "uniprot_id": detail.uniprot_id,
+            "sequence_length": detail.sequence_length,
+            "reviewed": detail.reviewed,
+            "protein_name": detail.protein_name,
+            "taxon_id": detail.taxon_id,
+            "taxon_name": detail.taxon_name,
+        }
+        for detail in details
+    ]
+    if len(detail_data) == 0:
+        return 0
+    detail_df = DataFrame(detail_data)
+    con.execute(
+        """
+        INSERT OR REPLACE INTO proteins
+        (uniprot_acc, uniprot_id, sequence_length, reviewed, protein_name, taxon_id, taxon_name)
+        SELECT uniprot_acc, uniprot_id, sequence_length, reviewed, protein_name, taxon_id, taxon_name
+        FROM detail_df
+        """
+    )
+    return len(detail_df)
 
 
 def save_pdbs(

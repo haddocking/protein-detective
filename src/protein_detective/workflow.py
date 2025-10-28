@@ -11,7 +11,7 @@ from protein_quest.alphafold.fetch import DownloadableFormat
 from protein_quest.alphafold.fetch import fetch_many_async as af_fetch
 from protein_quest.alphafold.fetch import relative_to as af_relative_to
 from protein_quest.pdbe.fetch import fetch as pdbe_fetch
-from protein_quest.uniprot import search4af, search4pdb, search4uniprot
+from protein_quest.uniprot import map_uniprot_accessions2uniprot_details, search4af, search4pdb, search4uniprot
 from protein_quest.utils import DirectoryCacher
 
 from protein_detective.db import (
@@ -28,6 +28,7 @@ from protein_detective.db import (
     save_pdbs,
     save_query,
     save_uniprot_accessions,
+    save_uniprot_details,
 )
 from protein_detective.filter import (
     FilteredStructure,
@@ -73,25 +74,35 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
         and the number of AlphaFold structures found.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Searching UniProt")
     uniprot_accessions = search4uniprot(query, limit)
+    logger.info(f"Found {len(uniprot_accessions)} UniProt accessions matching the query")
+    logger.info(f"Searching for interaction partners")
     logger.debug(uniprot_accessions)
     uniprot_accessions_of_partners = search_for_interaction_partners(query, limit)
     logger.debug(uniprot_accessions_of_partners)
     nr_interaction_partners = len(uniprot_accessions_of_partners)
+    logger.info(f"Found {nr_interaction_partners} interaction partners")
     uniprot_accessions.update(uniprot_accessions_of_partners)
+    logger.info(f"Searching for PDB references")
     pdbs = search4pdb(uniprot_accessions, limit=limit)
+    logger.info(f"Searching for AlphaFold references")
     af_result = search4af(
         uniprot_accessions,
         min_sequence_length=query.min_sequence_length,
         max_sequence_length=query.max_sequence_length,
         limit=limit,
     )
+    logger.info(f"Fetching details for {len(uniprot_accessions)} UniProt accessions")
+    uniprot_details = list(map_uniprot_accessions2uniprot_details(uniprot_accessions))
+    logger.info(f"Saving results to session in {session_dir}")
 
     with connect(session_dir) as con:
         save_query(query, con)
         save_uniprot_accessions(uniprot_accessions, con)
         nr_pdbs, nr_prot2pdb = save_pdbs(pdbs, con)
         nr_afs = save_alphafolds(af_result, con)
+        save_uniprot_details(uniprot_details, con)
 
     return UniprotSearchResult(
         nr_uniprot_accessions=len(uniprot_accessions),

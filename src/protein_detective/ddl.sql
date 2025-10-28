@@ -10,6 +10,12 @@ CREATE TABLE IF NOT EXISTS uniprot_searches (
 
 CREATE TABLE IF NOT EXISTS proteins (
     uniprot_acc TEXT PRIMARY KEY,
+    uniprot_id TEXT,
+    sequence_length INTEGER,
+    reviewed BOOLEAN,
+    protein_name TEXT,
+    taxon_id INTEGER,
+    taxon_name TEXT
 );
 
 CREATE TABLE IF NOT EXISTS pdbs (
