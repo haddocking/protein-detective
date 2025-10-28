@@ -312,6 +312,8 @@ def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
             str(af.am_annotations_file) if af.am_annotations_file else None,
             str(af.am_annotations_hg19_file) if af.am_annotations_hg19_file else None,
             str(af.am_annotations_hg38_file) if af.am_annotations_hg38_file else None,
+            str(af.msa_file) if af.msa_file else None,
+            str(af.plddt_doc_file) if af.plddt_doc_file else None,
             af.uniprot_accession,
         )
         for af in afs
@@ -328,7 +330,9 @@ def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection):
             pae_doc_file = ?,
             am_annotations_file = ?,
             am_annotations_hg19_file = ?,
-            am_annotations_hg38_file = ?
+            am_annotations_hg38_file = ?,
+            msa_file = ?,
+            plddt_doc_file = ?
         WHERE uniprot_acc = ?
         """,
         rows,
@@ -383,7 +387,17 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
             length(am_annotations_hg38_file),
             concat_ws('/', getvariable('session_dir'), am_annotations_hg38_file),
             NULL
-        ) AS am_annotations_hg38_file
+        ) AS am_annotations_hg38_file,
+        if(
+            length(msa_file),
+            concat_ws('/', getvariable('session_dir'), msa_file),
+            NULL
+        ) AS msa_file,
+        if(
+            length(plddt_doc_file),
+            concat_ws('/', getvariable('session_dir'), plddt_doc_file),
+            NULL
+        ) AS plddt_doc_file
     FROM alphafolds
     """
     rows = con.execute(query).fetchall()
@@ -394,10 +408,12 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
             bcif_file=Path(row[2]) if row[2] else None,
             cif_file=Path(row[3]) if row[3] else None,
             pdb_file=Path(row[4]) if row[4] else None,
-            pae_doc_file=Path(row[6]) if row[6] else None,
-            am_annotations_file=Path(row[7]) if row[7] else None,
-            am_annotations_hg19_file=Path(row[8]) if row[8] else None,
-            am_annotations_hg38_file=Path(row[9]) if row[9] else None,
+            pae_doc_file=Path(row[5]) if row[5] else None,
+            am_annotations_file=Path(row[6]) if row[6] else None,
+            am_annotations_hg19_file=Path(row[7]) if row[7] else None,
+            am_annotations_hg38_file=Path(row[8]) if row[8] else None,
+            msa_file=Path(row[9]) if row[9] else None,
+            plddt_doc_file=Path(row[10]) if row[10] else None,
         )
         for row in rows
     ]

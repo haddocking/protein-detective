@@ -72,7 +72,7 @@ def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list
     return commands, powerfit_run_id
 
 
-def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_address: str | Cluster | None) -> int:
+def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_address: str | Cluster | None = None) -> int:
     """Run distributed PowerFits on each of the PDB files in the session directory.
 
     Args:

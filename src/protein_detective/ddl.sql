@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS alphafolds (
     am_annotations_file TEXT,
     am_annotations_hg19_file TEXT,
     am_annotations_hg38_file TEXT,
+    msa_file TEXT,
+    plddt_doc_file TEXT,
     FOREIGN KEY (uniprot_acc) REFERENCES proteins (uniprot_acc)
 );
 
