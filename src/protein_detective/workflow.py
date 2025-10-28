@@ -80,7 +80,12 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
     nr_interaction_partners = len(uniprot_accessions_of_partners)
     uniprot_accessions.update(uniprot_accessions_of_partners)
     pdbs = search4pdb(uniprot_accessions, limit=limit)
-    af_result = search4af(uniprot_accessions, limit=limit)
+    af_result = search4af(
+        uniprot_accessions,
+        min_sequence_length=query.min_sequence_length,
+        max_sequence_length=query.max_sequence_length,
+        limit=limit,
+    )
 
     with connect(session_dir) as con:
         save_query(query, con)
