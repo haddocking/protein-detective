@@ -38,7 +38,7 @@ def run(density_map: BinaryIO, structure: Path, result_dir: Path, options: Power
     # disable progress bar, use parent template_structures as progress bar
     progress = partial(tqdm, disable=True)
 
-    with structure.open() as template_structure:
+    with structure.open(mode="br") as template_structure:
         powerfit(
             target_volume=density_map,
             resolution=options.resolution,

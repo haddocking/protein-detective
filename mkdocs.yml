@@ -78,6 +78,7 @@ nav:
   - CLI Reference: cli.md
   - Notebooks:
     - Prepare EM map: em_prepare.ipynb
+    - Determine the fraction of Secondary Structure Elements (SSE): SSE_elements.ipynb
     - Workflow: workflow.ipynb
     - Powerfit: powerfit.ipynb
     - Visualization: visualization.ipynb

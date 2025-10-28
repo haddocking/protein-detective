@@ -8,7 +8,7 @@ from protein_quest.alphafold.confidence import ConfidenceFilterQuery
 from protein_quest.alphafold.fetch import downloadable_formats
 from protein_quest.converter import converter
 from protein_quest.ss import SecondaryStructureFilterQuery
-from rich import print as rprint
+from rich.console import Console
 from rich.logging import RichHandler
 from rich_argparse import RawDescriptionRichHelpFormatter, RichHelpFormatter
 
@@ -26,10 +26,14 @@ from protein_detective.workflow import (
     what_retrieve_choices,
 )
 
+console = Console(stderr=True)
+rprint = console.print
+
 
 def add_search_parser(subparsers):
     parser = subparsers.add_parser("search", help="Search UniProt for structures", formatter_class=RichHelpFormatter)
     parser.add_argument("session_dir", help="Session directory to store results")
+    # Protein quest based arguments
     parser.add_argument("--taxon-id", type=str, help="NCBI Taxon ID")
     parser.add_argument(
         "--reviewed",
@@ -50,6 +54,10 @@ def add_search_parser(subparsers):
         action="append",
         help="Molecular function (GO term, e.g. GO:0003677). Can be specified multiple times.",
     )
+    parser.add_argument("--min-sequence-length", type=int, help="Minimum length of the canonical sequence.")
+    parser.add_argument("--max-sequence-length", type=int, help="Maximum length of the canonical sequence.")
+
+    # Detective only arguments
     parser.add_argument(
         "--interaction-partner-seed",
         type=str,
@@ -65,6 +73,16 @@ def add_search_parser(subparsers):
         type=str,
         action="append",
         help="UniProt ID to exclude as found interaction partners. Can be specified multiple times.",
+    )
+    parser.add_argument(
+        "--min-residues",
+        type=int,
+        help="Minimum number of residues required in the chain mapped to the UniProt accession.",
+    )
+    parser.add_argument(
+        "--max-residues",
+        type=int,
+        help="Maximum number of residues allowed in chain mapped to the UniProt accession.",
     )
 
     parser.add_argument("--limit", type=int, default=10_000, help="Limit number of results")
@@ -96,10 +114,10 @@ def add_filter_parser(subparsers: argparse._SubParsersAction):
     - For PDBe structures the chain of Uniprot protein is written as chain A.
     - For AlphaFold structures filter by confidence (pLDDT) threshold
     - Number of residues in chain A
-      - For AlphaFold structures writes new files with low confidence residues (below threshold) removed
+      For AlphaFold structures writes new files with low confidence residues (below threshold) removed
     - Number of residues in secondary structure (helices and sheets)
+    - For determining the fraction or number of Secondary Structure elements see the following notebook: https://www.bonvinlab.org/protein-detective/SSE_elements.html
 
-    Also uncompresses *.cif.gz files to *.cif files for compatibility with powerfit.
     """)
     parser = subparsers.add_parser(
         "filter",
@@ -155,8 +173,12 @@ def handle_search(args):
             "subcellular_location_uniprot": args.subcellular_location_uniprot,
             "subcellular_location_go": args.subcellular_location_go,
             "molecular_function_go": args.molecular_function_go,
+            "min_sequence_length": args.min_sequence_length,
+            "max_sequence_length": args.max_sequence_length,
             "interaction_partner_seeds": args.interaction_partner_seed or [],
             "interaction_partner_excludes": args.interaction_partner_exclude or [],
+            "min_residues": args.min_residues,
+            "max_residues": args.max_residues,
         },
         UniprotQuery,
     )
@@ -236,7 +258,7 @@ def main():
 
     args = parser.parse_args()
 
-    logging.basicConfig(level=args.log_level, handlers=[RichHandler(show_level=False)])
+    logging.basicConfig(level=args.log_level, handlers=[RichHandler(show_level=False, console=console)])
 
     if args.command == "search":
         handle_search(args)

@@ -8,22 +8,19 @@ dependencies = [
     "aiofiles>=24.1.0",
     "aiohttp>=3.11.18",
     "aiohttp-retry>=2.9.1",
-    "attrs>=25.3.0",
-    "bokeh>=3.7.3",
-    "cattrs>=24.1.3",
     "dask>=2025.5.1",
     "distributed>=2025.5.1",
     "duckdb>=1.2.2",
     "molviewspec>=1.6.0",
+    "numpy>=2.3.1",
     "pandas>=2.3.0",
-    "powerfit-em[opencl]>=3.0.6",
-    "protein-quest>=0.6.0",
+    "powerfit-em[opencl]>=4.0.3",
+    "protein-quest>=0.7.0",
     "psutil>=7.0.0",
+    "pyopencl>=2025.2.5",
     "rich>=14.0.0",
     "rich-argparse>=1.7.1",
-    "sparqlwrapper>=2.0.0",
-    "tqdm>=4.67.1",
-    "urllib3>=2.4.0",
+    "tqdm>=4.67.1"
 ]
 
 [project.urls]
@@ -37,35 +34,39 @@ protein-detective = "protein_detective.cli:main"
 
 [dependency-groups]
 type = [
-    "pyrefly>=0.30.0",
+    "pyrefly>=0.39.1",
     "types-aiofiles>=24.1.0.20250326",
-    "types-tqdm>=4.67.0.20250513",
+    "types-tqdm>=4.67.0.20250513"
+]
+test = [
+    "pytest>=8.3.5",
 ]
 dev = [
-    "pytest>=8.3.5",
-    {include-group = "type"},
+    {include-group = "test"},
+    {include-group = "type"}
 ]
 docs = [
-    "atomium",
     "duckdb-engine>=0.17.0",
-    "ipykernel>=6.29.5",
+    "gemmi>=0.7.3",
+    "ipykernel>=6.31.0",
     "ipywidgets>=8.1.7",
     "jupysql>=0.11.1",
     "matplotlib>=3.10.3",
     "mkdocs>=1.6.1",
     "mkdocs-autoapi>=0.4.1",
     "mkdocs-jupyter>=0.25.1",
-    "mkdocs-material>=9.6.14",
+    "mkdocs-material>=9.6.22",
     "mkdocs-rich-argparse>=0.1.2",
-    "mkdocstrings[python]>=0.29.1",
-    "nbconvert>=7.16.6",
-    "toml>=0.10.2",
+    "mkdocstrings[python]>=0.30.1",
+    "nbconvert>=7.16.6"
+]
+marimo = [
+    "marimo[sql]>=0.17.2"
 ]
 docs-type = [
-    "marimo[sql]>=0.13.15",
-    "pyrefly>=0.23.1",
+    {include-group = "marimo"},
     {include-group = "type"},
-    {include-group = "docs"},
+    {include-group = "docs"}
 ]
 
 [build-system]
@@ -155,7 +156,7 @@ ignore = [
     # Allow generic variable name
     "PD901",
     # Allow suspicious-url-open-usage
-    "S310",
+    "S310"
 ]
 
 [tool.ruff.lint.pydocstyle]
