@@ -100,7 +100,6 @@ def add_filter_parser(subparsers: argparse._SubParsersAction):
     - Number of residues in secondary structure (helices and sheets)
     - For determining the fraction or number of Secondary Structure elements see the following notebook: https://www.bonvinlab.org/protein-detective/SSE_elements.html
 
-    Also uncompresses *.cif.gz files to *.cif files for compatibility with powerfit.
     """)
     parser = subparsers.add_parser(
         "filter",

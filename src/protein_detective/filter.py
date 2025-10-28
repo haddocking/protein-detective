@@ -3,9 +3,7 @@
 In protein_quest package the filters are more granular, here we combine them into coarse grained methods.
 """
 
-import gzip
 import logging
-import shutil
 import sys
 from copy import deepcopy
 from dataclasses import dataclass
@@ -308,23 +306,6 @@ def _filter_pdb_structures_by_residue_count(
     return residue_filtered, residue_filtered_files
 
 
-def _uncompress_gz_files(pdbe_total_results: FilterResults) -> None:
-    # protein-quest downloaded and filtered *.cif.gz files however powerfit only understands *.pdb and *.cif files
-    logger.info("Uncompressing *.cif.gz files to *.cif files")
-    i = 0
-    for r in pdbe_total_results.values():
-        orig_output_file = r.output_file
-        if orig_output_file is None or orig_output_file.suffix != ".gz":
-            continue
-        i += 1
-        new_output_file = orig_output_file.with_suffix("")
-        with gzip.open(orig_output_file, "rb") as f_in, new_output_file.open("wb") as f_out:
-            shutil.copyfileobj(f_in, f_out)  # pyright: ignore[reportArgumentType]
-        orig_output_file.unlink()
-        r.output_file = new_output_file
-    logger.info("Uncompression of %i files complete", i)
-
-
 def filter_pdbe_structures(
     proteinpdbs: list[ProteinPdbRow],
     session_dir: Path,
@@ -333,8 +314,6 @@ def filter_pdbe_structures(
     scheduler_address: str | Cluster | None,
 ) -> FilterResults:
     """Filter PDBe structures in the session directory based on chain, number of residues, and secondary structure.
-
-    Also uncompresses any *.cif.gz files to *.cif files for use in powerfit.
 
     Args:
         proteinpdbs: The list of ProteinPdbRow entries to filter.
@@ -406,7 +385,5 @@ def filter_pdbe_structures(
             residue_filtered=residue_filtered,
             residue_filtered_files=residue_filtered_files,
         )
-
-    _uncompress_gz_files(pdbe_total_results)
 
     return pdbe_total_results

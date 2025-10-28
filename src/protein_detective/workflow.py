@@ -191,8 +191,6 @@ def filter_structures(
 ) -> tuple[Path, list[FilteredStructure]]:
     """Filter the structures in the session based on confidence, number of residues, and secondary structure.
 
-    Also uncompresses *.cif.gz files to *.cif files for compatibility with powerfit.
-
     Args:
         session_dir: The directory containing the session data, including structure files.
         options: The filter options containing confidence and secondary structure filter queries.
