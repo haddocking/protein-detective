@@ -8,7 +8,7 @@ from protein_quest.alphafold.confidence import ConfidenceFilterQuery
 from protein_quest.alphafold.fetch import downloadable_formats
 from protein_quest.converter import converter
 from protein_quest.ss import SecondaryStructureFilterQuery
-from rich import print as rprint
+from rich.console import Console
 from rich.logging import RichHandler
 from rich_argparse import RawDescriptionRichHelpFormatter, RichHelpFormatter
 
@@ -25,6 +25,9 @@ from protein_detective.workflow import (
     search_structures_in_uniprot,
     what_retrieve_choices,
 )
+
+console = Console(stderr=True)
+rprint = console.print
 
 
 def add_search_parser(subparsers):
@@ -255,7 +258,7 @@ def main():
 
     args = parser.parse_args()
 
-    logging.basicConfig(level=args.log_level, handlers=[RichHandler(show_level=False)])
+    logging.basicConfig(level=args.log_level, handlers=[RichHandler(show_level=False, console=console)])
 
     if args.command == "search":
         handle_search(args)
