@@ -80,21 +80,21 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
         and the number of AlphaFold structures found.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Searching UniProt")
+    logger.info("Searching UniProt")
     uniprot_accessions = search4uniprot(query, limit)
     logger.info(f"Found {len(uniprot_accessions)} UniProt accessions matching the query")
-    logger.info(f"Searching for interaction partners")
+    logger.info("Searching for interaction partners")
     logger.debug(uniprot_accessions)
     uniprot_accessions_of_partners = search_for_interaction_partners(query, limit)
     logger.debug(uniprot_accessions_of_partners)
     nr_interaction_partners = len(uniprot_accessions_of_partners)
     logger.info(f"Found {nr_interaction_partners} interaction partners")
     uniprot_accessions.update(uniprot_accessions_of_partners)
-    logger.info(f"Searching for PDB references")
+    logger.info("Searching for PDB references")
     pdbs = search4pdb(uniprot_accessions, limit=limit)
     if query.min_residues or query.max_residues:
         pdbs = filter_pdb_results_on_chain_length(pdbs, query.min_residues, query.max_residues)
-    logger.info(f"Searching for AlphaFold references")
+    logger.info("Searching for AlphaFold references")
     af_result = search4af(
         uniprot_accessions,
         min_sequence_length=query.min_sequence_length,
