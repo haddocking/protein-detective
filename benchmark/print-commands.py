@@ -32,7 +32,7 @@ protein-detective search \\
     --subcellular-location-uniprot "{subcellular_uniprot}" \\
     --subcellular-location-go GO:{go_location} \\
     --interaction-partner-exclude "{interaction_partner_exclude}" \\
-{interaction_partner_seed} \\
+{interaction_partner_seed}\
     --min-residues {soft_min_res} \\
     --max-residues {soft_max_res} \\
     --min-sequence-length {hard_min_res} \\
