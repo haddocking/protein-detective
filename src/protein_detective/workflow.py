@@ -84,12 +84,7 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
     session_dir.mkdir(parents=True, exist_ok=True)
 
     logger.warning("Searching UniProt")
-    uniprot_accessions: set[str] = set()
-    with connect(session_dir, read_only=True) as con:
-        uniprot_query_exists = check_uniprot_query_exists(query, con)
-        if uniprot_query_exists:
-            logger.warning("Query already exists in session, reusing previously found UniProt accessions")
-            uniprot_accessions = load_uniprot_accessions(con)
+    uniprot_accessions = _get_saved_uniprot_accessions(query, session_dir)
     if not uniprot_accessions:
         uniprot_accessions = search4uniprot(query, limit)
     logger.warning(f"Found {len(uniprot_accessions)} UniProt accessions matching the query")
@@ -133,6 +128,17 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
         nr_afs=nr_afs,
         nr_interaction_partners=nr_interaction_partners,
     )
+
+
+def _get_saved_uniprot_accessions(query: UniprotQuery, session_dir: Path) -> set[str]:
+    with connect(session_dir) as con:
+        # As this most likely first query we need to open in non-read-only mode
+        # to allow creating of the database
+        uniprot_query_exists = check_uniprot_query_exists(query, con)
+        if uniprot_query_exists:
+            logger.warning("Query already exists in session, reusing previously found UniProt accessions")
+            return load_uniprot_accessions(con)
+    return set()
 
 
 WhatRetrieve = Literal["pdbe", "alphafold"]

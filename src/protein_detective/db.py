@@ -93,6 +93,7 @@ def connect(session_dir: Path, read_only: bool = False) -> Iterator[DuckDBPyConn
         read_only: If True, the connection will be read-only.
             If read only then database can be read by multiple processes.
             If not read only then database can be read and written to by a single process.
+            Can not create the database if it does not exist in read-only mode.
 
     Yields:
         DuckDBPyConnection: The connection to the DuckDB database.
