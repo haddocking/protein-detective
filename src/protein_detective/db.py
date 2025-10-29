@@ -122,6 +122,37 @@ def save_query(query: UniprotQuery, con: DuckDBPyConnection):
     con.execute("INSERT INTO uniprot_searches (query) VALUES (?)", (value,))
 
 
+def check_uniprot_query_exists(query: UniprotQuery, con: DuckDBPyConnection) -> bool:
+    """Check if a UniProt search query already exists in the database.
+
+    Args:
+        query: The UniProt search query to check.
+        con: The DuckDB connection to use for checking the data.
+
+    Returns:
+        True if the query exists in the database, False otherwise.
+    """
+    value = converter.dumps(query).decode()
+    result = con.execute(
+        "SELECT COUNT(*) FROM uniprot_searches WHERE query = ?",
+        (value,),
+    ).fetchone()
+    return result is not None and result[0] > 0
+
+
+def load_uniprot_accessions(con: DuckDBPyConnection) -> set[str]:
+    """Load UniProt accessions from the database.
+
+    Args:
+        con: The DuckDB connection to use for fetching the data.
+    Returns:
+        A set of UniProt accessions.
+    """
+    query = "SELECT uniprot_acc FROM proteins"
+    rows = con.execute(query).fetchall()
+    return {row[0] for row in rows}
+
+
 def save_uniprot_accessions(uniprot_accessions: Iterable[str], con: DuckDBPyConnection) -> int:
     """Save UniProt accessions to the database.
 

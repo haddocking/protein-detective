@@ -21,11 +21,13 @@ from protein_quest.uniprot import (
 from protein_quest.utils import DirectoryCacher
 
 from protein_detective.db import (
+    check_uniprot_query_exists,
     connect,
     load_alphafold_ids,
     load_alphafolds,
     load_pdb_ids,
     load_pdbs,
+    load_uniprot_accessions,
     save_alphafolds,
     save_alphafolds_files,
     save_filter,
@@ -80,36 +82,48 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
         and the number of AlphaFold structures found.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
-    logger.info("Searching UniProt")
-    uniprot_accessions = search4uniprot(query, limit)
-    logger.info(f"Found {len(uniprot_accessions)} UniProt accessions matching the query")
-    logger.info("Searching for interaction partners")
+
+    logger.warning("Searching UniProt")
+    uniprot_accessions: set[str] = set()
+    with connect(session_dir, read_only=True) as con:
+        uniprot_query_exists = check_uniprot_query_exists(query, con)
+        if uniprot_query_exists:
+            logger.warning("Query already exists in session, reusing previously found UniProt accessions")
+            uniprot_accessions = load_uniprot_accessions(con)
+    if not uniprot_accessions:
+        uniprot_accessions = search4uniprot(query, limit)
+    logger.warning(f"Found {len(uniprot_accessions)} UniProt accessions matching the query")
+    logger.warning("Searching for interaction partners")
     logger.debug(uniprot_accessions)
     uniprot_accessions_of_partners = search_for_interaction_partners(query, limit)
     logger.debug(uniprot_accessions_of_partners)
     nr_interaction_partners = len(uniprot_accessions_of_partners)
-    logger.info(f"Found {nr_interaction_partners} interaction partners")
+    logger.warning(f"Found {nr_interaction_partners} interaction partners")
     uniprot_accessions.update(uniprot_accessions_of_partners)
-    logger.info("Searching for PDB references")
+    with connect(session_dir) as con:
+        save_query(query, con)
+        save_uniprot_accessions(uniprot_accessions, con)
+
+    logger.warning("Searching for PDB references")
     pdbs = search4pdb(uniprot_accessions, limit=limit)
     if query.min_residues or query.max_residues:
-        pdbs = filter_pdb_results_on_chain_length(pdbs, query.min_residues, query.max_residues)
-    logger.info("Searching for AlphaFold references")
+        pdbs = filter_pdb_results_on_chain_length(pdbs, query.min_residues, query.max_residues, keep_invalid=True)
+    with connect(session_dir) as con:
+        nr_pdbs, nr_prot2pdb = save_pdbs(pdbs, con)
+
+    logger.warning("Searching for AlphaFold references")
     af_result = search4af(
         uniprot_accessions,
         min_sequence_length=query.min_sequence_length,
         max_sequence_length=query.max_sequence_length,
         limit=limit,
     )
-    logger.info(f"Fetching details for {len(uniprot_accessions)} UniProt accessions")
-    uniprot_details = list(map_uniprot_accessions2uniprot_details(uniprot_accessions))
-    logger.info(f"Saving results to session in {session_dir}")
-
     with connect(session_dir) as con:
-        save_query(query, con)
-        save_uniprot_accessions(uniprot_accessions, con)
-        nr_pdbs, nr_prot2pdb = save_pdbs(pdbs, con)
         nr_afs = save_alphafolds(af_result, con)
+
+    logger.warning(f"Fetching details for {len(uniprot_accessions)} UniProt accessions")
+    uniprot_details = list(map_uniprot_accessions2uniprot_details(uniprot_accessions))
+    with connect(session_dir) as con:
         save_uniprot_details(uniprot_details, con)
 
     return UniprotSearchResult(
