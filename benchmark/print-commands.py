@@ -68,9 +68,7 @@ protein-detective retrieve .
 fi
 
 # Is fitted model {pdb_id}:{chain} part of the search results?
-ls -1 downloads/pdbe/{pdb_id.lower()}.cif
-
-# use {soft_min_res} to {soft_max_res} as residue range
+ls -1 downloads/pdbe/{pdb_id.lower()}.cif.gz
 
 if [ ! -d "filtered" ]; then
 protein-detective filter \\
@@ -81,7 +79,7 @@ protein-detective filter \\
 fi
 
 # Is the fitted model {pdb_id}:{chain} still part of the search results?
-ls -l filtered/{pdb_id.lower()}_{chain}2A.cif
+ls -1 filtered/{pdb_id.lower()}_{chain}2A.cif.gz
 
 # powerfit
 protein-detective powerfit run {masked_map} {resolution} . {powerfit_args}
