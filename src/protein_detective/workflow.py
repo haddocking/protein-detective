@@ -43,6 +43,7 @@ from protein_detective.filter import (
     filter_alphafold_structures,
     filter_pdbe_structures,
 )
+from protein_detective.powerfit.parallel import configure_dask_scheduler
 from protein_detective.search import UniprotQuery, search_for_interaction_partners
 
 logger = logging.getLogger(__name__)
@@ -251,12 +252,19 @@ def filter_structures(
     final_dir = session_dir / "filtered"
     final_dir.mkdir(parents=True, exist_ok=True)
 
+    scheduler_address = configure_dask_scheduler(
+        scheduler_address,
+        name="filter-chain",
+    )
+
     # Filter AlphaFolds
     with connect(session_dir, read_only=True) as con:
         logger.info("Gathering AlphaFold files from session in %s", session_dir)
         afs = load_alphafolds(con)
         logger.info("Found %i AlphaFold files", len(afs))
-    total_results = filter_alphafold_structures(afs, session_dir, options, final_dir)
+    total_results = filter_alphafold_structures(
+        afs, session_dir, options, final_dir, scheduler_address=scheduler_address
+    )
 
     # Filter PDBe structures
     with connect(session_dir, read_only=True) as con:
