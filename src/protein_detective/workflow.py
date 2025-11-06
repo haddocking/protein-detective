@@ -172,8 +172,8 @@ async def async_retrieve_structures(
     Args:
         session_dir: The directory to store downloaded files and the session database.
         what: A set of strings indicating which databases to retrieve files from ("pdbe", "alphafold").
-        what_af_formats: A set of formats to download from AlphaFold (e.g., "pdb", "cif").
-            If None, defaults to {"summary", "cif"}.
+        what_af_formats: A set of formats to download from AlphaFold (e.g., "summary", "pdb", "cif").
+            If None, defaults to {"cif"}.
 
     Returns:
         A tuple containing:
@@ -213,7 +213,7 @@ async def async_retrieve_structures(
         # AlphaFold entries for the given query
         af_ids = set()
         if what_af_formats is None:
-            what_af_formats = {"summary", "cif"}
+            what_af_formats = {"cif"}
         download_af_dir = download_dir / "alphafold"
         download_af_dir.mkdir(parents=True, exist_ok=True)
         with connect(session_dir, read_only=True) as con:

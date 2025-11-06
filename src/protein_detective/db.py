@@ -390,7 +390,7 @@ def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection) ->
     """
     data = [
         (
-            converter.dumps(af.summary, EntrySummary).decode(),
+            converter.dumps(af.summary, EntrySummary).decode() if af.summary else None,
             str(af.bcif_file) if af.bcif_file else None,
             str(af.cif_file) if af.cif_file else None,
             str(af.pdb_file) if af.pdb_file else None,
@@ -493,7 +493,7 @@ def load_alphafolds(con: DuckDBPyConnection) -> list[AlphaFoldEntry]:
     return [
         AlphaFoldEntry(
             uniprot_accession=row[0],
-            summary=converter.loads(row[1], EntrySummary),
+            summary=converter.loads(row[1], EntrySummary) if row[1] else None,
             bcif_file=Path(row[2]) if row[2] else None,
             cif_file=Path(row[3]) if row[3] else None,
             pdb_file=Path(row[4]) if row[4] else None,
