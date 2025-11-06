@@ -389,41 +389,39 @@ def save_alphafolds_files(afs: list[AlphaFoldEntry], con: DuckDBPyConnection) ->
         The number of AlphaFold entries updated with file paths.
     """
     data = [
-        (
-            converter.dumps(af.summary, EntrySummary).decode() if af.summary else None,
-            str(af.bcif_file) if af.bcif_file else None,
-            str(af.cif_file) if af.cif_file else None,
-            str(af.pdb_file) if af.pdb_file else None,
-            str(af.pae_doc_file) if af.pae_doc_file else None,
-            str(af.am_annotations_file) if af.am_annotations_file else None,
-            str(af.am_annotations_hg19_file) if af.am_annotations_hg19_file else None,
-            str(af.am_annotations_hg38_file) if af.am_annotations_hg38_file else None,
-            str(af.msa_file) if af.msa_file else None,
-            str(af.plddt_doc_file) if af.plddt_doc_file else None,
-            af.uniprot_accession,
-        )
+        {
+            "summary": converter.dumps(af.summary, EntrySummary).decode() if af.summary else None,
+            "bcif_file": str(af.bcif_file) if af.bcif_file else None,
+            "cif_file": str(af.cif_file) if af.cif_file else None,
+            "pdb_file": str(af.pdb_file) if af.pdb_file else None,
+            "pae_doc_file": str(af.pae_doc_file) if af.pae_doc_file else None,
+            "am_annotations_file": str(af.am_annotations_file) if af.am_annotations_file else None,
+            "am_annotations_hg19_file": str(af.am_annotations_hg19_file) if af.am_annotations_hg19_file else None,
+            "am_annotations_hg38_file": str(af.am_annotations_hg38_file) if af.am_annotations_hg38_file else None,
+            "msa_file": str(af.msa_file) if af.msa_file else None,
+            "plddt_doc_file": str(af.plddt_doc_file) if af.plddt_doc_file else None,
+            "uniprot_acc": af.uniprot_accession,
+        }
         for af in afs
     ]
     if len(data) == 0:
-        # executemany can not be called with an empty list, it raises error, so we return early
         return 0
     df = DataFrame(data)
-    con.executemany(
+    con.execute(
         """UPDATE alphafolds SET
-            summary = ?,
-            bcif_file = ?,
-            cif_file = ?,
-            pdb_file = ?,
-            pae_doc_file = ?,
-            am_annotations_file = ?,
-            am_annotations_hg19_file = ?,
-            am_annotations_hg38_file = ?,
-            msa_file = ?,
-            plddt_doc_file = ?
+            summary = df.summary,
+            bcif_file = df.bcif_file,
+            cif_file = df.cif_file,
+            pdb_file = df.pdb_file,
+            pae_doc_file = df.pae_doc_file,
+            am_annotations_file = df.am_annotations_file,
+            am_annotations_hg19_file = df.am_annotations_hg19_file,
+            am_annotations_hg38_file = df.am_annotations_hg38_file,
+            msa_file = df.msa_file,
+            plddt_doc_file = df.plddt_doc_file
         FROM df
         WHERE alphafolds.uniprot_acc = df.uniprot_acc
-        """,
-        data,
+        """
     )
     return len(df)
 
