@@ -9,7 +9,6 @@ from typing import Literal
 from distributed.deploy.cluster import Cluster
 from protein_quest.alphafold.fetch import DownloadableFormat
 from protein_quest.alphafold.fetch import fetch_many_async as af_fetch
-from protein_quest.alphafold.fetch import relative_to as af_relative_to
 from protein_quest.pdbe.fetch import fetch as pdbe_fetch
 from protein_quest.uniprot import (
     filter_pdb_results_on_chain_length,
@@ -222,7 +221,7 @@ async def async_retrieve_structures(
         afs = [
             entry async for entry in af_fetch(af_ids, download_af_dir, what_af_formats, gzip_files=True, cacher=cacher)
         ]
-        sr_afs = [af_relative_to(af, session_dir) for af in afs]
+        sr_afs = [af.relative_to(session_dir) for af in afs]
         with connect(session_dir) as con:
             save_alphafolds_files(sr_afs, con)
 
