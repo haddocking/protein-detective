@@ -3,7 +3,15 @@ from functools import partial
 from pathlib import Path
 from typing import BinaryIO
 
-from powerfit_em.powerfit import powerfit
+from powerfit_em.analyzer import Analyzer
+from powerfit_em.powerfit import (
+    get_gpu_queue,
+    powerfit,
+    setup_rotational_matrix,
+    setup_target,
+    setup_template_structure,
+)
+from powerfit_em.powerfitter import PowerFitter
 from tqdm.auto import tqdm
 
 from protein_detective.db import PowerfitOptions
@@ -62,3 +70,50 @@ def run(density_map: BinaryIO, structure: Path, result_dir: Path, options: Power
             delimiter=",",
             progress=progress,  # type: ignore[bad-argument-type]
         )
+
+
+class FitActor:
+    def __init__(self, options: PowerfitOptions):
+        logger.info(f"Initializing FitActor with: {options}")
+        self.options = options
+        self.queue = None
+        if options.gpu:
+            # Dask worker can only access its assigned GPU, so we can hardcode '0:0'
+            self.queue = get_gpu_queue("0:0")
+        with options.target.open("rb") as f:
+            self.target = setup_target(
+                f,
+                options.resolution,
+                options.no_resampling,
+                options.resampling_rate,
+                options.no_trimming,
+                options.trimming_cutoff,
+            )
+        self.rotmat = setup_rotational_matrix(options.angle)
+        self.fitter: PowerFitter | None = None
+
+    def fit_structure(self, template_structure: Path):
+        with template_structure.open("rb") as f:
+            template_vars = setup_template_structure(
+                f, None, self.target, self.options.resolution, self.options.core_weighted
+            )
+        _, template, mask, z_sigma = template_vars
+        if self.fitter is None:
+            self.fitter = PowerFitter(
+                self.target, self.rotmat, template, mask, self.queue, self.options.nproc, laplace=self.options.laplace
+            )
+        else:
+            self.fitter.set_template(template, mask)
+
+        self.fitter.scan(progress=None)
+        lcc = self.fitter.lcc
+        rot = self.fitter.rot
+        analysis = Analyzer(
+            lcc,
+            self.rotmat,
+            rot,
+            voxelspacing=self.target.voxelspacing,
+            origin=self.target.origin,
+            z_sigma=z_sigma,
+        )
+        return template_structure, analysis.solutions

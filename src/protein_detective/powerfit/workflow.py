@@ -1,5 +1,7 @@
 # PowerFit-related workflow methods moved from workflow.py
 
+from dataclasses import replace
+import json
 import logging
 import shutil
 from pathlib import Path
@@ -17,6 +19,7 @@ from protein_detective.db import (
 )
 from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.powerfit.parallel import build_gpu_cycler, configure_dask_scheduler, powerfit_worker
+from protein_detective.powerfit.run import FitActor
 from protein_detective.powerfit.solution import fit_models
 
 logger = logging.getLogger(__name__)
@@ -36,10 +39,10 @@ def _initialize_powerfit_run(session_dir, options):
     logger.info(f"Copied density map from {density_map} to {density_map_target}")
 
     # Load the PDB files from the session directory
-    pdb_files = []
+    template_structures = []
     with connect(session_dir, read_only=True) as con:
-        pdb_files = load_filtered_structure_files(con)
-    return powerfit_run_id, powerfit_run_dir, density_map_target, pdb_files
+        template_structures = load_filtered_structure_files(con)
+    return powerfit_run_id, powerfit_run_dir, density_map_target, template_structures
 
 
 def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list[str], int]:
@@ -55,24 +58,24 @@ def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list
             - A list of PowerFit command strings.
             - The ID of the PowerFit run saved in the session database.
     """
-    powerfit_run_id, powerfit_run_root_dir, density_map_target, pdb_files = _initialize_powerfit_run(
+    powerfit_run_id, powerfit_run_root_dir, density_map_target, template_structures = _initialize_powerfit_run(
         session_dir, options
     )
 
     # Generate PowerFit commands for each PDB file
     commands = []
     gpu_cycler = build_gpu_cycler(options.gpu)
-    for pdb_file in pdb_files:
-        result_dir = powerfit_run_root_dir / pdb_file.stem
+    for template_structure in template_structures:
+        result_dir = powerfit_run_root_dir / template_structure.stem
         command = options.to_command(
-            density_map=density_map_target, template=pdb_file, out_dir=result_dir, gpu_cycler=gpu_cycler
+            density_map=density_map_target, template=template_structure, out_dir=result_dir, gpu_cycler=gpu_cycler
         )
         commands.append(command)
 
     return commands, powerfit_run_id
 
 
-def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_address: str | Cluster | None = None) -> int:
+def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_address: str | Cluster | None = None):
     """Run distributed PowerFits on each of the PDB files in the session directory.
 
     Args:
@@ -84,9 +87,11 @@ def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_address
         The ID of the PowerFit run saved in the session.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
-    powerfit_run_id, powerfit_run_root_dir, density_map_target, pdb_files = _initialize_powerfit_run(
-        session_dir, options
-    )
+    with connect(session_dir) as con:
+        powerfit_run_id = save_powerfit_options(options, con)
+    template_structures = []
+    with connect(session_dir, read_only=True) as con:
+        template_structures = load_filtered_structure_files(con)
     scheduler_address = configure_dask_scheduler(
         scheduler_address,
         name=f"powerfit-run-{powerfit_run_id}",
@@ -96,17 +101,29 @@ def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_address
 
     with Client(scheduler_address) as client:
         logger.info(f"Follow progress on dask dashboard at: {client.dashboard_link}")
-        futures = client.map(
-            powerfit_worker,
-            pdb_files,
-            density_map_target=density_map_target,
-            powerfit_run_root_dir=powerfit_run_root_dir,
-            options=options,
-        )
-
+        workers = list(client.scheduler_info()["workers"].keys())
+        logger.info(f"Using workers: {workers}")
+        actor_futures = [client.submit(FitActor, options, actor=True, workers=[worker]) for worker in workers]
+        actors = [future.result() for future in actor_futures]
+        logger.info(f"Actors initialized: {actors}")
+        futures = []
+        for i, template_structure in enumerate(template_structures):
+            actor = actors[i % len(actors)]
+            future = actor.fit_structure(template_structure)
+            futures.append(future)
         progress(futures)
 
-        client.gather(futures)
+        results = client.gather(futures)
+
+        logger.info("Cleaning up actors")
+        for actor in actors:
+            actor.close()
+
+    logger.info(f"PowerFit run {powerfit_run_id} completed.")
+    # Write results to session db instead of file
+    results_fn = session_dir / f"powerfit_results.{powerfit_run_id}.json"
+    with results_fn.open("w") as f:
+        json.dump(results, f)
 
     return powerfit_run_id
 
