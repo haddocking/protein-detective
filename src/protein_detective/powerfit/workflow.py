@@ -16,7 +16,8 @@ from protein_detective.db import (
     save_powerfit_options,
 )
 from protein_detective.powerfit.options import PowerfitOptions
-from protein_detective.powerfit.parallel import build_gpu_cycler, configure_dask_scheduler, powerfit_worker
+from protein_detective.powerfit.parallel import build_gpu_cycler, configure_dask_scheduler
+from protein_detective.powerfit.run import powerfit_worker
 from protein_detective.powerfit.solution import fit_models
 
 logger = logging.getLogger(__name__)

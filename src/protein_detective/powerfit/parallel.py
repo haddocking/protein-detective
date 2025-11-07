@@ -2,16 +2,12 @@
 
 import logging
 from collections.abc import Generator
-from pathlib import Path
 
 from dask.distributed import LocalCluster, Nanny
 from distributed import Scheduler, SpecCluster
 from distributed.deploy.cluster import Cluster
 from distributed.worker_memory import parse_memory_limit
 from psutil import cpu_count
-
-from protein_detective.db import PowerfitOptions
-from protein_detective.powerfit.run import run as powerfit_run
 
 try:
     import pyopencl
@@ -161,18 +157,3 @@ def _configure_gpu_dask_scheduler(workers_per_gpu: int, cluster_name: str) -> Sp
     )
     logger.info(f"Found {n_gpus} GPUs, using {workers_per_gpu} workers per GPU.")
     return scheduler_address
-
-
-def powerfit_worker(pdb_file: Path, density_map_target: Path, powerfit_run_root_dir: Path, options: PowerfitOptions):
-    """Worker function for running PowerFit on a single PDB file.
-
-    Args:
-        pdb_file: Path to the PDB file to process
-        density_map_target: Path to the density map file
-        powerfit_run_root_dir: Root directory for PowerFit results
-        options: PowerFit options
-    """
-    result_dir = powerfit_run_root_dir / pdb_file.stem
-    logger.info(f"Running PowerFit on {density_map_target} against {pdb_file} with options: {options}")
-    with density_map_target.open("rb") as density_map:
-        powerfit_run(density_map, pdb_file, result_dir, options)
