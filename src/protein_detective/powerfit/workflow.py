@@ -88,14 +88,15 @@ def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_address
     powerfit_run_id, powerfit_run_root_dir, density_map_target, pdb_files = _initialize_powerfit_run(
         session_dir, options
     )
-    scheduler_address = configure_dask_scheduler(
-        scheduler_address,
-        name=f"powerfit-run-{powerfit_run_id}",
-        workers_per_gpu=options.gpu,
-        nproc=options.nproc,
-    )
-
-    with Client(scheduler_address) as client:
+    with (
+        configure_dask_scheduler(
+            scheduler_address,
+            name=f"powerfit-run-{powerfit_run_id}",
+            workers_per_gpu=options.gpu,
+            nproc=options.nproc,
+        ) as scheduler_address,
+        Client(scheduler_address) as client,
+    ):
         logger.info(f"Follow progress on dask dashboard at: {client.dashboard_link}")
         client.run(clear_worker_cache)
         futures = client.map(

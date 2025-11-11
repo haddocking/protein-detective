@@ -252,33 +252,32 @@ def filter_structures(
     final_dir = session_dir / "filtered"
     final_dir.mkdir(parents=True, exist_ok=True)
 
-    scheduler_address = configure_dask_scheduler(
+    with configure_dask_scheduler(
         scheduler_address,
         name="filter-chain",
-    )
+    ) as scheduler_address:
+        # Filter AlphaFolds
+        with connect(session_dir, read_only=True) as con:
+            logger.info("Gathering AlphaFold files from session in %s", session_dir)
+            afs = load_alphafolds(con)
+            logger.info("Found %i AlphaFold files", len(afs))
+        total_results = filter_alphafold_structures(
+            afs, session_dir, options, final_dir, scheduler_address=scheduler_address
+        )
 
-    # Filter AlphaFolds
-    with connect(session_dir, read_only=True) as con:
-        logger.info("Gathering AlphaFold files from session in %s", session_dir)
-        afs = load_alphafolds(con)
-        logger.info("Found %i AlphaFold files", len(afs))
-    total_results = filter_alphafold_structures(
-        afs, session_dir, options, final_dir, scheduler_address=scheduler_address
-    )
-
-    # Filter PDBe structures
-    with connect(session_dir, read_only=True) as con:
-        logger.info("Gathering PDBe files from session in %s", session_dir)
-        proteinpdbs = load_pdbs(con)
-        logger.info("Found %i PDBe files", len(proteinpdbs))
-    pdbe_total_results = filter_pdbe_structures(
-        proteinpdbs=proteinpdbs,
-        session_dir=session_dir,
-        options=options,
-        final_dir=final_dir,
-        scheduler_address=scheduler_address,
-    )
-    total_results.update(pdbe_total_results)
+        # Filter PDBe structures
+        with connect(session_dir, read_only=True) as con:
+            logger.info("Gathering PDBe files from session in %s", session_dir)
+            proteinpdbs = load_pdbs(con)
+            logger.info("Found %i PDBe files", len(proteinpdbs))
+        pdbe_total_results = filter_pdbe_structures(
+            proteinpdbs=proteinpdbs,
+            session_dir=session_dir,
+            options=options,
+            final_dir=final_dir,
+            scheduler_address=scheduler_address,
+        )
+        total_results.update(pdbe_total_results)
 
     # Save filtering results to database
     logger.info("Saving filtering results to database in %s", session_dir)

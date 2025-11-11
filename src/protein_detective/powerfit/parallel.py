@@ -1,13 +1,14 @@
 """Dask helper functions."""
 
 import logging
-from collections.abc import Generator
+from collections.abc import Generator, Iterator
+from contextlib import contextmanager
 
 from dask.distributed import LocalCluster, Nanny
 from distributed import Scheduler, SpecCluster
 from distributed.deploy.cluster import Cluster
 from distributed.worker_memory import parse_memory_limit
-from psutil import cpu_count
+from protein_quest.parallel import nr_cpus
 
 try:
     import pyopencl
@@ -20,13 +21,17 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+@contextmanager
 def configure_dask_scheduler(
     scheduler_address: str | Cluster | None,
     name: str,
     workers_per_gpu: int = 0,
     nproc: int = 1,
-) -> str | Cluster:
+) -> Iterator[str | Cluster]:
     """Configure the Dask scheduler by reusing existing or creating a new cluster.
+
+    If scheduler_address is None then creates a local Dask cluster
+    else returns scheduler_address unchanged and the callee is responsible for cluster cleanup.
 
     When creating a local GPU cluster on a machine with multiple GPUs,
     it will start workers which each can only see a single GPU.
@@ -42,7 +47,7 @@ def configure_dask_scheduler(
         ImportError: If GPU support is requested but pyopencl is not installed.
         ValueError: If multiple GPUs are detected but the vendor is unsupported.
 
-    Returns:
+    Yields:
         A Dask Cluster instance or a string address for the scheduler.
     """
     if scheduler_address is None:
@@ -51,6 +56,10 @@ def configure_dask_scheduler(
         else:
             scheduler_address = _configure_cpu_dask_scheduler(nproc, name)
         logger.info(f"Using local Dask cluster: {scheduler_address}")
+        try:
+            yield scheduler_address
+        finally:
+            scheduler_address.close()
     else:
         if workers_per_gpu > 0:
             if pyopencl is None:
@@ -61,15 +70,12 @@ def configure_dask_scheduler(
                     "Multiple GPUs detected, make sure each worker has a pinned GPU using "
                     "CUDA_VISIBLE_DEVICES or ROCR_VISIBLE_DEVICES environment variables."
                 )
-
-    return scheduler_address
+        # Pass through existing scheduler address or cluster
+        yield scheduler_address
 
 
 def _configure_cpu_dask_scheduler(nproc: int, name: str) -> LocalCluster:
-    physical_cores = cpu_count(logical=False)
-    if physical_cores is None:
-        msg = "Cannot determine number of logical CPU cores."
-        raise ValueError(msg)
+    physical_cores = nr_cpus()
     n_workers = physical_cores // nproc
     # Use single thread per worker to prevent GIL slowing down the computations
     return LocalCluster(name=name, threads_per_worker=1, n_workers=n_workers)
