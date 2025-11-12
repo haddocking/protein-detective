@@ -6,6 +6,8 @@ from cattrs import Converter
 from cattrs.gen import make_dict_structure_fn, override
 
 benchmark_dir = Path(__file__).parent
+root_work_dir = benchmark_dir / "work"
+
 # The xlsx file was converted to csv and modified by removing angstrom from header
 csv_path = benchmark_dir / "Benchmarklist.csv"
 map_root = "/trinity/login/aengle/pipeline_project/simulated_benchmark/pdbs"
@@ -21,9 +23,9 @@ class Dataset:
     Uniprot_id: str
     First_larger_cellular_location_GO: str
     First_cellular_location_Uniprot: str
-    Number_of_residues_in_construct: str
-    Number_of_residues_in_uniprot: str
-    Number_of_residues_modelled: str
+    Number_of_residues_in_construct: int
+    Number_of_residues_in_uniprot: int
+    Number_of_residues_modelled: int
     Source_Organism: str
     Ncbi_tax_id: str
     Unmodeled_based_on_provided_sequence: str
@@ -72,7 +74,7 @@ def parse_benchmark_csv(csv_path) -> list[Dataset]:
                 continue
 
             pdb_emdb_dir_name = f"{row['PDB_id']}-{row['EMDB']}"
-            pdb_emdb_dir = benchmark_dir / "work" / pdb_emdb_dir_name
+            pdb_emdb_dir = root_work_dir / pdb_emdb_dir_name
             chain_uniprot_dir = f"{row['Chain']}-{row['Uniprot_id']}"
             output_dir = pdb_emdb_dir / chain_uniprot_dir
             row["output_dir"] = output_dir
