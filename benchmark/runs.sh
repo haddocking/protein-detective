@@ -6,6 +6,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
 #SBATCH --partition=medium
+#SBATCH --exclude=node011
 
 # Make progressbar less chatty
 export TQDM_MININTERVAL=9
