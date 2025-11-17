@@ -103,6 +103,9 @@ def main():
         }
 
         # Generate and write run.sh
+        # TODO split run scrip in 2 stages: search+retrieve and filter+powerfit
+        # as search+retrieve talks to removed servers it is better to run sequentially
+        # and filter+powerfit can be run in parallel on HPC
         script_content = create_run_script_content(dataset, map_root, interaction_partner_seeds)
         run_sh_path = output_dir / "run.sh"
         run_sh_path.write_text(script_content, encoding="utf-8")
