@@ -31,7 +31,6 @@ protein-detective search \\
     --interaction-partner-exclude "{interaction_partner_exclude}" \\
 {interaction_partner_seed}\
     --min-residues {soft_min_res} \\
-    --max-residues {soft_max_res} \\
     --min-sequence-length {hard_min_res} \\
     --limit {search_limit} \\
     .
@@ -43,7 +42,6 @@ protein-detective search \\
     --interaction-partner-exclude "{interaction_partner_exclude}" \\
 {interaction_partner_seed} \\
     --min-residues {soft_min_res} \\
-    --max-residues {soft_max_res} \\
     --min-sequence-length {hard_min_res} \\
     --limit {search_limit} \\
     .
