@@ -15,7 +15,7 @@ dependencies = [
     "numpy>=2.3.1",
     "pandas>=2.3.0",
     "powerfit-em[opencl]>=4.0.3",
-    "protein-quest>=0.9.0",
+    "protein-quest>=1.0.0",
     "psutil>=7.0.0",
     "pyopencl>=2025.2.5",
     "rich>=14.0.0",
@@ -34,7 +34,7 @@ protein-detective = "protein_detective.cli:main"
 
 [dependency-groups]
 type = [
-    "pyrefly>=0.39.1",
+    "pyrefly>=0.42.0",
     "types-aiofiles>=24.1.0.20250326",
     "types-tqdm>=4.67.0.20250513"
 ]
@@ -170,3 +170,7 @@ displaylimit = 100
 
 [tool.uv.sources]
 protein-quest = { path = "../protein-quest", editable = true }
+
+[tool.pyrefly]
+project-includes = ["src", "tests", "benchmark"]
+search-paths = ["./src", "./benchmark"]
