@@ -68,8 +68,9 @@ CREATE TABLE IF NOT EXISTS filtered_structures (
     output_file TEXT,
     -- PRIMARY KEY (filter_id, uniprot_acc, pdb_id), #-- pdb_id can be NULL so cannot use as part of primary key
     FOREIGN KEY (filter_id) REFERENCES filters (filter_id),
-    FOREIGN KEY (uniprot_acc) REFERENCES alphafolds (uniprot_acc),
-    FOREIGN KEY (uniprot_acc, pdb_id) REFERENCES proteins_pdbs (uniprot_acc, pdb_id),
+    -- cannot have foreign keys for uniprot_acc as they can be 2 tables
+    -- FOREIGN KEY (uniprot_acc) REFERENCES alphafolds (uniprot_acc),
+    -- FOREIGN KEY (uniprot_acc, pdb_id) REFERENCES proteins_pdbs (uniprot_acc, pdb_id),
 );
 
 CREATE SEQUENCE IF NOT EXISTS id_powerfit_runs START 1;
