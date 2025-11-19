@@ -283,6 +283,7 @@ def filter_structures(
     logger.info("Saving filtering results to database in %s", session_dir)
     total_results_values = [r.make_relative_to(session_dir) for r in total_results.values()]
     with connect(session_dir) as con:
+        # TODO filter results not in db
         filter_id = save_filter(options, con)
         save_filtered_structures(total_results_values, filter_id, con)
 
