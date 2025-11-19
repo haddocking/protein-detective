@@ -12,6 +12,7 @@ root_work_dir = benchmark_dir / "work"
 csv_path = benchmark_dir / "Benchmarklist.csv"
 map_root = "/trinity/login/aengle/pipeline_project/simulated_benchmark/pdbs"
 
+
 @dataclass
 class Dataset:
     PDB_id: str
@@ -31,6 +32,7 @@ class Dataset:
     Unmodeled_based_on_provided_sequence: str
     output_dir: Path
 
+
 c = Converter()
 c.register_structure_hook(
     Dataset,
@@ -46,8 +48,9 @@ c.register_structure_hook(
         Source_Organism=override(rename="Source Organism"),
         Ncbi_tax_id=override(rename="Ncbi tax id"),
         Unmodeled_based_on_provided_sequence=override(rename="Unmodeled based on provided sequence"),
-    )
+    ),
 )
+
 
 def parse_benchmark_csv(csv_path) -> list[Dataset]:
     with csv_path.open(newline="", encoding="utf-8") as csvfile:
@@ -82,5 +85,5 @@ def parse_benchmark_csv(csv_path) -> list[Dataset]:
             previous_row = row
     return datasets
 
-datasets = parse_benchmark_csv(csv_path)
 
+datasets = parse_benchmark_csv(csv_path)

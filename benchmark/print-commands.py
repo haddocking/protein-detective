@@ -13,10 +13,10 @@ def create_run_script_content(row: Dataset, map_root: str, interaction_partner_s
     # Use a range around the modelled residues for filtering
     # TODO use better logic to determine min/max residues based on the volume of the unknown density
     sorf_res_range_fraction = 0.1  # +- 10%
-    hard_res_range_fraction = 0.2  # +- 20%
     soft_min_res = int(float(row.Number_of_residues_modelled) * (1 - sorf_res_range_fraction))
     soft_max_res = int(float(row.Number_of_residues_modelled) * (1 + sorf_res_range_fraction))
-    hard_min_res = int(float(row.Number_of_residues_modelled) * (1 - hard_res_range_fraction))
+    hard_min_res = int(float(row.Number_of_residues_modelled) * (0.8))  # at least 80%
+    hard_max_res = int(float(row.Number_of_residues_modelled) * (1.5))  # at most 150%
     interaction_partner_exclude = uniprot
     interaction_partner_seed = " \\\n".join(f'    --interaction-partner-seed "{s}"' for s in interaction_partner_seeds)
 
@@ -31,6 +31,7 @@ protein-detective search \\
     --interaction-partner-exclude "{interaction_partner_exclude}" \\
 {interaction_partner_seed}\
     --min-residues {soft_min_res} \\
+    --max-residues {hard_max_res} \\
     --min-sequence-length {hard_min_res} \\
     --limit {search_limit} \\
     .
@@ -42,6 +43,7 @@ protein-detective search \\
     --interaction-partner-exclude "{interaction_partner_exclude}" \\
 {interaction_partner_seed} \\
     --min-residues {soft_min_res} \\
+    --max-residues {hard_max_res} \\
     --min-sequence-length {hard_min_res} \\
     --limit {search_limit} \\
     .
@@ -97,9 +99,7 @@ def main():
         output_dir.mkdir(parents=True, exist_ok=True)
 
         interaction_partner_seeds = {
-            row.Uniprot_id
-            for row in datasets
-            if row.EMDB == dataset.EMDB and row.Uniprot_id != dataset.Uniprot_id
+            row.Uniprot_id for row in datasets if row.EMDB == dataset.EMDB and row.Uniprot_id != dataset.Uniprot_id
         }
 
         # Generate and write run.sh

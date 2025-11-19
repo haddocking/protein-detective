@@ -43,7 +43,7 @@ for dataset in datasets:
     if filtered_dir.exists():
         continue
 
-    sorf_res_range_fraction = 0.1  # +- 10%
+    sorf_res_range_fraction = 0.5
     soft_max_res = int(float(dataset.Number_of_residues_modelled) * (1 + sorf_res_range_fraction))
     pdb_chain_length = next(
         int(r["chain_length"])
