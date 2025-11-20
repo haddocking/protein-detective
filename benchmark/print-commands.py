@@ -19,9 +19,9 @@ def create_run_script_content(row: Dataset, map_root: str, interaction_partner_s
     hard_max_res = int(float(row.Number_of_residues_modelled) * (1.5))  # at most 150%
     interaction_partner_exclude = uniprot
     interaction_partner_seed = " \\\n".join(f'    --interaction-partner-seed "{s}"' for s in interaction_partner_seeds)
-
     resolution = float(row.Resolution)
-    powerfit_args = ""
+    number_of_workers_per_gpu = 3
+    powerfit_args = f"--gpu {number_of_workers_per_gpu}"
 
     search = f"""\
 protein-detective search \\
@@ -98,13 +98,14 @@ def main():
         output_dir = dataset.output_dir
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Group proteins in the same emdb entry as interaction partners
         interaction_partner_seeds = {
             row.Uniprot_id for row in datasets if row.EMDB == dataset.EMDB and row.Uniprot_id != dataset.Uniprot_id
         }
 
         # Generate and write run.sh
         # TODO split run scrip in 3 stages: search+retrieve, filter, and powerfit
-        # as search+retrieve talks to removed servers it is better to run sequentially
+        # as search+retrieve talks to remote servers it is better to run sequentially
         # and filter can run in parallel on CPU
         # and powerfit can be run in parallel on GPU
         script_content = create_run_script_content(dataset, map_root, interaction_partner_seeds)

@@ -6,7 +6,10 @@ from pdconfig import datasets
 
 
 def nr_files_in_directory(path: Path) -> int:
-    return len(listdir(path))  # noqa: PTH208
+    try:
+        return len(listdir(path))  # noqa: PTH208
+    except FileNotFoundError:
+        return 0
 
 
 def dataset_stats_of_dirs(path: Path) -> dict[str, int]:
