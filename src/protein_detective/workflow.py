@@ -9,7 +9,6 @@ from typing import Literal
 from distributed.deploy.cluster import Cluster
 from protein_quest.alphafold.fetch import DownloadableFormat
 from protein_quest.alphafold.fetch import fetch_many_async as af_fetch
-from protein_quest.alphafold.fetch import relative_to as af_relative_to
 from protein_quest.pdbe.fetch import fetch as pdbe_fetch
 from protein_quest.uniprot import (
     filter_pdb_results_on_chain_length,
@@ -21,11 +20,13 @@ from protein_quest.uniprot import (
 from protein_quest.utils import DirectoryCacher
 
 from protein_detective.db import (
+    check_uniprot_query_exists,
     connect,
     load_alphafold_ids,
     load_alphafolds,
     load_pdb_ids,
     load_pdbs,
+    load_uniprot_accessions,
     save_alphafolds,
     save_alphafolds_files,
     save_filter,
@@ -42,6 +43,7 @@ from protein_detective.filter import (
     filter_alphafold_structures,
     filter_pdbe_structures,
 )
+from protein_detective.powerfit.parallel import configure_dask_scheduler
 from protein_detective.search import UniprotQuery, search_for_interaction_partners
 
 logger = logging.getLogger(__name__)
@@ -80,36 +82,45 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
         and the number of AlphaFold structures found.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
-    logger.info("Searching UniProt")
-    uniprot_accessions = search4uniprot(query, limit)
-    logger.info(f"Found {len(uniprot_accessions)} UniProt accessions matching the query")
-    logger.info("Searching for interaction partners")
+
+    logger.warning("Searching UniProt")
+    uniprot_accessions = _get_saved_uniprot_accessions(query, session_dir)
+    if uniprot_accessions:
+        logger.warning(f"Reusing {len(uniprot_accessions)} previously found UniProt accessions")
+    else:
+        uniprot_accessions = search4uniprot(query, limit)
+        logger.warning(f"Found {len(uniprot_accessions)} UniProt accessions matching the query")
+    logger.warning("Searching for interaction partners")
     logger.debug(uniprot_accessions)
     uniprot_accessions_of_partners = search_for_interaction_partners(query, limit)
     logger.debug(uniprot_accessions_of_partners)
     nr_interaction_partners = len(uniprot_accessions_of_partners)
-    logger.info(f"Found {nr_interaction_partners} interaction partners")
+    logger.warning(f"Found {nr_interaction_partners} interaction partners")
     uniprot_accessions.update(uniprot_accessions_of_partners)
-    logger.info("Searching for PDB references")
+    with connect(session_dir) as con:
+        save_query(query, con)
+        save_uniprot_accessions(uniprot_accessions, con)
+
+    logger.warning("Searching for PDB references")
     pdbs = search4pdb(uniprot_accessions, limit=limit)
     if query.min_residues or query.max_residues:
-        pdbs = filter_pdb_results_on_chain_length(pdbs, query.min_residues, query.max_residues)
-    logger.info("Searching for AlphaFold references")
+        pdbs = filter_pdb_results_on_chain_length(pdbs, query.min_residues, query.max_residues, keep_invalid=True)
+    with connect(session_dir) as con:
+        nr_pdbs, nr_prot2pdb = save_pdbs(pdbs, con)
+
+    logger.warning("Searching for AlphaFold references")
     af_result = search4af(
         uniprot_accessions,
         min_sequence_length=query.min_sequence_length,
         max_sequence_length=query.max_sequence_length,
         limit=limit,
     )
-    logger.info(f"Fetching details for {len(uniprot_accessions)} UniProt accessions")
-    uniprot_details = list(map_uniprot_accessions2uniprot_details(uniprot_accessions))
-    logger.info(f"Saving results to session in {session_dir}")
-
     with connect(session_dir) as con:
-        save_query(query, con)
-        save_uniprot_accessions(uniprot_accessions, con)
-        nr_pdbs, nr_prot2pdb = save_pdbs(pdbs, con)
         nr_afs = save_alphafolds(af_result, con)
+
+    logger.warning(f"Fetching details for {len(uniprot_accessions)} UniProt accessions")
+    uniprot_details = list(map_uniprot_accessions2uniprot_details(uniprot_accessions))
+    with connect(session_dir) as con:
         save_uniprot_details(uniprot_details, con)
 
     return UniprotSearchResult(
@@ -119,6 +130,17 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
         nr_afs=nr_afs,
         nr_interaction_partners=nr_interaction_partners,
     )
+
+
+def _get_saved_uniprot_accessions(query: UniprotQuery, session_dir: Path) -> set[str]:
+    with connect(session_dir) as con:
+        # As this most likely first query we need to open in non-read-only mode
+        # to allow creating of the database
+        uniprot_query_exists = check_uniprot_query_exists(query, con)
+        if uniprot_query_exists:
+            logger.warning("Query already exists in session, reusing previously found UniProt accessions")
+            return load_uniprot_accessions(con)
+    return set()
 
 
 WhatRetrieve = Literal["pdbe", "alphafold"]
@@ -153,8 +175,8 @@ async def async_retrieve_structures(
     Args:
         session_dir: The directory to store downloaded files and the session database.
         what: A set of strings indicating which databases to retrieve files from ("pdbe", "alphafold").
-        what_af_formats: A set of formats to download from AlphaFold (e.g., "pdb", "cif").
-            If None, defaults to {"summary", "cif"}.
+        what_af_formats: A set of formats to download from AlphaFold (e.g., "summary", "pdb", "cif").
+            If None, defaults to {"cif"}.
 
     Returns:
         A tuple containing:
@@ -181,11 +203,12 @@ async def async_retrieve_structures(
         download_pdbe_dir.mkdir(parents=True, exist_ok=True)
         # mmCIF files from PDBe for the Uniprot entries in the session.
         pdb_ids = set()
-        with connect(session_dir) as con:
+        with connect(session_dir, read_only=True) as con:
             pdb_ids = load_pdb_ids(con)
-            mmcif_files = await pdbe_fetch(pdb_ids, download_pdbe_dir, cacher=cacher)
-            # make paths relative to session_dir, so db stores paths relative to session_dir
-            sr_mmcif_files = {pdb_id: mmcif_file.relative_to(session_dir) for pdb_id, mmcif_file in mmcif_files.items()}
+        mmcif_files = await pdbe_fetch(pdb_ids, download_pdbe_dir, cacher=cacher)
+        # make paths relative to session_dir, so db stores paths relative to session_dir
+        sr_mmcif_files = {pdb_id: mmcif_file.relative_to(session_dir) for pdb_id, mmcif_file in mmcif_files.items()}
+        with connect(session_dir) as con:
             save_pdb_files(sr_mmcif_files, con)
 
     afs = []
@@ -193,16 +216,16 @@ async def async_retrieve_structures(
         # AlphaFold entries for the given query
         af_ids = set()
         if what_af_formats is None:
-            what_af_formats = {"summary", "cif"}
+            what_af_formats = {"cif"}
         download_af_dir = download_dir / "alphafold"
         download_af_dir.mkdir(parents=True, exist_ok=True)
-        with connect(session_dir) as con:
+        with connect(session_dir, read_only=True) as con:
             af_ids = load_alphafold_ids(con)
-            afs = [
-                entry
-                async for entry in af_fetch(af_ids, download_af_dir, what_af_formats, gzip_files=True, cacher=cacher)
-            ]
-            sr_afs = [af_relative_to(af, session_dir) for af in afs]
+        afs = [
+            entry async for entry in af_fetch(af_ids, download_af_dir, what_af_formats, gzip_files=True, cacher=cacher)
+        ]
+        sr_afs = [af.relative_to(session_dir) for af in afs]
+        with connect(session_dir) as con:
             save_alphafolds_files(sr_afs, con)
 
     return download_dir, len(sr_mmcif_files), len(afs)
@@ -231,31 +254,38 @@ def filter_structures(
     final_dir = session_dir / "filtered"
     final_dir.mkdir(parents=True, exist_ok=True)
 
-    # Filter AlphaFolds
-    with connect(session_dir, read_only=True) as con:
-        logger.info("Gathering AlphaFold files from session in %s", session_dir)
-        afs = load_alphafolds(con)
-        logger.info("Found %i AlphaFold files", len(afs))
-    total_results = filter_alphafold_structures(afs, session_dir, options, final_dir)
+    with configure_dask_scheduler(
+        scheduler_address,
+        name="filter-chain",
+    ) as scheduler_address:
+        # Filter AlphaFolds
+        with connect(session_dir, read_only=True) as con:
+            logger.info("Gathering AlphaFold files from session in %s", session_dir)
+            afs = load_alphafolds(con)
+            logger.info("Found %i AlphaFold files", len(afs))
+        total_results = filter_alphafold_structures(
+            afs, session_dir, options, final_dir, scheduler_address=scheduler_address
+        )
 
-    # Filter PDBe structures
-    with connect(session_dir, read_only=True) as con:
-        logger.info("Gathering PDBe files from session in %s", session_dir)
-        proteinpdbs = load_pdbs(con)
-        logger.info("Found %i PDBe files", len(proteinpdbs))
-    pdbe_total_results = filter_pdbe_structures(
-        proteinpdbs=proteinpdbs,
-        session_dir=session_dir,
-        options=options,
-        final_dir=final_dir,
-        scheduler_address=scheduler_address,
-    )
-    total_results.update(pdbe_total_results)
+        # Filter PDBe structures
+        with connect(session_dir, read_only=True) as con:
+            logger.info("Gathering PDBe files from session in %s", session_dir)
+            proteinpdbs = load_pdbs(con)
+            logger.info("Found %i PDBe files", len(proteinpdbs))
+        pdbe_total_results = filter_pdbe_structures(
+            proteinpdbs=proteinpdbs,
+            session_dir=session_dir,
+            options=options,
+            final_dir=final_dir,
+            scheduler_address=scheduler_address,
+        )
+        total_results.update(pdbe_total_results)
 
     # Save filtering results to database
     logger.info("Saving filtering results to database in %s", session_dir)
     total_results_values = [r.make_relative_to(session_dir) for r in total_results.values()]
     with connect(session_dir) as con:
+        # TODO filter results not in db
         filter_id = save_filter(options, con)
         save_filtered_structures(total_results_values, filter_id, con)
 

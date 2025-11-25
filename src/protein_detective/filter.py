@@ -8,7 +8,7 @@ import sys
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from distributed.deploy.cluster import Cluster
 from protein_quest.alphafold.confidence import ConfidenceFilterQuery, ConfidenceFilterResult, filter_files_on_confidence
@@ -176,7 +176,11 @@ def _filter_alphafolds_on_secondary_structure(
 
 
 def filter_alphafold_structures(
-    afs: list[AlphaFoldEntry], session_dir: Path, options: FilterOptions, final_dir: Path
+    afs: list[AlphaFoldEntry],
+    session_dir: Path,
+    options: FilterOptions,
+    final_dir: Path,
+    scheduler_address: str | Cluster | Literal["sequential"] | None = None,
 ) -> FilterResults:
     """Filter AlphaFold structures in the session directory based on confidence and secondary structure.
 
@@ -185,6 +189,9 @@ def filter_alphafold_structures(
         session_dir: The directory containing the session data, including AlphaFold structure files.
         options: The filter options containing confidence and secondary structure filter queries.
         final_dir: The directory to store the final filtered structures.
+        scheduler_address: The address of the Dask scheduler.
+            If not provided, will create a local cluster.
+            If set to `sequential` will run tasks sequentially.
 
     Returns:
         A dictionary mapping (uniprot_accession, pdb_id) to FilteredStructure objects
@@ -204,7 +211,9 @@ def filter_alphafold_structures(
     logger.info("Filtering AlphaFold files on confidence")
     cf_dir = session_dir / "confidence_filtered" if do_ss else final_dir
     cf_dir.mkdir(parents=True, exist_ok=True)
-    cf_result = list(filter_files_on_confidence(alphafold_cif_files, confidence, cf_dir, copy_method="symlink"))
+    cf_result = filter_files_on_confidence(
+        alphafold_cif_files, confidence, cf_dir, copy_method="symlink", scheduler_address=scheduler_address
+    )
     for e in cf_result:
         upid = alphafold_cif_files2upid[e.input_file]
         af_total_results[upid] = FilteredStructure(uniprot_accession=upid[0], confidence=e)
@@ -220,6 +229,7 @@ def filter_alphafold_structures(
             af_total_results=af_total_results,
             alphafold_cif_files2upid=alphafold_cif_files2upid,
         )
+
     return af_total_results
 
 

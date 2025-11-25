@@ -1,64 +1,106 @@
 import logging
-from functools import partial
 from pathlib import Path
-from typing import BinaryIO
 
-from powerfit_em.powerfit import powerfit
-from tqdm.auto import tqdm
+from powerfit_em.analyzer import Analyzer
+from powerfit_em.powerfit import (
+    get_gpu_queue,
+    setup_rotational_matrix,
+    setup_target,
+    setup_template_structure,
+)
+from powerfit_em.powerfitter import PowerFitter
 
 from protein_detective.db import PowerfitOptions
 
 logger = logging.getLogger(__name__)
 
 
-def run(density_map: BinaryIO, structure: Path, result_dir: Path, options: PowerfitOptions):
-    """Run powerfit on the given density map and structure, saving results to result_dir.
+# Cached fitter on each worker
+pf: PowerFitter | None = None
 
-    If resuls_dir / solutions.out already exists, it skips the run.
+
+def powerfit_worker(
+    template_structure: Path, density_map_target: Path, powerfit_run_root_dir: Path, options: PowerfitOptions
+):
+    """Worker function for running PowerFit on a template structure file.
 
     Args:
-        density_map: The density map file to fit the structure into.
-        structure: The path to the prepared PDB structure file.
-        result_dir: The directory where results will be saved.
-        options: Options for running powerfit, including resolution, angle, etc.
-
+        template_structure: Path to the template structure file to process
+        density_map_target: Path to the density map file
+        powerfit_run_root_dir: Root directory for PowerFit results
+        options: PowerFit options
     """
+    # This function is a refactor of powerfit_em.powerfit.powerfit function that caches
+    # the PowerFitter instance on each worker to avoid re-initialization overhead and reuse of GPU queue.
+    global pf  # noqa: PLW0603
+    result_dir = powerfit_run_root_dir / template_structure.stem
     solutions = result_dir / "solutions.out"
+    logger.info(f"Running PowerFit on {density_map_target} against {template_structure} with options: {options}")
     if solutions.exists():
-        # For example session1/powerfit/11/A8MT69_pdb4ne5.ent_B2A/solutions.out
-        # The 11 is the powerfit_run_id which maps to values in to options
-        # So if exists then powerfit was already run with same options
         logger.info(f"Skipping powerfit run, solutions file already exists: {solutions}")
         return
+    if pf is None:
+        gpu: str | None = None
+        if options.gpu:
+            gpu = "0:0"
+        queue = None
 
-    gpu: str | None = None
-    if options.gpu:
-        gpu = "0:0"
+        if gpu:
+            queue = get_gpu_queue(gpu)
 
-    # disable progress bar, use parent template_structures as progress bar
-    progress = partial(tqdm, disable=True)
+        with density_map_target.open("rb") as f:
+            target = setup_target(
+                f,
+                options.resolution,
+                options.no_resampling,
+                options.resampling_rate,
+                options.no_trimming,
+                options.trimming_cutoff,
+            )
 
-    with structure.open(mode="br") as template_structure:
-        powerfit(
-            target_volume=density_map,
-            resolution=options.resolution,
-            template_structure=template_structure,
-            angle=options.angle,
-            laplace=options.laplace,
-            core_weighted=options.core_weighted,
-            no_resampling=options.no_resampling,
-            resampling_rate=options.resampling_rate,
-            no_trimming=options.no_trimming,
-            trimming_cutoff=options.trimming_cutoff,
-            # No chain specified as prepared pdb has single A chain
-            chain=None,
-            directory=str(result_dir),
-            # Do not write any fitted models during powerfit run,
-            # to spare disk space and time,
-            # use `protein-detective powerfit fit-models` command to generate fitted model PDB files
-            num=0,
-            gpu=gpu,
-            nproc=options.nproc,
-            delimiter=",",
-            progress=progress,  # type: ignore[bad-argument-type]
-        )
+        rotmat = setup_rotational_matrix(options.angle)
+
+        with template_structure.open("rb") as f:
+            _, template, mask, z_sigma = setup_template_structure(
+                f, None, target, options.resolution, options.core_weighted
+            )
+
+        pf = PowerFitter(target, rotmat, template, mask, queue, options.nproc, laplace=options.laplace)
+    else:
+        logger.info("Reusing cached PowerFitter instance on worker.")
+        with template_structure.open("rb") as f:
+            _, template, mask, z_sigma = setup_template_structure(
+                f, None, pf._target, options.resolution, options.core_weighted
+            )
+        pf.set_template(template, mask)
+
+    pf.scan(progress=None)
+    analyzer = Analyzer(
+        pf.lcc,
+        pf._rotations,
+        pf.rot,
+        voxelspacing=pf._target.voxelspacing,
+        origin=pf._target.origin,
+        z_sigma=z_sigma,
+    )
+    result_dir.mkdir(parents=True, exist_ok=True)
+    analyzer.tofile(str(solutions), delimiter=",")
+    logger.info(f"PowerFit results saved to {solutions}")
+
+
+def clear_worker_cache():
+    """Clear cached objects on the worker.
+
+    Call this function if you want to call powerfit_worker
+    again with different arguments except the template_structure.
+
+    Example:
+
+        from dask.distributed import Client
+        client = Client()  # or your existing client
+        from protein_detective.powerfit.run import clear_worker_cache
+        client.run(clear_worker_cache)
+
+    """
+    global pf  # noqa: PLW0603
+    pf = None

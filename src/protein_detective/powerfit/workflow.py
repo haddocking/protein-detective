@@ -16,7 +16,8 @@ from protein_detective.db import (
     save_powerfit_options,
 )
 from protein_detective.powerfit.options import PowerfitOptions
-from protein_detective.powerfit.parallel import build_gpu_cycler, configure_dask_scheduler, powerfit_worker
+from protein_detective.powerfit.parallel import build_gpu_cycler, configure_dask_scheduler
+from protein_detective.powerfit.run import clear_worker_cache, powerfit_worker
 from protein_detective.powerfit.solution import fit_models
 
 logger = logging.getLogger(__name__)
@@ -87,15 +88,17 @@ def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_address
     powerfit_run_id, powerfit_run_root_dir, density_map_target, pdb_files = _initialize_powerfit_run(
         session_dir, options
     )
-    scheduler_address = configure_dask_scheduler(
-        scheduler_address,
-        name=f"powerfit-run-{powerfit_run_id}",
-        workers_per_gpu=options.gpu,
-        nproc=options.nproc,
-    )
-
-    with Client(scheduler_address) as client:
+    with (
+        configure_dask_scheduler(
+            scheduler_address,
+            name=f"powerfit-run-{powerfit_run_id}",
+            workers_per_gpu=options.gpu,
+            nproc=options.nproc,
+        ) as scheduler_address,
+        Client(scheduler_address) as client,
+    ):
         logger.info(f"Follow progress on dask dashboard at: {client.dashboard_link}")
+        client.run(clear_worker_cache)
         futures = client.map(
             powerfit_worker,
             pdb_files,

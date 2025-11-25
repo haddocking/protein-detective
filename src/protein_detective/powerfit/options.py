@@ -31,8 +31,8 @@ class PowerfitOptions:
     target: Path
     resolution: float
     angle: float = 10
-    laplace: bool = False
-    core_weighted: bool = False
+    laplace: bool = True
+    core_weighted: bool = True
     no_resampling: bool = False
     resampling_rate: float = 2
     no_trimming: bool = False
@@ -57,8 +57,8 @@ class PowerfitOptions:
             target=Path(target),
             resolution=parsed_args.resolution,
             angle=parsed_args.angle,
-            laplace=parsed_args.laplace,
-            core_weighted=parsed_args.core_weighted,
+            laplace=not parsed_args.no_laplace,
+            core_weighted=not parsed_args.no_core_weighted,
             no_resampling=parsed_args.no_resampling,
             resampling_rate=parsed_args.resampling_rate,
             no_trimming=parsed_args.no_trimming,
