@@ -3,7 +3,7 @@ from textwrap import dedent, indent
 from pdconfig import Dataset, benchmark_dir, datasets, map_root
 
 
-def soft_residue_range(number_of_residues_modelled: str | int | float) -> tuple[int, int, int, int]:
+def residue_ranges(number_of_residues_modelled: str | int | float) -> tuple[int, int, int, int]:
     """Calculate soft/hard minimum and maximum residues based on modelled residues count.
 
     Uses a range fraction of 0.1 (+- 10%) around the modelled residues.
@@ -15,10 +15,10 @@ def soft_residue_range(number_of_residues_modelled: str | int | float) -> tuple[
         Tuple of (soft_min_res, soft_max_res, hard_min_res, hard_max_res)
     """
     # TODO use better logic to determine min/max residues based on the volume of the unknown density
-    sorf_res_range_fraction = 0.1  # +- 10%
+    soft_res_range_fraction = 0.1  # +- 10%
     base_count = float(number_of_residues_modelled)
-    soft_min_res = int(base_count * (1 - sorf_res_range_fraction))
-    soft_max_res = int(base_count * (1 + sorf_res_range_fraction))
+    soft_min_res = int(base_count * (1 - soft_res_range_fraction))
+    soft_max_res = int(base_count * (1 + soft_res_range_fraction))
     hard_min_res = int(base_count * (0.8))  # at least 80%
     hard_max_res = int(base_count * (1.5))  # at most 150%
     return soft_min_res, soft_max_res, hard_min_res, hard_max_res
@@ -35,7 +35,7 @@ def create_remote_script_content(row: Dataset, interaction_partner_seeds: set[st
     chain = row.Chain
     # Use a range around the modelled residues for filtering
     # TODO use better logic to determine min/max residues based on the volume of the unknown density
-    soft_min_res, _, hard_min_res, hard_max_res = soft_residue_range(row.Number_of_residues_modelled)
+    soft_min_res, _, hard_min_res, hard_max_res = residue_ranges(row.Number_of_residues_modelled)
 
     interaction_partner_exclude = uniprot
     interaction_partner_seed = " \\\n".join(f'--interaction-partner-seed "{s}"' for s in interaction_partner_seeds)
@@ -87,7 +87,7 @@ def create_filter_script_content(row: Dataset) -> str:
     pdb_id = row.PDB_id
     chain = row.Chain
     # Use a range around the modelled residues for filtering
-    soft_min_res, soft_max_res, _, _ = soft_residue_range(row.Number_of_residues_modelled)
+    soft_min_res, soft_max_res, _, _ = residue_ranges(row.Number_of_residues_modelled)
 
     return dedent(f"""\
         #!/bin/bash
