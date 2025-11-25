@@ -5,7 +5,6 @@ Trying to figure out why in slurm log I see:
 ls: cannot access 'downloads/pdbe/6wuc.cif.gz': No such file or directory
 ```
 
-
 """
 
 import csv

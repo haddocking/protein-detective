@@ -1,3 +1,4 @@
+"""Script to print some statistics about the (partially) completed datasets."""
 # ruff: noqa: T201 this is a script
 from os import listdir
 from pathlib import Path
@@ -24,6 +25,8 @@ def dataset_stats_of_dirs(path: Path) -> dict[str, int]:
         "nr_filtered": nr_filtered,
     }
 
+
+# TODO add stats for powerfit, show top 5 fits (uniprot acc+pdb id) per dataset
 
 for dataset in datasets:
     output_dir = dataset.output_dir

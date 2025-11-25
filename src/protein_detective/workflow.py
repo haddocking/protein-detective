@@ -85,9 +85,11 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
 
     logger.warning("Searching UniProt")
     uniprot_accessions = _get_saved_uniprot_accessions(query, session_dir)
-    if not uniprot_accessions:
+    if uniprot_accessions:
+        logger.warning(f"Reusing {len(uniprot_accessions)} previously found UniProt accessions")
+    else:
         uniprot_accessions = search4uniprot(query, limit)
-    logger.warning(f"Found {len(uniprot_accessions)} UniProt accessions matching the query")
+        logger.warning(f"Found {len(uniprot_accessions)} UniProt accessions matching the query")
     logger.warning("Searching for interaction partners")
     logger.debug(uniprot_accessions)
     uniprot_accessions_of_partners = search_for_interaction_partners(query, limit)

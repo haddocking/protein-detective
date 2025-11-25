@@ -116,6 +116,7 @@ def create_powerfit_script_content(row: Dataset, map_root: str) -> str:
     powerfit_args = f"--gpu {number_of_workers_per_gpu}"
     resampled_resolution = "6"
     masked_map = f"{map_root}/{pdb_id}/situs/{pdb_id}_{resampled_resolution}_{chain}.mrc"
+    top_fitted_pdbs2generate = 100
 
     # TODO non-run commands does not need GPU, so run on CPU.
     return dedent(f"""\
@@ -128,10 +129,10 @@ def create_powerfit_script_content(row: Dataset, map_root: str) -> str:
         # powerfit
         protein-detective powerfit run {powerfit_args} {masked_map} {resolution} .
 
-        protein-detective powerfit report .
+        protein-detective powerfit report . > powerfit_report.csv
 
         # Write all fitted pdbs
-        protein-detective powerfit fit-models . --top 100
+        protein-detective powerfit fit-models . --top {top_fitted_pdbs2generate}
 
         # View known model + unknown density + fitted models in mol* or chimeraX
         """)
