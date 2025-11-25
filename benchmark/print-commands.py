@@ -1,4 +1,4 @@
-from textwrap import dedent
+from textwrap import dedent, indent
 
 from pdconfig import Dataset, benchmark_dir, datasets, map_root
 
@@ -38,7 +38,7 @@ def create_remote_script_content(row: Dataset, interaction_partner_seeds: set[st
     soft_min_res, _, hard_min_res, hard_max_res = soft_residue_range(row.Number_of_residues_modelled)
 
     interaction_partner_exclude = uniprot
-    interaction_partner_seed = " \\\n".join(f'    --interaction-partner-seed "{s}"' for s in interaction_partner_seeds)
+    interaction_partner_seed = " \\\n".join(f'--interaction-partner-seed "{s}"' for s in interaction_partner_seeds)
 
     search = dedent(f"""\
         protein-detective search \\
@@ -46,7 +46,7 @@ def create_remote_script_content(row: Dataset, interaction_partner_seeds: set[st
             --subcellular-location-uniprot "{subcellular_uniprot}" \\
             --subcellular-location-go GO:{go_location} \\
             --interaction-partner-exclude "{interaction_partner_exclude}" \\
-        {interaction_partner_seed}    --min-residues {soft_min_res} \\
+        {indent(interaction_partner_seed, "            ")} --min-residues {soft_min_res} \\
             --max-residues {hard_max_res} \\
             --min-sequence-length {hard_min_res} \\
             --limit {search_limit} \\
@@ -57,7 +57,7 @@ def create_remote_script_content(row: Dataset, interaction_partner_seeds: set[st
             protein-detective search \\
                 --taxon-id {tax_id} \\
                 --interaction-partner-exclude "{interaction_partner_exclude}" \\
-            {interaction_partner_seed} \\
+            {indent(interaction_partner_seed, "            ")} \\
                 --min-residues {soft_min_res} \\
                 --max-residues {hard_max_res} \\
                 --min-sequence-length {hard_min_res} \\
@@ -73,7 +73,7 @@ def create_remote_script_content(row: Dataset, interaction_partner_seeds: set[st
         echo $PWD
 
         if [ ! -d "downloads" ]; then
-        {search}
+        {indent(search, "        ")}
         protein-detective retrieve .
         fi
 
