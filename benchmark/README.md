@@ -10,7 +10,7 @@ to execute a protein-detective pipeline.
 
 * The remote.sh script does search+retrieve as it talks to remote servers and is better to run sequentially.
 * The filter.sh script can run in parallel on CPU.
-* The powerfit.sh script can be run in seqeuntially on GPU. Each script uses all GPUs available.
+* The powerfit.sh script can be run sequentially on GPU. Each script uses all GPUs available.
 
 The "Benchmarklist.csv" file is not included in the repository, but you can create your own
 by looking in print-commands.py for the expected columns.
