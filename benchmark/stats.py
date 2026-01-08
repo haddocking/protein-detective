@@ -1,4 +1,5 @@
 """Script to print some statistics about the (partially) completed datasets."""
+
 # ruff: noqa: T201 this is a script
 from os import listdir
 from pathlib import Path
