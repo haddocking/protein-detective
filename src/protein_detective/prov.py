@@ -18,7 +18,7 @@ def prov[T](
 
     Expects args Namespace given to handler to have a _parser attribute with the argparse.ArgumentParser.
 
-    This is a copy of :func:`rocrate_action_recorder.recorded_argparse` with parser embedded into args.
+    This is a copy of [rocrate_action_recorder.recorded_argparse][] with parser embedded into args.
     Made to avoid circular import between cli and powerfit.cli modules.
     """
 

@@ -54,6 +54,8 @@ plugins:
             - https://pandas.pydata.org/docs/objects.inv
             - https://numpy.org/doc/stable/objects.inv
             - https://atomium.bio/objects.inv
+            - https://www.bonvinlab.org/protein-quest/objects.inv
+            - https://rocrate-action-recorder.readthedocs.io/en/stable/objects.inv
           options:
             docstring_style: google
             show_source: false
