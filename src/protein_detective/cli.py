@@ -18,6 +18,7 @@ from protein_detective.powerfit.cli import (
     add_powerfit_parser,
     handle_powerfit,
 )
+from protein_detective.prov import prov
 from protein_detective.search import UniprotQuery
 from protein_detective.workflow import (
     filter_structures,
@@ -165,6 +166,7 @@ def add_filter_parser(subparsers: argparse._SubParsersAction):
     )
 
 
+@prov(output_dirs=["session_dir"])
 def handle_search(args):
     query = converter.structure(
         {
@@ -193,6 +195,7 @@ def handle_search(args):
         rprint(f"Included {result.nr_interaction_partners} Uniprot entries found as interaction partners.")
 
 
+@prov(input_dirs=["session_dir"], output_dirs=["session_dir"])
 def handle_retrieve(args):
     session_dir = Path(args.session_dir)
     download_dir, nr_pdbes, nr_afs = retrieve_structures(
@@ -206,6 +209,7 @@ def handle_retrieve(args):
     )
 
 
+@prov(input_dirs=["session_dir"], output_dirs=["session_dir"])
 def handle_filter(args):
     session_dir: Path = args.session_dir
     cf_query = converter.structure(
@@ -257,6 +261,8 @@ def main():
     parser = make_parser()
 
     args = parser.parse_args()
+    # Store parser in args for provenance recording in handlers
+    args._parser = parser
 
     logging.basicConfig(level=args.log_level, handlers=[RichHandler(show_level=False, console=console)])
 

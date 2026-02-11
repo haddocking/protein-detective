@@ -20,7 +20,8 @@ dependencies = [
     "pyopencl>=2025.2.5",
     "rich>=14.0.0",
     "rich-argparse>=1.7.1",
-    "tqdm>=4.67.1"
+    "rocrate-action-recorder>=0.3.0",
+    "tqdm>=4.67.1",
 ]
 
 [project.urls]

@@ -11,6 +11,7 @@ from rich_argparse import RichHelpFormatter
 from protein_detective.db import connect, list_lcc_files, load_powerfit_runs
 from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.powerfit.workflow import powerfit_commands, powerfit_fit_models, powerfit_report, powerfit_runs
+from protein_detective.prov import prov
 
 
 def _copy_powerfit_parser_arguments(parser: argparse.ArgumentParser, borrowed_arguments: None | set[str] = None):
@@ -166,6 +167,7 @@ def add_powerfit_parser(subparsers):
     add_powerfit_list_lcc_parser(powerfit_subparsers)
 
 
+@prov(input_dirs=["session_dir"], input_files=["target"], output_files=["session_dir"])
 def handler_powerfit_run(args):
     session_dir = Path(args.session_dir)
     powerfit_run_id = powerfit_runs(session_dir, PowerfitOptions.from_args(args), args.scheduler_address)
@@ -187,6 +189,7 @@ def handle_powerfit(args):
         handler_powerfit_list_lcc(args)
 
 
+@prov(input_files=["target"], output_files=["output"], input_dirs=["session_dir"])
 def handle_powerfit_commands(args):
     session_dir = Path(args.session_dir)
     commands, powerfit_run_id = powerfit_commands(session_dir, PowerfitOptions.from_args(args))
@@ -201,6 +204,7 @@ def handle_powerfit_commands(args):
         print(command, file=args.output)
 
 
+@prov(input_dirs=["session_dir"], output_files=["output"])
 def handler_powerfit_report(args):
     session_dir = Path(args.session_dir)
     powerfit_run_id = args.powerfit_run_id
@@ -218,6 +222,7 @@ def handler_powerfit_report(args):
     solutions.to_csv(args.output, index=False)
 
 
+@prov(input_dirs=["session_dir"], output_files=["output"])
 def handler_powerfit_fit_models(args):
     session_dir = Path(args.session_dir)
     powerfit_run_id = args.powerfit_run_id
