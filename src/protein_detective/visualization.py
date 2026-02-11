@@ -139,7 +139,7 @@ def show_structure_and_density(structure: Path | str, density: Path, renderer: R
 
     # TODO use camera or focus to point camera to structure
 
-    state = builder.get_state(indent=2)
+    state = builder.get_state()
     data = {}
     data[density.name] = density.read_bytes()
     data[structure.name] = structure.read_bytes()
