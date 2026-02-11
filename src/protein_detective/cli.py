@@ -248,6 +248,11 @@ def make_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--log-level", default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument(
+        "--prov",
+        action="store_true",
+        help="Whether to write provenance information about the command execution to ro-crate-metadata.json file.",
+    )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
     add_search_parser(subparsers)
