@@ -20,7 +20,7 @@ dependencies = [
     "pyopencl>=2025.2.5",
     "rich>=14.0.0",
     "rich-argparse>=1.7.1",
-    "rocrate-action-recorder>=0.3.0",
+    "rocrate-action-recorder>=0.4.0",
     "tqdm>=4.67.1",
 ]
 
@@ -174,4 +174,3 @@ protein-quest = { path = "../protein-quest", editable = true }
 
 [tool.pyrefly]
 project-includes = ["src", "tests", "benchmark"]
-search-paths = ["./src", "./benchmark"]

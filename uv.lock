@@ -2362,7 +2362,7 @@ wheels = [
 
 [[package]]
 name = "posthog"
-version = "7.8.5"
+version = "7.8.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backoff" },
@@ -2372,9 +2372,9 @@ dependencies = [
     { name = "six" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b0/10/8e74a5e997c8286f0b63c69da522e503b1ab11627217ab76a06c7b62d647/posthog-7.8.5.tar.gz", hash = "sha256:e4f3796ce18323d8e05139bf419a04d318ccc4ad77b210f4d9d7c7546aea4f35", size = 169117, upload-time = "2026-02-09T22:59:49.207Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/21/c9/a7c67c039f23f16a0b87d17561ba2a1c863b01f054a226c92437c539a7b6/posthog-7.8.6.tar.gz", hash = "sha256:6f67e18b5f19bf20d7ef2e1a80fa1ad879a5cd309ca13cfb300f45a8105968c4", size = 169304, upload-time = "2026-02-11T13:59:42.558Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/33/b3/59b61d4b90e2efd138abaa34d98c7a89a4a352850cc3a079a60a46780655/posthog-7.8.5-py3-none-any.whl", hash = "sha256:979d306f07e61a8e837746e5dc432aafc49827fecac91bd6c624dcf3a1967448", size = 194647, upload-time = "2026-02-09T22:59:47.744Z" },
+    { url = "https://files.pythonhosted.org/packages/56/c7/41664398a838f52ddfc89141e4c38b88eaa01b9e9a269c5ac184bd8586c6/posthog-7.8.6-py3-none-any.whl", hash = "sha256:21809f73e8e8f09d2bc273b09582f1a9f997b66f51fc626ef5bd3c5bdffd8bcd", size = 194801, upload-time = "2026-02-11T13:59:41.26Z" },
 ]
 
 [[package]]
@@ -2591,7 +2591,7 @@ requires-dist = [
     { name = "pyopencl", specifier = ">=2025.2.5" },
     { name = "rich", specifier = ">=14.0.0" },
     { name = "rich-argparse", specifier = ">=1.7.1" },
-    { name = "rocrate-action-recorder", specifier = ">=0.3.0" },
+    { name = "rocrate-action-recorder", specifier = ">=0.4.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
 ]
 
@@ -3260,14 +3260,14 @@ wheels = [
 
 [[package]]
 name = "rocrate-action-recorder"
-version = "0.3.0"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "rocrate" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a4/05/4fd922c8cb22e358c9ea45382b881d6acf9509bf4f1b350ea9d8e4677dbd/rocrate_action_recorder-0.3.0.tar.gz", hash = "sha256:ec98d3a3df6fa82f369600ba606d34a002d6b57d52d2870fa76c051186c7c745", size = 65382, upload-time = "2026-02-11T11:35:23.398Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2e/64/2464c40a75029aebee28404c881d35740b14bb3aa5425c0d4156f5d5de44/rocrate_action_recorder-0.4.0.tar.gz", hash = "sha256:e265f1b65817e4456d1ad20277c5b60c9157dd38d57d29a0463ce23c26f7ecea", size = 65932, upload-time = "2026-02-11T14:14:00.569Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7c/c1/a01ee2de39b57b441b1bc29031295a519022ec2131a3122a51cc355fb22f/rocrate_action_recorder-0.3.0-py3-none-any.whl", hash = "sha256:f1881309605e03a9ca7b8896665e2021099cbbe5edfc63e381873eddd0b55d54", size = 17692, upload-time = "2026-02-11T11:35:21.41Z" },
+    { url = "https://files.pythonhosted.org/packages/91/91/f2cb3f3ffb57654a561114cac75fdc92e4a2c9c8b14f8434936bbaeafbfa/rocrate_action_recorder-0.4.0-py3-none-any.whl", hash = "sha256:a934e575d219a2555695c7cd7d8aea3f0724024b33ea6ffaf691f917da639b94", size = 17939, upload-time = "2026-02-11T14:13:59.558Z" },
 ]
 
 [[package]]
