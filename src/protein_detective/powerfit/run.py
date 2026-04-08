@@ -2,7 +2,6 @@ import logging
 from os import environ
 from pathlib import Path
 
-from aiofiles import os
 from powerfit_em.analyzer import Analyzer
 from powerfit_em.powerfit import (
     get_gpu_queue,
