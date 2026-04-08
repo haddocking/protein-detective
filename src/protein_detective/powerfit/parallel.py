@@ -3,6 +3,7 @@
 import logging
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
+from os import environ
 
 from dask.distributed import LocalCluster, Nanny
 from distributed import Scheduler, SpecCluster
@@ -128,6 +129,10 @@ def _configure_gpu_dask_scheduler(workers_per_gpu: int, cluster_name: str) -> Sp
         # Assume first platform is quickest
     platform = pyopencl.get_platforms()[0]
     gpus = platform.get_devices()
+    gpu_ids = list(range(len(gpus)))
+    visible_devices = environ.get("CUDA_VISIBLE_DEVICES", environ.get("ROCR_VISIBLE_DEVICES"))
+    if visible_devices:
+        gpu_ids = [int(d) for d in visible_devices.split(",")]
     # Below is similar to https://github.com/rapidsai/dask-cuda/blob/main/dask_cuda/local_cuda_cluster.py
     # but more minimalistic and with AMD support
     n_gpus = len(gpus)
@@ -139,7 +144,7 @@ def _configure_gpu_dask_scheduler(workers_per_gpu: int, cluster_name: str) -> Sp
     # The computation besides using GPU also uses Python,
     # so we can not use multiple threads
     # as it would slow down the computations due to GIL.
-    for i in range(n_gpus):
+    for i in gpu_ids:
         for j in range(workers_per_gpu):
             worker_spec = {
                 "cls": Nanny,
