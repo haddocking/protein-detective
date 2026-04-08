@@ -10,7 +10,7 @@ from protein_quest.converter import converter
 from protein_quest.filters import ResidueFilterStatistics
 from protein_quest.io import convert_to_cif_file, glob_structure_files, read_structure
 from protein_quest.ss import SecondaryStructureFilterQuery
-from protein_quest.structure import chains_in_structure
+from protein_quest.structure import chains_in_structure, structure2uniprot_accessions
 from protein_quest.utils import CopyMethod, copy_methods
 from rich.console import Console
 from rich.logging import RichHandler
@@ -18,7 +18,7 @@ from rich.progress import track
 from rich_argparse import RawDescriptionRichHelpFormatter, RichHelpFormatter
 
 from protein_detective.__version__ import __version__
-from protein_detective.db import connect, save_filter, save_filtered_structures
+from protein_detective.db import connect, save_filter, save_filtered_structures, save_uniprot_accessions
 from protein_detective.filter import FilteredStructure, FilterOptions
 from protein_detective.powerfit.cli import (
     add_powerfit_parser,
@@ -280,43 +280,53 @@ def handle_import_structures(args):
     import_dir: Path = session_dir / "imported_structures"
     import_dir.mkdir(exist_ok=True, parents=True)
 
-    imported_files: list[FilteredStructure] = []
+    results: list[FilteredStructure] = []
     for structure_file in track(
         glob_structure_files(structures_dir), description="Importing structures...", console=console
     ):
         target_file = convert_to_cif_file(structure_file, import_dir, copy_method=copy_method, output_format=".cif.gz")
-
         structure = read_structure(target_file)
+        try:
+            pdb_id = structure.info["_entry.id"]
+        except KeyError:
+            pdb_id = None
         chains = chains_in_structure(structure)
-        # TODO get uniprot accession from structure
         # TODO get pdb_id from structure
         if chains != {"A"}:
             msg = f"Structure file {structure_file} contains chains {chains}, expected single chain A."
             msg += " Use `protein-quest filter chain` to fix this."
             raise ValueError(msg)
         nr_residues = len(next(iter(chains)))
-        imported_files.append(FilteredStructure(
-            residue=ResidueFilterStatistics(
-                input_file=structure_file,
-                passed=True,
-                output_file=target_file,
-                residue_count=nr_residues,
-            ),
-            uniprot_accession="",
-        ))
+        uniprot_accessions = structure2uniprot_accessions(structure)
+        if len(uniprot_accessions) != 1:
+            msg = f"Structure file {structure_file} contains {uniprot_accessions} uniprot accessions, expected 1."
+            msg += " Use `protein-quest filter uniprot` to fix this."
+            raise ValueError(msg)
+
+        results.append(
+            FilteredStructure(
+                residue=ResidueFilterStatistics(
+                    input_file=structure_file,
+                    passed=True,
+                    output_file=target_file,
+                    residue_count=nr_residues,
+                ),
+                pdb_id=pdb_id,
+                uniprot_accession=next(iter(uniprot_accessions)),
+            )
+        )
 
     with connect(session_dir) as con:
-        # TODO add uniprot accessions to db
-        # TODO add pdb ids to db
-        # TODO add residue count
+        uniprot_accessions = {r.uniprot_accession for r in results}
+        save_uniprot_accessions(uniprot_accessions, con)
         filter_options = FilterOptions(
-            confidence= ConfidenceFilterQuery(),
-            secondary_structure= SecondaryStructureFilterQuery(),
+            confidence=ConfidenceFilterQuery(),
+            secondary_structure=SecondaryStructureFilterQuery(),
         )
         filter_id = save_filter(filter_options, con)
-        save_filtered_structures(imported_files, filter_id, con)  # TODO add file paths and metadata to db
+        save_filtered_structures(results, filter_id, con)
 
-    console.print(f"Imported {len(imported_files)} structure files into session at {import_dir}", style="green")
+    console.print(f"Imported {len(results)} structure files into session at {import_dir}", style="green")
 
 
 def make_parser() -> argparse.ArgumentParser:
