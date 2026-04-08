@@ -1,6 +1,8 @@
 import logging
+from os import environ
 from pathlib import Path
 
+from aiofiles import os
 from powerfit_em.analyzer import Analyzer
 from powerfit_em.powerfit import (
     get_gpu_queue,
@@ -42,7 +44,9 @@ def powerfit_worker(
     if pf is None:
         gpu: str | None = None
         if options.gpu:
-            gpu = "0:0"
+            visible_devices = environ.get("CUDA_VISIBLE_DEVICES", environ.get("ROCR_VISIBLE_DEVICES"))
+            if visible_devices:
+                gpu = f"0:{visible_devices}"
         queue = None
 
         if gpu:
