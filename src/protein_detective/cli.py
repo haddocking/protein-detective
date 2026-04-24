@@ -198,6 +198,15 @@ def add_import_structures_parser(subparsers: argparse._SubParsersAction):
             "If 'hardlink', hard links will be created (unavailable on Windows)."
         ),
     )
+    parser.add_argument(
+        "--strict",
+        dest="strict",
+        action="store_true",
+        help=(
+            "Raise error if structure files do not meet expected criteria (single chain A, single UniProt accession)."
+            " Files that do not meet criteria will be skipped with a warning."
+        ),
+    )
 
 
 def handle_search(args):
@@ -284,31 +293,39 @@ def handle_import_structures(args):
     for structure_file in track(
         glob_structure_files(structures_dir), description="Importing structures...", console=console
     ):
-        target_file = convert_to_cif_file(structure_file, import_dir, copy_method=copy_method, output_format=".cif.gz")
+        target_file = convert_to_cif_file(
+            structure_file.resolve(), import_dir, copy_method=copy_method, output_format=".cif.gz"
+        )
         structure = read_structure(target_file)
         try:
             pdb_id = structure.info["_entry.id"]
         except KeyError:
             pdb_id = None
         chains = chains_in_structure(structure)
-        # TODO get pdb_id from structure
-        if chains != {"A"}:
-            msg = f"Structure file {structure_file} contains chains {chains}, expected single chain A."
+        chain_ids = {chain.name for chain in chains}
+        if chain_ids != {"A"}:
+            msg = f"Structure file {structure_file} contains chains {chain_ids}, expected single chain A."
             msg += " Use `protein-quest filter chain` to fix this."
-            raise ValueError(msg)
+            if args.strict:
+                raise ValueError(msg)
+            console.print(f"Warning: {msg} Skipping file.", style="yellow")
+            continue
         nr_residues = len(next(iter(chains)))
         uniprot_accessions = structure2uniprot_accessions(structure)
         if len(uniprot_accessions) != 1:
             msg = f"Structure file {structure_file} contains {uniprot_accessions} uniprot accessions, expected 1."
             msg += " Use `protein-quest filter uniprot` to fix this."
-            raise ValueError(msg)
+            if args.strict:
+                raise ValueError(msg)
+            console.print(f"Warning: {msg} Skipping file.", style="yellow")
+            continue
 
         results.append(
             FilteredStructure(
                 residue=ResidueFilterStatistics(
-                    input_file=structure_file,
+                    input_file=structure_file.absolute().relative_to(session_dir.absolute(), walk_up=True),
                     passed=True,
-                    output_file=target_file,
+                    output_file=target_file.relative_to(session_dir),
                     residue_count=nr_residues,
                 ),
                 pdb_id=pdb_id,
