@@ -111,6 +111,15 @@ protein-detective --log-level INFO filter \
 protein-detective filter mysession --abs-min-helix-residues 40
 ```
 
+### Import filtered structures
+
+If you have a directory of structures ((gzipped) pdb,cif files), each with single chain called `A` and single UniProt accession.
+You can import them into a new protein detective session with:
+
+```shell
+protein-detective import-structures ./mysession/filtered/ ./mysession3
+```
+
 ### Powerfit
 
 Rotate and translate the prepared structures to fit and score them into the EM density map using powerfit.
