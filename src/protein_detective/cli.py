@@ -7,7 +7,7 @@ from textwrap import dedent
 from protein_quest.alphafold.confidence import ConfidenceFilterQuery
 from protein_quest.alphafold.fetch import downloadable_formats
 from protein_quest.converter import converter
-from protein_quest.ss import SecondaryStructureFilterQuery
+from protein_quest.filters.ss import SecondaryStructureFilterQuery
 from rich.console import Console
 from rich.logging import RichHandler
 from rich_argparse import RawDescriptionRichHelpFormatter, RichHelpFormatter
