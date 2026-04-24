@@ -203,8 +203,9 @@ def add_import_structures_parser(subparsers: argparse._SubParsersAction):
         dest="strict",
         action="store_true",
         help=(
-            "Raise error if structure files do not meet expected criteria (single chain A, single UniProt accession)."
-            " Files that do not meet criteria will be skipped with a warning."
+            "Raise an error if structure files do not meet expected criteria "
+            "(single chain A, single UniProt accession). Without this flag, "
+            "files that do not meet these criteria are skipped with a warning."
         ),
     )
 

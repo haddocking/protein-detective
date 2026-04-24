@@ -113,7 +113,7 @@ protein-detective filter mysession --abs-min-helix-residues 40
 
 ### Import filtered structures
 
-If you have a directory of structures ((gzipped) pdb,cif files), each with single chain called `A` and single UniProt accession.
+If you have a directory of structures ((optionally gzipped) PDB/mmCIF files), each with a single chain called `A` and a single UniProt accession.
 You can import them into a new protein detective session with:
 
 ```shell
