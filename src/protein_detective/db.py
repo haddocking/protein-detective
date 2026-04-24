@@ -184,13 +184,13 @@ def save_uniprot_details(details: Iterable[UniprotDetails], con: DuckDBPyConnect
     """
     detail_data = [
         {
-            "uniprot_acc": detail.uniprot_accession,
-            "uniprot_id": detail.uniprot_id,
-            "sequence_length": detail.sequence_length,
-            "reviewed": detail.reviewed,
-            "protein_name": detail.protein_name,
-            "taxon_id": detail.taxon_id,
-            "taxon_name": detail.taxon_name,
+            "uniprot_acc": detail["uniprot_accession"],
+            "uniprot_id": detail["uniprot_id"],
+            "sequence_length": detail["sequence_length"],
+            "reviewed": detail["reviewed"],
+            "protein_name": detail["protein_name"],
+            "taxon_id": detail["taxon_id"],
+            "taxon_name": detail["taxon_name"],
         }
         for detail in details
     ]

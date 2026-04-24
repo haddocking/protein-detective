@@ -7,13 +7,19 @@ from textwrap import dedent
 from protein_quest.alphafold.confidence import ConfidenceFilterQuery
 from protein_quest.alphafold.fetch import downloadable_formats
 from protein_quest.converter import converter
-from protein_quest.ss import SecondaryStructureFilterQuery
+from protein_quest.filters.residues import ResidueFilterStatistics
+from protein_quest.filters.ss import SecondaryStructureFilterQuery
+from protein_quest.io import convert_to_cif_file, glob_structure_files, read_structure
+from protein_quest.structure import chains_in_structure, structure2uniprot_accessions
+from protein_quest.utils import CopyMethod, copy_methods
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.progress import track
 from rich_argparse import RawDescriptionRichHelpFormatter, RichHelpFormatter
 
 from protein_detective.__version__ import __version__
-from protein_detective.filter import FilterOptions
+from protein_detective.db import connect, save_filter, save_filtered_structures, save_uniprot_accessions
+from protein_detective.filter import FilteredStructure, FilterOptions
 from protein_detective.powerfit.cli import (
     add_powerfit_parser,
     handle_powerfit,
@@ -165,6 +171,45 @@ def add_filter_parser(subparsers: argparse._SubParsersAction):
     )
 
 
+def add_import_structures_parser(subparsers: argparse._SubParsersAction):
+    description = dedent("""\
+        Import structures from a directory into the session.
+
+        The directory should contain structure files in PDB or mmCIF format.
+
+        This can be used to import structures obtained from other sources,
+        or to re-import structures after filtering with external tools.
+    """)
+    parser = subparsers.add_parser(
+        "import-structures",
+        help="Import structures from a directory into the session",
+        description=description,
+        formatter_class=RawDescriptionRichHelpFormatter,
+    )
+    parser.add_argument("structures_dir", type=Path, help="Directory containing structure files to import")
+    parser.add_argument("session_dir", type=Path, help="Session directory to store results")
+    parser.add_argument(
+        "--copy-method",
+        choices=copy_methods,
+        default="hardlink",
+        help=(
+            "Method to use for importing files. Default is 'hardlink'. "
+            "If 'copy', files will be copied. If 'symlink', symbolic links will be created. "
+            "If 'hardlink', hard links will be created (unavailable on Windows)."
+        ),
+    )
+    parser.add_argument(
+        "--strict",
+        dest="strict",
+        action="store_true",
+        help=(
+            "Raise an error if structure files do not meet expected criteria "
+            "(single chain A, single UniProt accession). Without this flag, "
+            "files that do not meet these criteria are skipped with a warning."
+        ),
+    )
+
+
 def handle_search(args):
     query = converter.structure(
         {
@@ -238,6 +283,70 @@ def handle_filter(args):
     rprint(f"Filtering complete, {nr_passed} structure files in {f_dir} directory.")
 
 
+def handle_import_structures(args):
+    structures_dir: Path = args.structures_dir
+    session_dir: Path = args.session_dir
+    copy_method: CopyMethod = args.copy_method
+    import_dir: Path = session_dir / "imported_structures"
+    import_dir.mkdir(exist_ok=True, parents=True)
+
+    results: list[FilteredStructure] = []
+    for structure_file in track(
+        glob_structure_files(structures_dir), description="Importing structures...", console=console
+    ):
+        target_file = convert_to_cif_file(
+            structure_file.resolve(), import_dir, copy_method=copy_method, output_format=".cif.gz"
+        )
+        structure = read_structure(target_file)
+        try:
+            pdb_id = structure.info["_entry.id"]
+        except KeyError:
+            pdb_id = None
+        chains = chains_in_structure(structure)
+        chain_ids = {chain.name for chain in chains}
+        if chain_ids != {"A"}:
+            msg = f"Structure file {structure_file} contains chains {chain_ids}, expected single chain A."
+            msg += " Use `protein-quest filter chain` to fix this."
+            if args.strict:
+                raise ValueError(msg)
+            console.print(f"Warning: {msg} Skipping file.", style="yellow")
+            continue
+        nr_residues = len(next(iter(chains)))
+        uniprot_accessions = structure2uniprot_accessions(structure)
+        if len(uniprot_accessions) != 1:
+            msg = f"Structure file {structure_file} contains {uniprot_accessions} UniProt accessions, expected 1."
+            msg += " Use `protein-quest filter uniprot` to fix the UniProt accessions."
+            if args.strict:
+                raise ValueError(msg)
+            console.print(f"Warning: {msg} Skipping file.", style="yellow")
+            continue
+
+        results.append(
+            FilteredStructure(
+                residue=ResidueFilterStatistics(
+                    input_file=structure_file.absolute().relative_to(session_dir.absolute(), walk_up=True),
+                    passed=True,
+                    output_file=target_file.relative_to(session_dir),
+                    residue_count=nr_residues,
+                ),
+                pdb_id=pdb_id,
+                uniprot_accession=next(iter(uniprot_accessions)),
+            )
+        )
+
+    with connect(session_dir) as con:
+        uniprot_accessions = {r.uniprot_accession for r in results}
+        save_uniprot_accessions(uniprot_accessions, con)
+        filter_options = FilterOptions(
+            confidence=ConfidenceFilterQuery(),
+            secondary_structure=SecondaryStructureFilterQuery(),
+        )
+        filter_id = save_filter(filter_options, con)
+        save_filtered_structures(results, filter_id, con)
+
+    console.print(f"Imported {len(results)} structure files into session at {import_dir}", style="green")
+
+
 def make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Protein Detective CLI", prog="protein-detective", formatter_class=RichHelpFormatter
@@ -249,6 +358,7 @@ def make_parser() -> argparse.ArgumentParser:
     add_search_parser(subparsers)
     add_retrieve_parser(subparsers)
     add_filter_parser(subparsers)
+    add_import_structures_parser(subparsers)
     add_powerfit_parser(subparsers)
     return parser
 
@@ -268,6 +378,10 @@ def main():
         handle_filter(args)
     elif args.command == "powerfit":
         handle_powerfit(args)
+    elif args.command == "import-structures":
+        handle_import_structures(args)
+    else:
+        parser.print_help()
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ from protein_detective.db import (
     save_powerfit_options,
 )
 from protein_detective.powerfit.options import PowerfitOptions
-from protein_detective.powerfit.parallel import build_gpu_cycler, configure_dask_scheduler
+from protein_detective.powerfit.parallel import build_gpu_cycler, configure_dask_scheduler, detect_available_gpus
 from protein_detective.powerfit.run import clear_worker_cache, powerfit_worker
 from protein_detective.powerfit.solution import fit_models
 
@@ -62,7 +62,11 @@ def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list
 
     # Generate PowerFit commands for each PDB file
     commands = []
-    gpu_cycler = build_gpu_cycler(options.gpu)
+    gpu_ids = detect_available_gpus()
+    if options.gpu > 0 and not gpu_ids:
+        msg = "GPU execution requested, but no GPUs were detected."
+        raise ValueError(msg)
+    gpu_cycler = build_gpu_cycler(options.gpu, gpu_ids=gpu_ids)
     for pdb_file in pdb_files:
         result_dir = powerfit_run_root_dir / pdb_file.stem
         command = options.to_command(

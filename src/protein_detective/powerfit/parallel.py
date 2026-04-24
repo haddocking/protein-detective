@@ -3,6 +3,7 @@
 import logging
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
+from os import environ
 
 from dask.distributed import LocalCluster, Nanny
 from distributed import Scheduler, SpecCluster
@@ -81,44 +82,59 @@ def _configure_cpu_dask_scheduler(nproc: int, name: str) -> LocalCluster:
     return LocalCluster(name=name, threads_per_worker=1, n_workers=n_workers)
 
 
-def nr_gpus() -> int:
-    """The number of available GPUs on the system.
+def _parse_visible_gpu_ids(visible_devices: str) -> list[int]:
+    return [int(device.strip()) for device in visible_devices.split(",") if device.strip()]
+
+
+def detect_available_gpus() -> list[int]:
+    """Detect available GPU IDs.
+
+    Preference order is CUDA/ROCR visibility environment variables,
+    then OpenCL discovery.
 
     Returns:
-        Number of GPUs available
+        List of available GPU IDs. Empty list means no GPU detected.
     """
+    visible_devices = environ.get("CUDA_VISIBLE_DEVICES")
+    if visible_devices is None:
+        visible_devices = environ.get("ROCR_VISIBLE_DEVICES")
+    if visible_devices:
+        return _parse_visible_gpu_ids(visible_devices)
+
     if pyopencl is None:
-        return 0
+        return []
 
     try:
         platform = pyopencl.get_platforms()[0]
     except LogicError as e:
         if "PLATFORM_NOT_FOUND_KHR" in str(e):
             logger.debug("No OpenCL platform found.")
-            return 0
+            return []
         raise
-    gpus = platform.get_devices()
-    return len(gpus)
+    return list(range(len(platform.get_devices())))
 
 
-def build_gpu_cycler(workers_per_gpu: int = 1, n_gpus: int = nr_gpus()) -> Generator[int]:
-    """Generator to cycle through GPU indices.
+def build_gpu_cycler(workers_per_gpu: int = 1, gpu_ids: list[int] | None = None) -> Generator[int]:
+    """Generator to cycle through GPU IDs.
 
     On machine with multiple GPUs and a computation that does not use a full GPU.
-    This will yield GPU indices in a round-robin fashion.
+    This will yield GPU IDs in a round-robin fashion.
 
-    - If n_gpus is set to 0, it will yield 0 indefinitely.
-    - If workers_per_gpu>0 and n_gpus=1, it will yield 0 indefinitely.
-    - If workers_per_gpu=1 and n_gpus=2, it will yield 0, 1 indefinitely.
-    - If workers_per_gpu=4 and n_gpus=2, it will yield 0, 1, 0, 1, 0, 1, 0, 1 indefinitely.
+    - If gpu_ids is empty, it will yield 0 indefinitely.
+    - If workers_per_gpu>0 and gpu_ids=[2], it will yield 2 indefinitely.
+    - If workers_per_gpu=1 and gpu_ids=[0, 2], it will yield 0, 2 indefinitely.
+    - If workers_per_gpu=4 and gpu_ids=[0, 2], it will yield 0, 2, 0, 2, 0, 2, 0, 2 indefinitely.
     """
-    if n_gpus == 0:
+    if gpu_ids is None:
+        gpu_ids = detect_available_gpus()
+
+    if not gpu_ids:
         while True:
             yield 0
     else:
         while True:
             for _ in range(workers_per_gpu):
-                yield from range(n_gpus)
+                yield from gpu_ids
 
 
 def _configure_gpu_dask_scheduler(workers_per_gpu: int, cluster_name: str) -> SpecCluster:
@@ -127,10 +143,10 @@ def _configure_gpu_dask_scheduler(workers_per_gpu: int, cluster_name: str) -> Sp
         raise ImportError(msg)
         # Assume first platform is quickest
     platform = pyopencl.get_platforms()[0]
-    gpus = platform.get_devices()
+    gpu_ids = detect_available_gpus()
     # Below is similar to https://github.com/rapidsai/dask-cuda/blob/main/dask_cuda/local_cuda_cluster.py
     # but more minimalistic and with AMD support
-    n_gpus = len(gpus)
+    n_gpus = len(gpu_ids)
     if platform.vendor not in ["NVIDIA Corporation", "Advanced Micro Devices, Inc."] and n_gpus > 1:
         msg = f"Unsupported GPU vendor: {platform.vendor} for multiple GPU support."
         raise ValueError(msg)
@@ -139,7 +155,7 @@ def _configure_gpu_dask_scheduler(workers_per_gpu: int, cluster_name: str) -> Sp
     # The computation besides using GPU also uses Python,
     # so we can not use multiple threads
     # as it would slow down the computations due to GIL.
-    for i in range(n_gpus):
+    for i in gpu_ids:
         for j in range(workers_per_gpu):
             worker_spec = {
                 "cls": Nanny,

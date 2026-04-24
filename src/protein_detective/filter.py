@@ -13,13 +13,9 @@ from typing import TYPE_CHECKING, Literal
 from distributed.deploy.cluster import Cluster
 from protein_quest.alphafold.confidence import ConfidenceFilterQuery, ConfidenceFilterResult, filter_files_on_confidence
 from protein_quest.alphafold.fetch import AlphaFoldEntry
-from protein_quest.filters import (
-    ChainFilterStatistics,
-    ResidueFilterStatistics,
-    filter_files_on_chain,
-    filter_files_on_residues,
-)
-from protein_quest.ss import (
+from protein_quest.filters.chain import ChainFilterStatistics, filter_files_on_chain
+from protein_quest.filters.residues import ResidueFilterStatistics, filter_files_on_residues
+from protein_quest.filters.ss import (
     SecondaryStructureFilterQuery,
     SecondaryStructureFilterResult,
     filter_files_on_secondary_structure,
