@@ -63,6 +63,9 @@ def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list
     # Generate PowerFit commands for each PDB file
     commands = []
     gpu_ids = detect_available_gpus()
+    if options.gpu > 0 and not gpu_ids:
+        msg = "GPU execution requested, but no GPUs were detected."
+        raise ValueError(msg)
     gpu_cycler = build_gpu_cycler(options.gpu, gpu_ids=gpu_ids)
     for pdb_file in pdb_files:
         result_dir = powerfit_run_root_dir / pdb_file.stem
