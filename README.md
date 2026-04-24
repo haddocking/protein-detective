@@ -117,8 +117,10 @@ If you have a directory of structures ((gzipped) pdb,cif files), each with singl
 You can import them into a new protein detective session with:
 
 ```shell
-protein-detective import-structures ./mysession/filtered/ ./mysession3
+protein-detective import-structures ./mysession/filtered ./mysession3
 ```
+
+Imported structures can be used to run powerfit.
 
 ### Powerfit
 
