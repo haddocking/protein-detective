@@ -7,9 +7,9 @@ from textwrap import dedent
 from protein_quest.alphafold.confidence import ConfidenceFilterQuery
 from protein_quest.alphafold.fetch import downloadable_formats
 from protein_quest.converter import converter
-from protein_quest.filters import ResidueFilterStatistics
+from protein_quest.filters.residues import ResidueFilterStatistics
+from protein_quest.filters.ss import SecondaryStructureFilterQuery
 from protein_quest.io import convert_to_cif_file, glob_structure_files, read_structure
-from protein_quest.ss import SecondaryStructureFilterQuery
 from protein_quest.structure import chains_in_structure, structure2uniprot_accessions
 from protein_quest.utils import CopyMethod, copy_methods
 from rich.console import Console

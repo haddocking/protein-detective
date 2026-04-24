@@ -10,8 +10,8 @@ from distributed.deploy.cluster import Cluster
 from protein_quest.alphafold.fetch import DownloadableFormat
 from protein_quest.alphafold.fetch import fetch_many_async as af_fetch
 from protein_quest.pdbe.fetch import fetch as pdbe_fetch
+from protein_quest.pdbe.result import filter_pdb_results_on_chain_length
 from protein_quest.uniprot import (
-    filter_pdb_results_on_chain_length,
     map_uniprot_accessions2uniprot_details,
     search4af,
     search4pdb,
