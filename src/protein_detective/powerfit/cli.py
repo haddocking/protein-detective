@@ -26,6 +26,7 @@ def _copy_powerfit_parser_arguments(parser: argparse.ArgumentParser, borrowed_ar
             "no_trimming",
             "trimming_cutoff",
             "nproc",
+            "batch_size",
         }
     powerfit_parser = make_powerfit_parser()
 

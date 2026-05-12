@@ -4,7 +4,7 @@ from pathlib import Path
 
 from powerfit_em.analyzer import Analyzer
 from powerfit_em.powerfit import (
-    get_gpu_queue,
+    setup_gpu_backend,
     setup_rotational_matrix,
     setup_target,
     setup_template_structure,
@@ -47,10 +47,11 @@ def powerfit_worker(
             visible_devices = environ.get("CUDA_VISIBLE_DEVICES", environ.get("ROCR_VISIBLE_DEVICES"))
             if visible_devices:
                 gpu = f"0:{visible_devices}"
-        queue = None
+        opencl_queue = None
+        cuda_stream = None
 
         if gpu:
-            queue = get_gpu_queue(gpu)
+            opencl_queue, cuda_stream = setup_gpu_backend(gpu)
 
         with density_map_target.open("rb") as f:
             target = setup_target(
@@ -69,7 +70,16 @@ def powerfit_worker(
                 f, None, target, options.resolution, options.core_weighted
             )
 
-        pf = PowerFitter(target, rotmat, template, mask, queue, options.nproc, laplace=options.laplace)
+        pf = PowerFitter(
+            target,
+            rotmat,
+            template,
+            mask,
+            nproc=options.nproc,
+            laplace=options.laplace,
+            queue=opencl_queue,
+            cuda_stream=cuda_stream,
+        )
     else:
         logger.info("Reusing cached PowerFitter instance on worker.")
         with template_structure.open("rb") as f:

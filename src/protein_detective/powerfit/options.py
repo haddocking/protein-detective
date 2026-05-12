@@ -5,6 +5,8 @@ from io import BufferedReader
 from pathlib import Path
 from shlex import join
 
+from powerfit_em.correlators.shared import DEFAULT_BATCH_SIZE
+
 # Copy of
 # https://github.com/haddocking/powerfit/blob/092c5bc387ad90d046601afa9fe79f4fb67f7408/src/powerfit_em/powerfit.py#L31-L164
 # with slight modifications to fit the protein_detective requirements.
@@ -26,6 +28,7 @@ class PowerfitOptions:
         trimming_cutoff: Cutoff for trimming.
         gpu: Number of workers per GPU. If > 0 then Powerfit will use GPU acceleration otherwise CPU.
         nproc: Number of processes to use. Ignored if GPU is used.
+        batch_size: Batch size for processing. Use 0 to do one rotation at a time.
     """
 
     target: Path
@@ -39,6 +42,7 @@ class PowerfitOptions:
     trimming_cutoff: float | None = None
     gpu: int = 0
     nproc: int = 1
+    batch_size: int = DEFAULT_BATCH_SIZE
 
     @staticmethod
     def from_args(parsed_args: Namespace) -> "PowerfitOptions":
@@ -65,6 +69,7 @@ class PowerfitOptions:
             trimming_cutoff=parsed_args.trimming_cutoff,
             gpu=parsed_args.gpu,
             nproc=parsed_args.nproc,
+            batch_size=parsed_args.batch_size,
         )
 
     def to_command(
@@ -113,6 +118,8 @@ class PowerfitOptions:
         if self.gpu > 0 and gpu_cycler is not None:
             gpu_id = next(gpu_cycler)
             args.extend(["--gpu", str(gpu_id)])
+        if self.batch_size != DEFAULT_BATCH_SIZE:
+            args.extend(["--batch-size", str(self.batch_size)])
         if self.angle:
             args.extend(["--angle", str(self.angle)])
         if self.trimming_cutoff is not None:
