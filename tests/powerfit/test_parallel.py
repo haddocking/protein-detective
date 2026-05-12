@@ -1,3 +1,5 @@
+import pytest
+
 from protein_detective.powerfit.parallel import build_gpu_cycler, detect_available_gpus
 
 
@@ -29,3 +31,16 @@ def test_detect_available_gpus_from_rocr_visible_devices(monkeypatch):
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
     monkeypatch.setenv("ROCR_VISIBLE_DEVICES", "1,3")
     assert detect_available_gpus() == [1, 3]
+
+
+@pytest.mark.parametrize(
+    ("has_cuda", "expected"),
+    [
+        (True, [4, 6]),
+        (False, []),
+    ],
+)
+def test_detect_available_gpus_for_cuda_backend(monkeypatch, has_cuda, expected):
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "4,6")
+    monkeypatch.delenv("ROCR_VISIBLE_DEVICES", raising=False)
+    assert detect_available_gpus("cuda", has_cuda=has_cuda) == expected

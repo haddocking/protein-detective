@@ -37,6 +37,15 @@ Or to use the latest development version:
 pip install git+https://github.com/haddocking/protein-detective.git
 ```
 
+By default OpenCL support is included, but if you want to use CUDA, you can install with:
+
+```shell
+# For CUDA version 13
+pip install "protein-detective[cuda13]"
+# or for CUDA version 12
+pip install "protein-detective[cuda12]"
+```
+
 ## Usage
 
 The main entry point is the `protein-detective` command line tool which has multiple subcommands to perform actions.
@@ -185,6 +194,8 @@ You can set the `--nproc <int>` so each powerfit will use that many CPU cores.
 This is useful if you have more CPU cores available then there are structures to fit.
 If the number of structure to fit is greater than available CPU cores then using the default (1 core per powerfit) is recommended.
 
+In testing on highend NVIDIA GPUs the OpenCL backend is faster than CUDA backend, so we default to using OpenCL.
+To use CUDA instead, you can set `--gpu-backend cuda` and make sure you installed protein-detective with the appropriate CUDA extra.
 </details>
 
 <details>

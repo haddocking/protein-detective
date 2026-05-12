@@ -62,7 +62,7 @@ def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list
 
     # Generate PowerFit commands for each PDB file
     commands = []
-    gpu_ids = detect_available_gpus()
+    gpu_ids = detect_available_gpus(options.gpu_backend)
     if options.gpu > 0 and not gpu_ids:
         msg = "GPU execution requested, but no GPUs were detected."
         raise ValueError(msg)
@@ -98,6 +98,7 @@ def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_address
             name=f"powerfit-run-{powerfit_run_id}",
             workers_per_gpu=options.gpu,
             nproc=options.nproc,
+            gpu_backend=options.gpu_backend,
         ) as scheduler_address,
         Client(scheduler_address) as client,
     ):
