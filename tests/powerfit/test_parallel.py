@@ -34,13 +34,15 @@ def test_detect_available_gpus_from_rocr_visible_devices(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("has_cuda", "expected"),
+    ("cuda_devices_arg", "expected"),
     [
-        (True, [4, 6]),
-        (False, []),
+        ([0, 1], [0, 1]),
+        (None, []),
     ],
 )
-def test_detect_available_gpus_for_cuda_backend(monkeypatch, has_cuda, expected):
+def test_detect_available_gpus_for_cuda_backend(monkeypatch, cuda_devices_arg, expected):
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "4,6")
     monkeypatch.delenv("ROCR_VISIBLE_DEVICES", raising=False)
-    assert detect_available_gpus("cuda", has_cuda=has_cuda) == expected
+    # When CUDA_VISIBLE_DEVICES="4,6", CuPy sees 2 devices and reports [0, 1]
+    # When cuda_devices is provided, cuda_available() check is bypassed
+    assert detect_available_gpus("cuda", cuda_devices=cuda_devices_arg) == expected

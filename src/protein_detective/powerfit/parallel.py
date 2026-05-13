@@ -123,27 +123,25 @@ def _detect_cuda_devices() -> list[int]:
         return []
 
 
-def detect_available_gpus(gpu_backend: GpuBackend = "opencl", has_cuda: bool | None = None) -> list[int]:
+def detect_available_gpus(gpu_backend: GpuBackend = "opencl", cuda_devices: list[int] | None = None) -> list[int]:
     """Detect available GPU IDs.
 
-    Preference order is CUDA/ROCR visibility environment variables,
-    then OpenCL discovery.
+    For CUDA backend: CuPy handles CUDA_VISIBLE_DEVICES/ROCR_VISIBLE_DEVICES internally.
+    For OpenCL backend: Checks environment variables before falling back to OpenCL discovery.
 
     Args:
         gpu_backend: Backend used for GPU discovery.
-        has_cuda: Optional override for CUDA availability.
-            If None, availability is detected via `cuda_available()`.
+        cuda_devices: Optional list of CUDA device IDs to use instead of detecting.
+            If provided, bypasses cuda_available() check.
 
     Returns:
         List of available GPU IDs. Empty list means no GPU detected.
     """
     if gpu_backend == "cuda":
-        cuda_is_available = cuda_available() if has_cuda is None else has_cuda
-        if not cuda_is_available:
+        if cuda_devices is not None:
+            return cuda_devices
+        if not cuda_available():
             return []
-        visible_devices = environ.get("CUDA_VISIBLE_DEVICES") or environ.get("ROCR_VISIBLE_DEVICES")
-        if visible_devices:
-            return _parse_visible_gpu_ids(visible_devices)
         return _detect_cuda_devices()
 
     visible_devices = environ.get("CUDA_VISIBLE_DEVICES") or environ.get("ROCR_VISIBLE_DEVICES")
