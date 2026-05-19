@@ -20,6 +20,22 @@ def _is_gpu_backend(value: object) -> TypeGuard[GpuBackend]:
     return isinstance(value, str) and value in gpu_backends
 
 
+def parse_first_visible_gpu_id(visible_devices: str | None) -> int:
+    """Parse first GPU id from visible-devices env var value.
+
+    Falls back to GPU 0 when the value is missing, empty, or invalid.
+    """
+    if not visible_devices:
+        return 0
+    first_visible_device = visible_devices.split(",")[0].strip()
+    if not first_visible_device:
+        return 0
+    try:
+        return int(first_visible_device)
+    except ValueError:
+        return 0
+
+
 @dataclass
 class PowerfitOptions:
     """Options for the Powerfit command.
@@ -87,7 +103,7 @@ class PowerfitOptions:
             batch_size=parsed_args.batch_size,
         )
 
-    def _format_gpu_device(self, gpu_id: int) -> str:
+    def format_gpu_device(self, gpu_id: int) -> str:
         if self.gpu_backend == "cuda":
             return f"cuda:{gpu_id}"
         return f"0:{gpu_id}"
@@ -137,7 +153,7 @@ class PowerfitOptions:
         ]
         if self.gpu > 0 and gpu_cycler is not None:
             gpu_id = next(gpu_cycler)
-            args.extend(["--gpu", self._format_gpu_device(gpu_id)])
+            args.extend(["--gpu", self.format_gpu_device(gpu_id)])
         if self.batch_size != DEFAULT_BATCH_SIZE:
             args.extend(["--batch-size", str(self.batch_size)])
         if self.angle:

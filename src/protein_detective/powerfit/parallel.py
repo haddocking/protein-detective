@@ -132,7 +132,7 @@ def detect_available_gpus(gpu_backend: GpuBackend = "opencl", cuda_devices: list
     Args:
         gpu_backend: Backend used for GPU discovery.
         cuda_devices: Optional list of CUDA device IDs to use instead of detecting.
-            If provided, bypasses cuda_available() check.
+            If provided, bypasses cuda_available() check. Useful for testing.
 
     Returns:
         List of available GPU IDs. Empty list means no GPU detected.
@@ -190,7 +190,6 @@ def _configure_gpu_dask_scheduler(workers_per_gpu: int, cluster_name: str, gpu_b
         raise _opencl_unavailable_error()
     if gpu_backend == "cuda" and not cuda_available():
         raise _cuda_unavailable_error()
-        # Assume first platform is quickest
     gpu_ids = detect_available_gpus(gpu_backend)
     # Below is similar to https://github.com/rapidsai/dask-cuda/blob/main/dask_cuda/local_cuda_cluster.py
     # but more minimalistic and with AMD support

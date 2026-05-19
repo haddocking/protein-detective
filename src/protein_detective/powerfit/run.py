@@ -12,24 +12,13 @@ from powerfit_em.powerfit import (
 from powerfit_em.powerfitter import PowerFitter
 
 from protein_detective.db import PowerfitOptions
-from protein_detective.powerfit.options import GpuBackend
+from protein_detective.powerfit.options import parse_first_visible_gpu_id
 
 logger = logging.getLogger(__name__)
 
 
 # Cached fitter on each worker
 pf: PowerFitter | None = None
-
-
-def _format_gpu_device(gpu_backend: GpuBackend, visible_devices: str | None) -> str:
-    gpu_id = 0
-    if visible_devices:
-        first_visible_device = visible_devices.split(",")[0].strip()
-        if first_visible_device:
-            gpu_id = int(first_visible_device)
-    if gpu_backend == "cuda":
-        return f"cuda:{gpu_id}"
-    return f"0:{gpu_id}"
 
 
 def powerfit_worker(
@@ -56,7 +45,8 @@ def powerfit_worker(
         gpu: str | None = None
         if options.gpu:
             visible_devices = environ.get("CUDA_VISIBLE_DEVICES", environ.get("ROCR_VISIBLE_DEVICES"))
-            gpu = _format_gpu_device(options.gpu_backend, visible_devices)
+            gpu_id = parse_first_visible_gpu_id(visible_devices)
+            gpu = options.format_gpu_device(gpu_id)
         opencl_queue = None
         cuda_stream = None
 
