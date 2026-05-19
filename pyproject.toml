@@ -14,7 +14,7 @@ dependencies = [
     "molviewspec>=1.6.0",
     "numpy>=2.3.1",
     "pandas>=2.3.0",
-    "powerfit-em[opencl]>=4.0.3",
+    "powerfit-em[opencl]>=5.0.0",
     "protein-quest>=1.4.0",
     "psutil>=7.0.0",
     "pyopencl>=2025.2.5",
@@ -32,6 +32,14 @@ Source = "https://github.com/haddocking/protein-detective"
 [project.scripts]
 protein-detective = "protein_detective.cli:main"
 
+[project.optional-dependencies]
+cuda13 = [
+    "powerfit-em[cuda13x]>=5.0.0",
+]
+cuda12 = [
+    "powerfit-em[cuda12x]>=5.0.0",
+]
+
 [dependency-groups]
 type = [
     "pyrefly>=0.42.0",
@@ -39,7 +47,8 @@ type = [
     "types-tqdm>=4.67.0.20250513"
 ]
 test = [
-    "pytest>=8.3.5",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
 ]
 dev = [
     {include-group = "test"},
@@ -174,3 +183,7 @@ protein-quest = { path = "../protein-quest", editable = true }
 [tool.pyrefly]
 project-includes = ["src", "tests", "benchmark"]
 search-paths = ["./src", "./benchmark"]
+
+[tool.coverage.run]
+source = ["src/protein_detective"]
+branch = true

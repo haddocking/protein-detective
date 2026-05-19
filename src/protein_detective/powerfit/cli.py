@@ -9,7 +9,7 @@ from rich.table import Table
 from rich_argparse import RichHelpFormatter
 
 from protein_detective.db import connect, list_lcc_files, load_powerfit_runs
-from protein_detective.powerfit.options import PowerfitOptions
+from protein_detective.powerfit.options import PowerfitOptions, gpu_backends
 from protein_detective.powerfit.workflow import powerfit_commands, powerfit_fit_models, powerfit_report, powerfit_runs
 
 
@@ -26,12 +26,33 @@ def _copy_powerfit_parser_arguments(parser: argparse.ArgumentParser, borrowed_ar
             "no_trimming",
             "trimming_cutoff",
             "nproc",
+            "batch_size",
         }
     powerfit_parser = make_powerfit_parser()
 
     for powerfit_argument in powerfit_parser._actions:
         if powerfit_argument.dest in borrowed_arguments:
             parser._add_action(powerfit_argument)
+
+
+def _add_gpu_arguments(parser: argparse.ArgumentParser, gpu_backend_help: str):
+    parser.add_argument(
+        "-g",
+        "--gpu",
+        dest="gpu",
+        nargs="?",
+        const=1,
+        type=int,
+        default=0,
+        help="Off-load the intensive calculations to the GPU. "
+        "Optionally specify number of workers per GPU (default: 1).",
+    )
+    parser.add_argument(
+        "--gpu-backend",
+        choices=gpu_backends,
+        default="opencl",
+        help=gpu_backend_help,
+    )
 
 
 def add_powerfit_commands_parser(subparsers):
@@ -45,26 +66,15 @@ def add_powerfit_commands_parser(subparsers):
     _copy_powerfit_parser_arguments(parser)
 
     # Replaces template argument
-    parser.add_argument("session_dir", help="Session directory for input and output")
 
     # Removed --chain, as protein-detective created single chain PDB files
     # Removed --directory argument as protein_detective will generate that argument
 
     # Removed --num, as we can fit models later with `powerfit fit-models` command
 
-    # Replaces --gpu, from [<platform>:<device>] to boolean flag
-    # When enabled and machine has multiple GPUs, then 0:0 is used
-    parser.add_argument(
-        "-g",
-        "--gpu",
-        dest="gpu",
-        nargs="?",
-        const=1,
-        type=int,
-        default=0,
-        help="Off-load the intensive calculations to the GPU. "
-        "Optionally specify number of workers per GPU (default: 1).",
-    )
+    parser.add_argument("session_dir", help="Session directory for input and output")
+    # Replaces --gpu, from [<platform>:<device>] to workers-per-GPU count.
+    _add_gpu_arguments(parser, "GPU backend to target when generating PowerFit commands.")
 
     parser.add_argument(
         "--output",
@@ -86,17 +96,7 @@ def add_powerfit_run_parser(subparsers):
     _copy_powerfit_parser_arguments(parser)
 
     parser.add_argument("session_dir", help="Session directory containing PDB files")
-    parser.add_argument(
-        "-g",
-        "--gpu",
-        dest="gpu",
-        nargs="?",
-        const=1,
-        type=int,
-        default=0,
-        help="Off-load the intensive calculations to the GPU. "
-        "Optionally specify number of workers per GPU (default: 1).",
-    )
+    _add_gpu_arguments(parser, "GPU backend to target when running PowerFit.")
     parser.add_argument(
         "--scheduler-address",
         help="Address of the Dask scheduler to connect to. If not provided, will create a local cluster.",

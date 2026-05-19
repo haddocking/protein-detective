@@ -21,14 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: install system deps
         run: |
           sudo apt-get update
           sudo apt-get install -y ocl-icd-opencl-dev ocl-icd-libopencl1
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v8.1.0
         
       - name: Install dependencies
         run: uv sync --no-sources --group docs
@@ -42,7 +42,7 @@ jobs:
           TTY_INTERACTIVE: '0'
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: site
 
