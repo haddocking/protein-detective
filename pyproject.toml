@@ -47,7 +47,8 @@ type = [
     "types-tqdm>=4.67.0.20250513"
 ]
 test = [
-    "pytest>=8.3.5",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
 ]
 dev = [
     {include-group = "test"},
@@ -182,3 +183,7 @@ protein-quest = { path = "../protein-quest", editable = true }
 [tool.pyrefly]
 project-includes = ["src", "tests", "benchmark"]
 search-paths = ["./src", "./benchmark"]
+
+[tool.coverage.run]
+source = ["src/protein_detective"]
+branch = true
