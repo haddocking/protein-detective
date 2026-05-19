@@ -26,29 +26,7 @@ jobs:
       - name: Install pocl
         run: uv pip install pocl-binary-distribution==3.0
       - name: Run tests
-        run: uv run --no-sources pytest --cov --cov-report=xml
-      - uses: actions/upload-artifact@v4
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        with:
-          name: cobertura-report
-          path: coverage.xml
-  upload-coverage:
-    needs: test
-    if: ${{ !cancelled() && needs.test.result == 'success' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      code-quality: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: cobertura-report
-
-      - uses: actions/upload-code-coverage@v1.1.0
-        with:
-          file: coverage.xml
-          language: Python
-          label: code-coverage/pytest
+        run: uv run --no-sources pytest --cov
   build:
     name: build
     runs-on: ubuntu-latest
