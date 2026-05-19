@@ -34,7 +34,7 @@ jobs:
           path: coverage.xml
   upload-coverage:
     needs: test
-    if: ${{ !cancelled() && needs.build.result == 'success' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ !cancelled() && needs.test.result == 'success' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
