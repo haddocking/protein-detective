@@ -196,6 +196,13 @@ If the number of structure to fit is greater than available CPU cores then using
 
 In testing on highend NVIDIA GPUs the OpenCL backend is faster than CUDA backend, so we default to using OpenCL.
 To use CUDA instead, you can set `--gpu-backend cuda` and make sure you installed protein-detective with the appropriate CUDA extra.
+
+For example
+
+```shell
+protein-detective powerfit run --gpu 1 --batch-size 50 --gpu-backend cuda ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession
+```
+
 </details>
 
 <details>
