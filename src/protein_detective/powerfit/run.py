@@ -46,6 +46,8 @@ def powerfit_worker(
         if options.gpu:
             visible_devices = environ.get("CUDA_VISIBLE_DEVICES", environ.get("ROCR_VISIBLE_DEVICES"))
             gpu_id = parse_first_visible_gpu_id(visible_devices)
+            # TODO workaround to force first gpu to be used
+            gpu_id = 0
             gpu = options.format_gpu_device(gpu_id)
         opencl_queue = None
         cuda_stream = None
