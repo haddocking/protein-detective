@@ -9,8 +9,11 @@ from protein_quest.alphafold.fetch import downloadable_formats
 from protein_quest.converter import converter
 from protein_quest.filters.residues import ResidueFilterStatistics
 from protein_quest.filters.ss import SecondaryStructureFilterQuery
-from protein_quest.io import convert_to_cif_file, glob_structure_files, read_structure
-from protein_quest.structure import chains_in_structure, structure2uniprot_accessions
+from protein_quest.structure.chains import chains_in_structure
+from protein_quest.structure.convert import convert_to_cif_file
+from protein_quest.structure.files import glob_structure_files
+from protein_quest.structure.formats import read_structure
+from protein_quest.structure.uniprot import structure2uniprot_accessions
 from protein_quest.utils import CopyMethod, copy_methods
 from rich.console import Console
 from rich.logging import RichHandler
