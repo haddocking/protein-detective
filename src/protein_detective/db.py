@@ -599,11 +599,12 @@ def load_filtered_structure_files(con: DuckDBPyConnection) -> list[Path]:
     return [Path(row[0]) for row in rows]
 
 
-def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> int:
+def save_powerfit_options(options: PowerfitOptions, powerfit_run_id: str | None, con: DuckDBPyConnection) -> str:
     """Save PowerFit options of a powerfit run to the database.
 
     Args:
         options: The PowerFit options to save.
+        powerfit_run_id: Optional ID of the PowerFit run to use. If None, a new run ID will be generated.
         con: The DuckDB connection to use for saving the data.
 
     Returns:
@@ -612,18 +613,21 @@ def save_powerfit_options(options: PowerfitOptions, con: DuckDBPyConnection) -> 
     Raises:
         ValueError: If the options could not be saved or retrieved.
     """
+    if powerfit_run_id is None:
+        result = con.execute("SELECT count(*) FROM powerfit_runs").fetchone()
+        powerfit_run_id = "1" if result is None else str(result[0] + 1)
     try:
         result = con.execute(
-            """INSERT INTO powerfit_runs (options)
-            VALUES (?) RETURNING powerfit_run_id""",
-            (converter.dumps(options, PowerfitOptions).decode(),),
+            """INSERT INTO powerfit_runs (powerfit_run_id, options)
+            VALUES (?, ?)""",
+            (powerfit_run_id, converter.dumps(options, PowerfitOptions).decode()),
         ).fetchone()
         if result is None or len(result) != 1:
             msg = "Failed to insert powerfit options"
             raise ValueError(msg)
-        return result[0]
+        return powerfit_run_id  # noqa: TRY300
     except ConstraintException as e:
-        # If the options already exist, we can retrieve the existing run ID
+        # If the powerfit_run_id or options already exist, we can retrieve the existing run ID
         result = con.execute(
             """SELECT powerfit_run_id FROM powerfit_runs
             WHERE options = ?""",
@@ -665,7 +669,7 @@ def load_powerfit_runs(con: DuckDBPyConnection) -> list[tuple[int, PowerfitOptio
 
 
 def load_powerfit_run(
-    powerfit_run_id: int,
+    powerfit_run_id: str,
     con: DuckDBPyConnection,
 ) -> tuple[PowerfitOptions, Path]:
     """Load a specific PowerFit run by its ID.
@@ -689,7 +693,7 @@ def load_powerfit_run(
     raise ValueError(msg)
 
 
-def powerfit_solutions(con: DuckDBPyConnection, powerfit_run_id: int | None = None) -> DataFrame:
+def powerfit_solutions(con: DuckDBPyConnection, powerfit_run_id: str | None = None) -> DataFrame:
     """Retrieve PowerFit solutions from the solutions.out files.
 
     Args:

@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS filtered_structures (
 
 CREATE SEQUENCE IF NOT EXISTS id_powerfit_runs START 1;
 CREATE TABLE IF NOT EXISTS powerfit_runs (
-    powerfit_run_id INTEGER DEFAULT nextval('id_powerfit_runs') PRIMARY KEY,
+    powerfit_run_id TEXT PRIMARY KEY,
     options JSON NOT NULL,
     UNIQUE (options)
 );
@@ -136,7 +136,7 @@ LEFT JOIN (
 ORDER BY cc DESC;
 
 CREATE TABLE IF NOT EXISTS raw_fitted_models (
-    powerfit_run_id INTEGER NOT NULL,
+    powerfit_run_id TEXT NOT NULL,
     structure TEXT NOT NULL,
     rank INTEGER NOT NULL,
     -- unfitted_model_file is foreign key of filtererd_structures.output_file

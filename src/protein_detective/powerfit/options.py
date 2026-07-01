@@ -115,6 +115,7 @@ class PowerfitOptions:
         out_dir: Path,
         powerfit_cmd: str = "powerfit",
         gpu_cycler: Generator[int] | None = None,
+        powerfit_run_id: str | None = None,
     ) -> str:
         """Generate command from options and given arguments.
 
@@ -124,6 +125,7 @@ class PowerfitOptions:
             out_dir: Directory to save the output files.
             powerfit_cmd: Command to run Powerfit (default is "powerfit").
             gpu_cycler: Generator to cycle through GPU indices.
+            powerfit_run_id: Optional ID of the PowerFit run to use. If None, a new run ID will be generated.
 
         Returns:
             A string representing the command to run Powerfit.
@@ -160,6 +162,8 @@ class PowerfitOptions:
             args.extend(["--angle", str(self.angle)])
         if self.trimming_cutoff is not None:
             args.extend(["--trimming-cutoff", str(self.trimming_cutoff)])
+        if powerfit_run_id is not None:
+            args.extend(["--powerfit-run-id", str(powerfit_run_id)])
         # Filter out empty strings
         args = [arg for arg in args if arg]
         return join(args)

@@ -23,11 +23,11 @@ from protein_detective.powerfit.solution import fit_models
 logger = logging.getLogger(__name__)
 
 
-def _initialize_powerfit_run(session_dir, options):
+def _initialize_powerfit_run(session_dir, options, powerfit_run_id: str | None = None):
     session_dir.mkdir(parents=True, exist_ok=True)
     with connect(session_dir) as con:
-        powerfit_run_id = save_powerfit_options(options, con)
-    powerfit_run_dir = session_dir / "powerfit" / str(powerfit_run_id)
+        powerfit_run_id = save_powerfit_options(options, powerfit_run_id, con)
+    powerfit_run_dir = session_dir / "powerfit" / powerfit_run_id
     powerfit_run_dir.mkdir(parents=True, exist_ok=True)
 
     # Copy the density map to the powerfit directory
@@ -43,13 +43,16 @@ def _initialize_powerfit_run(session_dir, options):
     return powerfit_run_id, powerfit_run_dir, density_map_target, pdb_files
 
 
-def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list[str], int]:
+def powerfit_commands(
+    session_dir: Path, options: PowerfitOptions, powerfit_run_id: str | None = None
+) -> tuple[list[str], str]:
     """
     Generate PowerFit commands for fitting structures to a density map.
 
     Args:
         session_dir: Directory containing the session data, including PDB files.
         options: Options for generating PowerFit commands.
+        powerfit_run_id: Optional ID of the PowerFit run to use. If None, a new run ID will be generated.
 
     Returns:
         A tuple containing:
@@ -57,7 +60,7 @@ def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list
             - The ID of the PowerFit run saved in the session database.
     """
     powerfit_run_id, powerfit_run_root_dir, density_map_target, pdb_files = _initialize_powerfit_run(
-        session_dir, options
+        session_dir, options, powerfit_run_id=powerfit_run_id
     )
 
     # Generate PowerFit commands for each PDB file
@@ -70,27 +73,37 @@ def powerfit_commands(session_dir: Path, options: PowerfitOptions) -> tuple[list
     for pdb_file in pdb_files:
         result_dir = powerfit_run_root_dir / pdb_file.stem
         command = options.to_command(
-            density_map=density_map_target, template=pdb_file, out_dir=result_dir, gpu_cycler=gpu_cycler
+            density_map=density_map_target,
+            template=pdb_file,
+            out_dir=result_dir,
+            gpu_cycler=gpu_cycler,
+            powerfit_run_id=powerfit_run_id,
         )
         commands.append(command)
 
     return commands, powerfit_run_id
 
 
-def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_address: str | Cluster | None = None) -> int:
+def powerfit_runs(
+    session_dir: Path,
+    options: PowerfitOptions,
+    scheduler_address: str | Cluster | None = None,
+    powerfit_run_id: str | None = None,
+) -> str:
     """Run distributed PowerFits on each of the PDB files in the session directory.
 
     Args:
         session_dir: Directory containing the session data, including PDB files.
         options: Options for running PowerFit.
         scheduler_address: Address of the Dask scheduler or a Cluster instance or None for local execution.
+        powerfit_run_id: Optional ID of the PowerFit run to use. If None, a new run ID will be generated.
 
     Returns:
         The ID of the PowerFit run saved in the session.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
     powerfit_run_id, powerfit_run_root_dir, density_map_target, pdb_files = _initialize_powerfit_run(
-        session_dir, options
+        session_dir, options, powerfit_run_id=powerfit_run_id
     )
     with (
         configure_dask_scheduler(
@@ -119,7 +132,7 @@ def powerfit_runs(session_dir: Path, options: PowerfitOptions, scheduler_address
     return powerfit_run_id
 
 
-def powerfit_report(session_dir: Path, powerfit_run_id: int | None = None) -> pd.DataFrame:
+def powerfit_report(session_dir: Path, powerfit_run_id: str | None = None) -> pd.DataFrame:
     """Report PowerFit results.
 
     Args:
@@ -134,7 +147,7 @@ def powerfit_report(session_dir: Path, powerfit_run_id: int | None = None) -> pd
 
 
 def powerfit_fit_models(
-    session_dir: Path, powerfit_run_id: int | None = None, top: int = 10, group_by_structure: bool = True
+    session_dir: Path, powerfit_run_id: str | None = None, top: int = 10, group_by_structure: bool = True
 ) -> pd.DataFrame:
     """Fit models using PowerFit solutions.
 

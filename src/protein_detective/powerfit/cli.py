@@ -73,6 +73,12 @@ def add_powerfit_commands_parser(subparsers):
     # Removed --num, as we can fit models later with `powerfit fit-models` command
 
     parser.add_argument("session_dir", help="Session directory for input and output")
+    parser.add_argument(
+        "--powerfit-run-id",
+        type=str,
+        default=None,
+        help="ID of the PowerFit run to use. If not provided, will autoincrement based on existing runs.",
+    )
     # Replaces --gpu, from [<platform>:<device>] to workers-per-GPU count.
     _add_gpu_arguments(parser, "GPU backend to target when generating PowerFit commands.")
 
@@ -96,6 +102,12 @@ def add_powerfit_run_parser(subparsers):
     _copy_powerfit_parser_arguments(parser)
 
     parser.add_argument("session_dir", help="Session directory containing PDB files")
+    parser.add_argument(
+        "--powerfit-run-id",
+        type=str,
+        default=None,
+        help="ID of the PowerFit run to use. If not provided, will autoincrement based on existing runs.",
+    )
     _add_gpu_arguments(parser, "GPU backend to target when running PowerFit.")
     parser.add_argument(
         "--scheduler-address",
@@ -108,7 +120,7 @@ def add_powerfit_report_parser(subparsers):
         "report", help="Generate a report of the best PowerFit solutions.", formatter_class=RichHelpFormatter
     )
     parser.add_argument("session_dir", help="Session directory containing PowerFit results")
-    parser.add_argument("--powerfit_run_id", type=int, default=None, help="ID of the PowerFit run to report on")
+    parser.add_argument("--powerfit-run-id", type=str, default=None, help="ID of the PowerFit run to report on")
     parser.add_argument("--top", type=int, default=1, help="Number of top solutions to report per structure.")
     parser.add_argument(
         "--no-group-by-structure",
@@ -130,8 +142,8 @@ def add_powerfit_fit_models_parser(subparsers):
     )
     parser.add_argument("session_dir", help="Session directory containing PowerFit results")
     parser.add_argument(
-        "--powerfit_run_id",
-        type=int,
+        "--powerfit-run-id",
+        type=str,
         default=None,
         help="ID of the PowerFit run to report on. If not provided, will use the all runs.",
     )
@@ -178,7 +190,10 @@ def add_powerfit_parser(subparsers):
 
 def handler_powerfit_run(args):
     session_dir = Path(args.session_dir)
-    powerfit_run_id = powerfit_runs(session_dir, PowerfitOptions.from_args(args), args.scheduler_address)
+    powerfit_run_id = args.powerfit_run_id
+    powerfit_run_id = powerfit_runs(
+        session_dir, PowerfitOptions.from_args(args), args.scheduler_address, powerfit_run_id=powerfit_run_id
+    )
     rprint(f"PowerFit run completed with ID: {powerfit_run_id}. Use this ID for reporting or fitting models.")
 
 
@@ -199,7 +214,10 @@ def handle_powerfit(args):
 
 def handle_powerfit_commands(args):
     session_dir = Path(args.session_dir)
-    commands, powerfit_run_id = powerfit_commands(session_dir, PowerfitOptions.from_args(args))
+    powerfit_run_id = args.powerfit_run_id
+    commands, powerfit_run_id = powerfit_commands(
+        session_dir, PowerfitOptions.from_args(args), powerfit_run_id=powerfit_run_id
+    )
     print("# Run the commands below in your own way", file=args.output)
     print("# When you are done", file=args.output)
     print(f"# in {Path().absolute()} directory", file=args.output)
