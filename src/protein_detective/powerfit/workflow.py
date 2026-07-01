@@ -133,20 +133,23 @@ def powerfit_report(session_dir: Path, powerfit_run_id: int | None = None) -> pd
         return powerfit_solutions(con, powerfit_run_id=powerfit_run_id)
 
 
-def powerfit_fit_models(session_dir: Path, powerfit_run_id: int | None = None, top: int = 10) -> pd.DataFrame:
+def powerfit_fit_models(
+    session_dir: Path, powerfit_run_id: int | None = None, top: int = 10, group_by_structure: bool = True
+) -> pd.DataFrame:
     """Fit models using PowerFit solutions.
 
     Args:
         session_dir: Directory containing the session data.
         powerfit_run_id: Optional ID of the PowerFit run to report. If None, reports over all runs.
         top: Number of top solutions to fit.
+        group_by_structure: Whether to group solutions by structure before selecting top solutions.
 
     Returns:
         A DataFrame containing the fitted models. See protein_detective.db.save_fitted_models function
             for details.
     """
     all_solutions = powerfit_report(session_dir, powerfit_run_id)
-    solutions = all_solutions.head(top)
+    solutions = all_solutions.groupby("structure").head(top) if group_by_structure else all_solutions.head(top)
     powerfit_root_run_dir = session_dir / "powerfit"
     fitted_df = fit_models(solutions, powerfit_root_run_dir)
     with connect(session_dir) as con:

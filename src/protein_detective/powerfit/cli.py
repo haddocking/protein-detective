@@ -109,7 +109,12 @@ def add_powerfit_report_parser(subparsers):
     )
     parser.add_argument("session_dir", help="Session directory containing PowerFit results")
     parser.add_argument("--powerfit_run_id", type=int, default=None, help="ID of the PowerFit run to report on")
-    parser.add_argument("--top", type=int, default=10, help="Number of top solutions to report")
+    parser.add_argument("--top", type=int, default=1, help="Number of top solutions to report per structure.")
+    parser.add_argument(
+        "--no-group-by-structure",
+        action="store_true",
+        help="Do not group solutions by structure. Top will be overall instead of per structure.",
+    )
     parser.add_argument(
         "--output",
         type=argparse.FileType("w", encoding="UTF-8"),
@@ -130,7 +135,12 @@ def add_powerfit_fit_models_parser(subparsers):
         default=None,
         help="ID of the PowerFit run to report on. If not provided, will use the all runs.",
     )
-    parser.add_argument("--top", type=int, default=10, help="Number of top solutions to fit models for")
+    parser.add_argument("--top", type=int, default=1, help="Number of top solutions per structure to fit models for.")
+    parser.add_argument(
+        "--no-group-by-structure",
+        action="store_true",
+        help="Do not group solutions by structure. Top will be overall instead of per structure.",
+    )
     parser.add_argument(
         "--output",
         type=argparse.FileType("w", encoding="UTF-8"),
@@ -204,9 +214,13 @@ def handle_powerfit_commands(args):
 def handler_powerfit_report(args):
     session_dir = Path(args.session_dir)
     powerfit_run_id = args.powerfit_run_id
+    group_by_structure = not args.no_group_by_structure
 
     all_solutions = powerfit_report(session_dir, powerfit_run_id)
-    solutions = all_solutions.head(args.top)
+    if group_by_structure:
+        solutions = all_solutions.groupby("structure").head(args.top)
+    else:
+        solutions = all_solutions.head(args.top)
 
     def array_to_str(arr):
         return ":".join(map(str, arr.flatten()))
@@ -221,9 +235,10 @@ def handler_powerfit_report(args):
 def handler_powerfit_fit_models(args):
     session_dir = Path(args.session_dir)
     powerfit_run_id = args.powerfit_run_id
+    group_by_structure = not args.no_group_by_structure
     top = args.top
 
-    fitted = powerfit_fit_models(session_dir, powerfit_run_id, top)
+    fitted = powerfit_fit_models(session_dir, powerfit_run_id, top, group_by_structure=group_by_structure)
     fitted.to_csv(args.output, index=False)
 
 
