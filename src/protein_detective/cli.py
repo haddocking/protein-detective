@@ -318,7 +318,7 @@ def handle_import_structures(args):
         uniprot_accessions = structure2uniprot_accessions(structure)
         if len(uniprot_accessions) != 1:
             msg = f"Structure file {structure_file} contains {uniprot_accessions} UniProt accessions, expected 1."
-            msg += " Use `protein-quest filter uniprot` to fix the UniProt accessions."
+            msg += " Use `protein-quest convert structures --uniprots ...` to fix the UniProt accessions."
             if args.strict:
                 raise ValueError(msg)
             console.print(f"Warning: {msg} Skipping file.", style="yellow")
