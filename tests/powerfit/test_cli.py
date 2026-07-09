@@ -8,15 +8,21 @@ from textwrap import dedent
 
 import gemmi
 import pytest
+from protein_quest.structure.uniprot import add_uniprot_accessions2structure
 
 from protein_detective.cli import handle_import_structures
-from protein_detective.powerfit.cli import handle_powerfit_commands, handler_powerfit_report
+from protein_detective.powerfit.cli import (
+    handle_powerfit_commands,
+    handler_powerfit_fit_models,
+    handler_powerfit_report,
+)
 
 
 def fake_archive_em_structure(pdb_id: str, output: Path):
     structure = gemmi.Structure()
     structure.name = pdb_id
     structure.info["_entry.id"] = pdb_id
+    structure.info["_exptl.method"] = "X-RAY DIFFRACTION"
     structure.resolution = 4.2
     atom = gemmi.Atom()
     atom.name = "CA"
@@ -32,7 +38,9 @@ def fake_archive_em_structure(pdb_id: str, output: Path):
     structure.add_model(model)
     structure.setup_entities()
     structure.assign_subchains()
+    structure = add_uniprot_accessions2structure(structure, {pdb_id: {("A", "P12345")}})
     doc = structure.make_mmcif_document(gemmi.MmcifOutputGroups(True, chem_comp=False))
+
     output.write_bytes(gzip.compress(doc.as_string().encode("utf-8")))
 
 
@@ -52,7 +60,7 @@ def powerfitted_session(tmp_path) -> Generator[Path]:
         session_dir=session_dir,
         structures_dir=structures_dir,
         copy_method="hardlink",
-        strict=False,
+        strict=True,
     )
     handle_import_structures(import_ns)
 
@@ -123,8 +131,8 @@ def assert_solutions(output: StringIO, expected: list[dict[str, str]]) -> None:
     assert trimmed_solutions == expected
 
 
-class TestHandlePowerfitReport:
-    def test_defaults(self, powerfitted_session: Path) -> None:
+class TestHandlerPowerfitReport:
+    def test_defaults(self, powerfitted_session: Path):
         session_dir = powerfitted_session
         powerfit_run_id = "fakerun1"
         output = StringIO()
@@ -166,3 +174,51 @@ class TestHandlePowerfitReport:
             {"powerfit_run_id": "fakerun1", "structure": "1abc.cif.gz", "rank": "2", "cc": "0.398"},
         ]
         assert_solutions(output, expected)
+
+    def test_no_group_by_structure(self, powerfitted_session: Path) -> None:
+        session_dir = powerfitted_session
+        powerfit_run_id = "fakerun1"
+        output = StringIO()
+        report_ns = Namespace(
+            session_dir=session_dir,
+            powerfit_run_id=powerfit_run_id,
+            no_group_by_structure=True,
+            top=2,
+            output=output,
+        )
+        handler_powerfit_report(report_ns)
+
+        expected = [
+            {
+                "cc": "0.499",
+                "powerfit_run_id": "fakerun1",
+                "rank": "1",
+                "structure": "3abc.cif.gz",
+            },
+            {
+                "cc": "0.487",
+                "powerfit_run_id": "fakerun1",
+                "rank": "2",
+                "structure": "3abc.cif.gz",
+            },
+        ]
+        assert_solutions(output, expected)
+
+
+class TestHandlerPowerfitFitModels:
+    def test_defaults(self, powerfitted_session: Path):
+        session_dir = powerfitted_session
+        powerfit_run_id = "fakerun1"
+        output = StringIO()
+        report_ns = Namespace(
+            session_dir=session_dir,
+            powerfit_run_id=powerfit_run_id,
+            no_group_by_structure=False,
+            top=1,
+            output=output,
+        )
+        handler_powerfit_fit_models(report_ns)
+
+        actual = list(csv.DictReader(output.getvalue().splitlines()))
+        expected = []
+        assert actual == expected
