@@ -29,6 +29,8 @@ def fake_archive_em_structure(pdb_id: str, output: Path):
     atom.element = gemmi.Element("C")
     residue = gemmi.Residue()
     residue.name = "ALA"
+    residue.label_seq = 1
+    residue.seqid = gemmi.SeqId(1, " ")
     residue.add_atom(atom)
     residue.entity_type = gemmi.EntityType.Polymer
     chain = gemmi.Chain("A")
@@ -39,6 +41,7 @@ def fake_archive_em_structure(pdb_id: str, output: Path):
     structure.setup_entities()
     structure.assign_subchains()
     structure = add_uniprot_accessions2structure(structure, {pdb_id: {("A", "P12345")}})
+    structure.setup_entities()
     doc = structure.make_mmcif_document(gemmi.MmcifOutputGroups(True, chem_comp=False))
 
     output.write_bytes(gzip.compress(doc.as_string().encode("utf-8")))
@@ -91,7 +94,7 @@ def powerfitted_session(tmp_path) -> Generator[Path]:
 
     # Write fake solutions
     powerfit_run_dir = session_dir / "powerfit" / powerfit_run_id
-    sr1 = powerfit_run_dir / "1abc.cif.gz" / "solutions.out"
+    sr1 = powerfit_run_dir / "1abc.cif" / "solutions.out"
     sr1.parent.mkdir(parents=True, exist_ok=True)
     solutions1 = dedent("""\
         rank,cc,Fish-z,rel-z,x,y,z,a11,a12,a13,a21,a22,a23,a31,a32,a33
@@ -101,7 +104,7 @@ def powerfitted_session(tmp_path) -> Generator[Path]:
         """)
     sr1.write_text(solutions1)
 
-    sr2 = powerfit_run_dir / "2abc.cif.gz" / "solutions.out"
+    sr2 = powerfit_run_dir / "2abc.cif" / "solutions.out"
     sr2.parent.mkdir(parents=True, exist_ok=True)
     solutions2 = dedent("""\
         rank,cc,Fish-z,rel-z,x,y,z,a11,a12,a13,a21,a22,a23,a31,a32,a33
@@ -111,7 +114,7 @@ def powerfitted_session(tmp_path) -> Generator[Path]:
         """)
     sr2.write_text(solutions2)
 
-    sr3 = powerfit_run_dir / "3abc.cif.gz" / "solutions.out"
+    sr3 = powerfit_run_dir / "3abc.cif" / "solutions.out"
     sr3.parent.mkdir(parents=True, exist_ok=True)
     solutions3 = dedent("""\
         rank,cc,Fish-z,rel-z,x,y,z,a11,a12,a13,a21,a22,a23,a31,a32,a33
@@ -146,9 +149,9 @@ class TestHandlerPowerfitReport:
         handler_powerfit_report(report_ns)
 
         expected = [
-            {"powerfit_run_id": "fakerun1", "structure": "3abc.cif.gz", "rank": "1", "cc": "0.499"},
-            {"powerfit_run_id": "fakerun1", "structure": "2abc.cif.gz", "rank": "1", "cc": "0.442"},
-            {"powerfit_run_id": "fakerun1", "structure": "1abc.cif.gz", "rank": "1", "cc": "0.399"},
+            {"powerfit_run_id": "fakerun1", "structure": "3abc.cif", "rank": "1", "cc": "0.499"},
+            {"powerfit_run_id": "fakerun1", "structure": "2abc.cif", "rank": "1", "cc": "0.442"},
+            {"powerfit_run_id": "fakerun1", "structure": "1abc.cif", "rank": "1", "cc": "0.399"},
         ]
         assert_solutions(output, expected)
 
@@ -166,12 +169,12 @@ class TestHandlerPowerfitReport:
         handler_powerfit_report(report_ns)
 
         expected = [
-            {"powerfit_run_id": "fakerun1", "structure": "3abc.cif.gz", "rank": "1", "cc": "0.499"},
-            {"powerfit_run_id": "fakerun1", "structure": "3abc.cif.gz", "rank": "2", "cc": "0.487"},
-            {"powerfit_run_id": "fakerun1", "structure": "2abc.cif.gz", "rank": "1", "cc": "0.442"},
-            {"powerfit_run_id": "fakerun1", "structure": "2abc.cif.gz", "rank": "2", "cc": "0.442"},
-            {"powerfit_run_id": "fakerun1", "structure": "1abc.cif.gz", "rank": "1", "cc": "0.399"},
-            {"powerfit_run_id": "fakerun1", "structure": "1abc.cif.gz", "rank": "2", "cc": "0.398"},
+            {"powerfit_run_id": "fakerun1", "structure": "3abc.cif", "rank": "1", "cc": "0.499"},
+            {"powerfit_run_id": "fakerun1", "structure": "3abc.cif", "rank": "2", "cc": "0.487"},
+            {"powerfit_run_id": "fakerun1", "structure": "2abc.cif", "rank": "1", "cc": "0.442"},
+            {"powerfit_run_id": "fakerun1", "structure": "2abc.cif", "rank": "2", "cc": "0.442"},
+            {"powerfit_run_id": "fakerun1", "structure": "1abc.cif", "rank": "1", "cc": "0.399"},
+            {"powerfit_run_id": "fakerun1", "structure": "1abc.cif", "rank": "2", "cc": "0.398"},
         ]
         assert_solutions(output, expected)
 
@@ -193,13 +196,13 @@ class TestHandlerPowerfitReport:
                 "cc": "0.499",
                 "powerfit_run_id": "fakerun1",
                 "rank": "1",
-                "structure": "3abc.cif.gz",
+                "structure": "3abc.cif",
             },
             {
                 "cc": "0.487",
                 "powerfit_run_id": "fakerun1",
                 "rank": "2",
-                "structure": "3abc.cif.gz",
+                "structure": "3abc.cif",
             },
         ]
         assert_solutions(output, expected)
@@ -220,5 +223,59 @@ class TestHandlerPowerfitFitModels:
         handler_powerfit_fit_models(report_ns)
 
         actual = list(csv.DictReader(output.getvalue().splitlines()))
-        expected = []
+        expected = [
+            {
+                "fitted_model_file": str(session_dir / "powerfit/fakerun1/3abc.cif/fit_1.pdb"),
+                "powerfit_run_id": "fakerun1",
+                "rank": "1",
+                "structure": "3abc.cif",
+                "unfitted_model_file": str(session_dir / "imported_structures/3abc.cif.gz"),
+            },
+            {
+                "fitted_model_file": str(session_dir / "powerfit/fakerun1/2abc.cif/fit_1.pdb"),
+                "powerfit_run_id": "fakerun1",
+                "rank": "1",
+                "structure": "2abc.cif",
+                "unfitted_model_file": str(session_dir / "imported_structures/2abc.cif.gz"),
+            },
+            {
+                "fitted_model_file": str(session_dir / "powerfit/fakerun1/1abc.cif/fit_1.pdb"),
+                "powerfit_run_id": "fakerun1",
+                "rank": "1",
+                "structure": "1abc.cif",
+                "unfitted_model_file": str(session_dir / "imported_structures/1abc.cif.gz"),
+            },
+        ]
+        assert actual == expected
+
+    def test_no_group_by_structure_top2(self, powerfitted_session: Path):
+        session_dir = powerfitted_session
+        powerfit_run_id = "fakerun1"
+        output = StringIO()
+        report_ns = Namespace(
+            session_dir=session_dir,
+            powerfit_run_id=powerfit_run_id,
+            no_group_by_structure=True,
+            top=2,
+            output=output,
+        )
+        handler_powerfit_fit_models(report_ns)
+
+        actual = list(csv.DictReader(output.getvalue().splitlines()))
+        expected = [
+            {
+                "fitted_model_file": str(session_dir / "powerfit/fakerun1/3abc.cif/fit_1.pdb"),
+                "powerfit_run_id": "fakerun1",
+                "rank": "1",
+                "structure": "3abc.cif",
+                "unfitted_model_file": str(session_dir / "imported_structures/3abc.cif.gz"),
+            },
+            {
+                "fitted_model_file": str(session_dir / "powerfit/fakerun1/3abc.cif/fit_2.pdb"),
+                "powerfit_run_id": "fakerun1",
+                "rank": "2",
+                "structure": "3abc.cif",
+                "unfitted_model_file": str(session_dir / "imported_structures/3abc.cif.gz"),
+            },
+        ]
         assert actual == expected
