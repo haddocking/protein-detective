@@ -133,7 +133,7 @@ LEFT JOIN (
     SELECT output_file, uniprot_acc, pdb_id, parse_filename(output_file, true) AS structure
     FROM filtered_structures WHERE output_file IS NOT NULL
 ) AS a USING (structure)
-ORDER BY cc DESC;
+ORDER BY cc DESC, rank ASC;
 
 CREATE TABLE IF NOT EXISTS raw_fitted_models (
     powerfit_run_id TEXT NOT NULL,
