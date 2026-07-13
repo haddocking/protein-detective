@@ -1,18 +1,22 @@
 import argparse
+import asyncio
 import logging
 import sys
 from pathlib import Path
 from textwrap import dedent
 
-from protein_quest.alphafold.confidence import ConfidenceFilterQuery
 from protein_quest.alphafold.fetch import downloadable_formats
 from protein_quest.converter import converter
+from protein_quest.filters.combined import CombinedFilterQuery
 from protein_quest.filters.residues import ResidueFilterStatistics
 from protein_quest.filters.ss import SecondaryStructureFilterQuery
+from protein_quest.pdbe.result import PdbResult
+from protein_quest.pdbe.ws import fetch_summary_quality_scores_in_batches
 from protein_quest.structure.chains import chains_in_structure
 from protein_quest.structure.convert import convert_to_cif_file
 from protein_quest.structure.files import glob_structure_files
 from protein_quest.structure.formats import read_structure
+from protein_quest.structure.metadata import structure_metadata
 from protein_quest.structure.uniprot import structure2uniprot_accessions
 from protein_quest.utils import CopyMethod, copy_methods
 from rich.console import Console
@@ -21,7 +25,15 @@ from rich.progress import track
 from rich_argparse import RawDescriptionRichHelpFormatter, RichHelpFormatter
 
 from protein_detective.__version__ import __version__
-from protein_detective.db import connect, save_filter, save_filtered_structures, save_uniprot_accessions
+from protein_detective.db import (
+    connect,
+    save_filter,
+    save_filtered_structures,
+    save_pdb_files,
+    save_pdb_quality_scores,
+    save_pdbs,
+    save_uniprot_accessions,
+)
 from protein_detective.filter import FilteredStructure, FilterOptions
 from protein_detective.powerfit.cli import (
     add_powerfit_parser,
@@ -37,6 +49,18 @@ from protein_detective.workflow import (
 
 console = Console(stderr=True)
 rprint = console.print
+
+
+def _imported_pdb_result(structure) -> PdbResult | None:
+    metadata = structure_metadata(structure)
+    if not metadata.id:
+        return None
+    return PdbResult(
+        id=metadata.id,
+        method=metadata.method,
+        uniprot_chains=f"{metadata.auth_chain}=1-{metadata.chain_length}",
+        resolution=str(metadata.resolution),
+    )
 
 
 def add_search_parser(subparsers):
@@ -150,6 +174,33 @@ def add_filter_parser(subparsers: argparse._SubParsersAction):
         default=sys.maxsize,
         help="Maximum number of residues in chain A",
     )
+    parser.add_argument(
+        "--min-geometry-quality",
+        type=float,
+        default=50.0,
+        help="Minimum PDBe geometry quality for structures that are ranked by validation score. Default is 50.0.",
+    )
+    parser.add_argument(
+        "--min-sequence-identity",
+        type=float,
+        default=1.0,
+        help="Minimum UniProt sequence identity ratio for PDBe structures. Default is 1.0.",
+    )
+    parser.add_argument(
+        "--top-uniprot-cluster",
+        type=int,
+        default=1000,
+        help=(
+            "Maximum number of structures to keep per UniProt cluster. "
+            "AlphaFold structures are excluded. Default is 1000."
+        ),
+    )
+    parser.add_argument(
+        "--top-non-uniprot",
+        type=int,
+        default=0,
+        help="Maximum number of structures without UniProt accession to keep. Default is 0.",
+    )
 
     parser.add_argument("--abs-min-helix-residues", type=int, help="Minimum number residues in helices")
     parser.add_argument("--abs-max-helix-residues", type=int, help="Maximum number residues in helices")
@@ -182,6 +233,10 @@ def add_import_structures_parser(subparsers: argparse._SubParsersAction):
 
         This can be used to import structures obtained from other sources,
         or to re-import structures after filtering with external tools.
+
+        For imported structures with resolution 0.0, the command fetches a
+        PDBe validation quality report and stores the geometry quality score
+        in the session database when available.
     """)
     parser = subparsers.add_parser(
         "import-structures",
@@ -256,13 +311,17 @@ def handle_retrieve(args):
 
 def handle_filter(args):
     session_dir: Path = args.session_dir
-    cf_query = converter.structure(
+    combined_query = converter.structure(
         {
-            "confidence": args.confidence_threshold,
+            "min_confidence": args.confidence_threshold,
             "min_residues": args.min_residues,
             "max_residues": args.max_residues,
+            "min_geometry_quality": args.min_geometry_quality,
+            "min_sequence_identity": args.min_sequence_identity,
+            "top_uniprot_cluster": args.top_uniprot_cluster,
+            "top_non_uniprot": args.top_non_uniprot,
         },
-        ConfidenceFilterQuery,
+        CombinedFilterQuery,
     )
     ss_query = converter.structure(
         {
@@ -277,7 +336,7 @@ def handle_filter(args):
         },
         SecondaryStructureFilterQuery,
     )
-    query = FilterOptions(confidence=cf_query, secondary_structure=ss_query)
+    query = FilterOptions(secondary_structure=ss_query, combined=combined_query)
     scheduler_address: None | str = args.scheduler_address
 
     f_dir, total_results = filter_structures(session_dir, query, scheduler_address)
@@ -294,6 +353,8 @@ def handle_import_structures(args):
     import_dir.mkdir(exist_ok=True, parents=True)
 
     results: list[FilteredStructure] = []
+    imported_pdbs: dict[str, set[PdbResult]] = {}
+    imported_pdb_files: dict[str, Path] = {}
     for structure_file in track(
         glob_structure_files(structures_dir), description="Importing structures...", console=console
     ):
@@ -301,10 +362,6 @@ def handle_import_structures(args):
             structure_file.resolve(), import_dir, copy_method=copy_method, output_format=".cif.gz"
         )
         structure = read_structure(target_file)
-        try:
-            pdb_id = structure.info["_entry.id"]
-        except KeyError:
-            pdb_id = None
         chains = chains_in_structure(structure)
         chain_ids = {chain.name for chain in chains}
         if chain_ids != {"A"}:
@@ -324,6 +381,12 @@ def handle_import_structures(args):
             console.print(f"Warning: {msg} Skipping file.", style="yellow")
             continue
 
+        uniprot_accession = next(iter(uniprot_accessions))
+        pdb_result = _imported_pdb_result(structure)
+        if pdb_result is not None:
+            imported_pdbs.setdefault(uniprot_accession, set()).add(pdb_result)
+            imported_pdb_files[pdb_result.id] = target_file.relative_to(session_dir)
+
         results.append(
             FilteredStructure(
                 residue=ResidueFilterStatistics(
@@ -332,17 +395,31 @@ def handle_import_structures(args):
                     output_file=target_file.relative_to(session_dir),
                     residue_count=nr_residues,
                 ),
-                pdb_id=pdb_id,
-                uniprot_accession=next(iter(uniprot_accessions)),
+                pdb_id=pdb_result.id if pdb_result is not None else None,
+                uniprot_accession=uniprot_accession,
             )
         )
+
+    quality_score_pdb_ids = {
+        pdb.id.lower()
+        for pdb_results in imported_pdbs.values()
+        for pdb in pdb_results
+        if pdb.resolution == "0.0"
+    }
+    scores = (
+        asyncio.run(fetch_summary_quality_scores_in_batches(quality_score_pdb_ids)) if quality_score_pdb_ids else {}
+    )
 
     with connect(session_dir) as con:
         uniprot_accessions = {r.uniprot_accession for r in results}
         save_uniprot_accessions(uniprot_accessions, con)
+        if imported_pdbs:
+            save_pdbs(imported_pdbs, con)
+            save_pdb_files(imported_pdb_files, con)
+            save_pdb_quality_scores(scores, con)
         filter_options = FilterOptions(
-            confidence=ConfidenceFilterQuery(),
             secondary_structure=SecondaryStructureFilterQuery(),
+            combined=CombinedFilterQuery(),
         )
         filter_id = save_filter(filter_options, con)
         save_filtered_structures(results, filter_id, con)

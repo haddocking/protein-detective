@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS pdbs (
     pdb_id TEXT PRIMARY KEY,
     method TEXT NOT NULL,
     resolution REAL,
+    geometry_quality REAL,
     mmcif_file TEXT,
 );
 

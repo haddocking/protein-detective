@@ -13,7 +13,9 @@ from pandas import DataFrame
 from protein_quest.alphafold.entry_summary import EntrySummary
 from protein_quest.alphafold.fetch import AlphaFoldEntry
 from protein_quest.converter import converter
-from protein_quest.uniprot import PdbResult, UniprotDetails
+from protein_quest.pdbe.result import PdbResult
+from protein_quest.pdbe.ws import Scores
+from protein_quest.uniprot import UniprotDetails
 
 from protein_detective.filter import FilteredStructure, FilterOptions
 from protein_detective.powerfit.options import PowerfitOptions
@@ -73,6 +75,7 @@ def initialize_db(session_dir: Path, con: DuckDBPyConnection):
         solution_header_file.write_text(solutions_header)
 
     con.execute(ddl)
+    con.execute("ALTER TABLE pdbs ADD COLUMN IF NOT EXISTS geometry_quality REAL")
 
 
 @contextmanager
@@ -291,6 +294,37 @@ def save_pdb_files(mmcif_files: Mapping[str, Path], con: DuckDBPyConnection) -> 
     return len(df)
 
 
+def save_pdb_quality_scores(scores: Mapping[str, Scores], con: DuckDBPyConnection) -> int:
+    """Save PDBe validation geometry quality scores to the database.
+
+    Args:
+        scores: Mapping of lowercase or uppercase PDB IDs to PDBe score summaries.
+        con: The DuckDB connection to use for saving the data.
+
+    Returns:
+        The number of PDB entries updated with geometry quality scores.
+    """
+    if len(scores) == 0:
+        return 0
+
+    data = [
+        {
+            "pdb_id": pdb_id.lower(),
+            "geometry_quality": score.geometry_quality,
+        }
+        for pdb_id, score in scores.items()
+    ]
+    df = DataFrame(data)
+    con.execute(
+        """UPDATE pdbs
+        SET geometry_quality = df.geometry_quality
+        FROM df
+        WHERE lower(pdbs.pdb_id) = df.pdb_id
+        """
+    )
+    return len(df)
+
+
 def load_pdb_ids(con: DuckDBPyConnection) -> set[str]:
     """Load PDB IDs from the database.
 
@@ -314,6 +348,7 @@ class ProteinPdbRow:
         uniprot_chains: The UniProt chains associated with the PDB entry.
         chain: The first chain from uniprot_chains.
         uniprot_acc: The UniProt accession number associated with the PDB entry.
+        geometry_quality: PDBe validation geometry quality score, if available.
         mmcif_file: The path to the mmCIF file for the PDB entry, or None if not retrieved yet.
     """
 
@@ -321,6 +356,7 @@ class ProteinPdbRow:
     uniprot_chains: str
     chain: str
     uniprot_acc: str
+    geometry_quality: float | None
     mmcif_file: Path | None
 
 
@@ -337,6 +373,7 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
     SELECT
         uniprot_acc,
         pdb_id,
+        geometry_quality,
         if(length(mmcif_file), concat_ws('/', getvariable('session_dir'), mmcif_file), NULL) AS mmcif_file,
         uniprot_chains,
         chain
@@ -348,9 +385,10 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
         ProteinPdbRow(
             uniprot_acc=row[0],
             pdb_id=row[1],
-            mmcif_file=Path(row[2]) if row[2] else None,
-            uniprot_chains=row[3],
-            chain=row[4],
+            geometry_quality=row[2],
+            mmcif_file=Path(row[3]) if row[3] else None,
+            uniprot_chains=row[4],
+            chain=row[5],
         )
         for row in rows
     ]

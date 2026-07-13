@@ -100,12 +100,11 @@ In `./mysession` directory, you will find mmCIF files from PDBe and PDB files an
 ### To filter structure
 
 Filter structures based on
-                         
-- For PDBe structures the chain of Uniprot protein is written as chain A.
-- For AlphaFold structures filter by confidence (pLDDT) threshold
-- Number of residues in chain A
-  - For AlphaFold structures writes new files with low confidence residues (below threshold) removed
-- Number of residues in secondary structure (helices and sheets)
+
+- For PDBe structures the chain mapped to the UniProt protein is written as chain `A`.
+- Filtering then follows the combined filter rules from protein-quest, including residue filtering, sequence identity, AlphaFold confidence filtering, clustering, and sorting by resolution or PDBe geometry quality.
+    See the [combined filter documentation](https://www.bonvinlab.org/protein-quest/autoapi/protein_quest/filters/combined.html#protein_quest.filters.combined.combined_filter).
+- Number of residues in secondary structure (helices and sheets) can be applied as an additional post-filter.
 
 Also uncompresses *.cif.gz files to *.cif files for compatibility with powerfit.
 
@@ -130,6 +129,7 @@ protein-detective import-structures ./mysession/filtered ./mysession3
 ```
 
 Imported structures can be used to run powerfit.
+For imported structures with resolution `0.0`, `import-structures` also fetches a PDBe validation quality report and stores the geometry quality score in the session database when available.
 
 ### Powerfit
 

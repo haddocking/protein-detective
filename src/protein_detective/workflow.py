@@ -11,6 +11,7 @@ from protein_quest.alphafold.fetch import DownloadableFormat
 from protein_quest.alphafold.fetch import fetch_many_async as af_fetch
 from protein_quest.pdbe.fetch import fetch as pdbe_fetch
 from protein_quest.pdbe.result import filter_pdb_results_on_chain_length
+from protein_quest.pdbe.ws import Scores, fetch_summary_quality_scores_in_batches
 from protein_quest.uniprot import (
     map_uniprot_accessions2uniprot_details,
     search4af,
@@ -32,6 +33,7 @@ from protein_detective.db import (
     save_filter,
     save_filtered_structures,
     save_pdb_files,
+    save_pdb_quality_scores,
     save_pdbs,
     save_query,
     save_uniprot_accessions,
@@ -40,8 +42,7 @@ from protein_detective.db import (
 from protein_detective.filter import (
     FilteredStructure,
     FilterOptions,
-    filter_alphafold_structures,
-    filter_pdbe_structures,
+    filter_structures_with_combined_filter,
 )
 from protein_detective.powerfit.parallel import configure_dask_scheduler
 from protein_detective.search import UniprotQuery, search_for_interaction_partners
@@ -105,8 +106,13 @@ def search_structures_in_uniprot(query: UniprotQuery, session_dir: Path, limit: 
     pdbs = search4pdb(uniprot_accessions, limit=limit)
     if query.min_residues or query.max_residues:
         pdbs = filter_pdb_results_on_chain_length(pdbs, query.min_residues, query.max_residues, keep_invalid=True)
+
+    pdb_ids = {pdb.id.lower() for pdb_results in pdbs.values() for pdb in pdb_results}
+    logger.warning("Fetching PDBe validation quality scores")
+    scores = asyncio.run(fetch_summary_quality_scores_in_batches(pdb_ids)) if pdb_ids else {}
     with connect(session_dir) as con:
         nr_pdbs, nr_prot2pdb = save_pdbs(pdbs, con)
+        save_pdb_quality_scores(scores, con)
 
     logger.warning("Searching for AlphaFold references")
     af_result = search4af(
@@ -258,28 +264,34 @@ def filter_structures(
         scheduler_address,
         name="filter-chain",
     ) as scheduler_address:
-        # Filter AlphaFolds
         with connect(session_dir, read_only=True) as con:
             logger.info("Gathering AlphaFold files from session in %s", session_dir)
             afs = load_alphafolds(con)
             logger.info("Found %i AlphaFold files", len(afs))
-        total_results = filter_alphafold_structures(
-            afs, session_dir, options, final_dir, scheduler_address=scheduler_address
-        )
-
-        # Filter PDBe structures
-        with connect(session_dir, read_only=True) as con:
             logger.info("Gathering PDBe files from session in %s", session_dir)
             proteinpdbs = load_pdbs(con)
             logger.info("Found %i PDBe files", len(proteinpdbs))
-        pdbe_total_results = filter_pdbe_structures(
+
+        scores = {
+            proteinpdb.pdb_id.lower(): Scores(
+                geometry_quality=proteinpdb.geometry_quality,
+                data_quality=None,
+                overall_quality=None,
+                experiment_data_available=False,
+            )
+            for proteinpdb in proteinpdbs
+            if proteinpdb.pdb_id is not None and proteinpdb.geometry_quality is not None
+        }
+
+        total_results = filter_structures_with_combined_filter(
+            afs=afs,
             proteinpdbs=proteinpdbs,
+            scores=scores,
             session_dir=session_dir,
             options=options,
             final_dir=final_dir,
             scheduler_address=scheduler_address,
         )
-        total_results.update(pdbe_total_results)
 
     # Save filtering results to database
     logger.info("Saving filtering results to database in %s", session_dir)
