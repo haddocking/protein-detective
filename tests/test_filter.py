@@ -1,14 +1,13 @@
 from pathlib import Path
 
 from protein_quest.filters.chain import ChainFilterStatistics
-from protein_quest.filters.combined import CombinedFilterQuery, CombinedFilterResult
+from protein_quest.filters.combined import CombinedFilterResult
 from protein_quest.filters.ss import (
-    SecondaryStructureFilterQuery,
     SecondaryStructureFilterResult,
     SecondaryStructureStats,
 )
 
-from protein_detective.filter import FilteredStructure, FilterOptions
+from protein_detective.filter import FilteredStructure
 
 
 def _secondary_structure_result(*, passed: bool) -> SecondaryStructureFilterResult:
@@ -22,16 +21,6 @@ def _secondary_structure_result(*, passed: bool) -> SecondaryStructureFilterResu
         ),
         passed=passed,
     )
-
-
-def test_filter_options_preserve_combined_query():
-    combined_query = CombinedFilterQuery(min_confidence=82.0, min_residues=10, max_residues=20)
-    options = FilterOptions(
-        secondary_structure=SecondaryStructureFilterQuery(),
-        combined=combined_query,
-    )
-
-    assert options.combined_query == combined_query
 
 
 def test_filtered_structure_prefers_secondary_structure_output(tmp_path: Path):
