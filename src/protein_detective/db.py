@@ -75,7 +75,6 @@ def initialize_db(session_dir: Path, con: DuckDBPyConnection):
         solution_header_file.write_text(solutions_header)
 
     con.execute(ddl)
-    con.execute("ALTER TABLE pdbs ADD COLUMN IF NOT EXISTS geometry_quality REAL")
 
 
 @contextmanager
