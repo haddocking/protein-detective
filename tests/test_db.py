@@ -101,11 +101,7 @@ def test_save_filtered_structures_persists_output_files(tmp_path: Path):
 
 
 def test_save_pdb_quality_scores_persists_geometry_quality(tmp_path: Path):
-    pdbs = {
-        "P12345": {
-            PdbResult(id="1ABC", method="X-ray diffraction", uniprot_chains="A=1-42", resolution="2.0")
-        }
-    }
+    pdbs = {"P12345": {PdbResult(id="1ABC", method="X-ray diffraction", uniprot_chains="A=1-42", resolution="2.0")}}
     scores = {
         "1abc": Scores(
             geometry_quality=77.5,
