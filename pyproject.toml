@@ -182,7 +182,6 @@ protein-quest = { path = "../protein-quest", editable = true }
 
 [tool.pyrefly]
 project-includes = ["src", "tests", "benchmark"]
-search-paths = ["./src", "./benchmark"]
 
 [tool.coverage.run]
 source = ["src/protein_detective"]
