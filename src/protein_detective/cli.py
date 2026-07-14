@@ -55,10 +55,11 @@ def _imported_pdb_result(structure) -> PdbResult | None:
     metadata = structure_metadata(structure)
     if not metadata.id:
         return None
+    uniprot_chains = f"{metadata.auth_chain}={metadata.uniprot_start}-{metadata.uniprot_end}"
     return PdbResult(
         id=metadata.id,
         method=metadata.method,
-        uniprot_chains=f"{metadata.auth_chain}=1-{metadata.chain_length}",
+        uniprot_chains=uniprot_chains,
         resolution=str(metadata.resolution),
     )
 
@@ -401,10 +402,7 @@ def handle_import_structures(args):
         )
 
     quality_score_pdb_ids = {
-        pdb.id.lower()
-        for pdb_results in imported_pdbs.values()
-        for pdb in pdb_results
-        if pdb.resolution == "0.0"
+        pdb.id.lower() for pdb_results in imported_pdbs.values() for pdb in pdb_results if pdb.resolution == "0.0"
     }
     scores = (
         asyncio.run(fetch_summary_quality_scores_in_batches(quality_score_pdb_ids)) if quality_score_pdb_ids else {}
