@@ -11,7 +11,7 @@ from protein_quest.alphafold.fetch import DownloadableFormat
 from protein_quest.alphafold.fetch import fetch_many_async as af_fetch
 from protein_quest.pdbe.fetch import fetch as pdbe_fetch
 from protein_quest.pdbe.result import filter_pdb_results_on_chain_length
-from protein_quest.pdbe.ws import Scores, fetch_summary_quality_scores_in_batches
+from protein_quest.pdbe.ws import fetch_summary_quality_scores_in_batches
 from protein_quest.uniprot import (
     map_uniprot_accessions2uniprot_details,
     search4af,
@@ -272,21 +272,9 @@ def filter_structures(
             proteinpdbs = load_pdbs(con)
             logger.info("Found %i PDBe files", len(proteinpdbs))
 
-        scores = {
-            proteinpdb.pdb_id.lower(): Scores(
-                geometry_quality=proteinpdb.geometry_quality,
-                data_quality=None,
-                overall_quality=None,
-                experiment_data_available=False,
-            )
-            for proteinpdb in proteinpdbs
-            if proteinpdb.pdb_id is not None and proteinpdb.geometry_quality is not None
-        }
-
         total_results = filter_structures_with_combined_filter(
             afs=afs,
             proteinpdbs=proteinpdbs,
-            scores=scores,
             session_dir=session_dir,
             options=options,
             final_dir=final_dir,

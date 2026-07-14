@@ -20,7 +20,10 @@ from protein_quest.filters.ss import (
     SecondaryStructureFilterResult,
     filter_files_on_secondary_structure,
 )
+from protein_quest.parallel import SchedulerAddress, map_with_progress
 from protein_quest.pdbe.ws import Scores
+from protein_quest.structure.formats import read_structure, write_structure
+from protein_quest.structure.uniprot import add_uniprot_accessions2structure
 from protein_quest.utils import copyfile
 
 if TYPE_CHECKING:
@@ -211,10 +214,28 @@ def _filter_structures_on_secondary_structure(
     logger.info("Kept %i files after secondary structure filtering in %s", nr_kept, final_dir)
 
 
+def add_uniprot_accessions2structure_wrapper(t: tuple[Path, tuple[str, str | None]]) -> None:
+    input_file, (uniprot_acc, pdb_id) = t
+    if pdb_id is None:
+        return
+    s = read_structure(input_file)
+    pdb2uniprot = {pdb_id: {("A", uniprot_acc)}}
+    ns = add_uniprot_accessions2structure(s, pdb2uniprot)
+    if s is not ns:
+        write_structure(ns, input_file)
+
+
+def add_uniprot_accessions2structures(
+    pdb_chain_out_file2upid: dict[Path, tuple[str, str | None]],
+    scheduler_address: SchedulerAddress,
+):
+    items = [d for d in pdb_chain_out_file2upid.items() if d[1][1] is not None]
+    return map_with_progress(scheduler_address, add_uniprot_accessions2structure_wrapper, items, None)
+
+
 def filter_structures_with_combined_filter(
     afs: list[AlphaFoldEntry],
     proteinpdbs: list[ProteinPdbRow],
-    scores: dict[str, Scores],
     session_dir: Path,
     options: FilterOptions,
     final_dir: Path,
@@ -256,7 +277,25 @@ def filter_structures_with_combined_filter(
             pdb_chain_out_file2upid[chain_result.output_file] = upid
     logger.info("Kept %i files after chain filtering in %s", len(pdb_chain_out_file2upid), pdb_chain_dir)
 
+    # Some structure files are missing their Uniprot mapping, so we try to add it back
+    add_uniprot_accessions2structures(
+        pdb_chain_out_file2upid,
+        scheduler_address=scheduler_address,
+    )
+
     combined_input_files = [*alphafold_input_file2upid.keys(), *pdb_chain_out_file2upid.keys()]
+
+    scores = {
+        proteinpdb.pdb_id.lower(): Scores(
+            geometry_quality=proteinpdb.geometry_quality,
+            data_quality=None,
+            overall_quality=None,
+            experiment_data_available=False,
+        )
+        for proteinpdb in proteinpdbs
+        if proteinpdb.geometry_quality is not None
+    }
+
     logger.info("Filtering %i structure files with combined filter", len(combined_input_files))
     combined_results = combined_filter(
         input_files=combined_input_files,
