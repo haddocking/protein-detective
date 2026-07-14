@@ -1,0 +1,2 @@
+ALTER TABLE pdbs
+ADD COLUMN IF NOT EXISTS geometry_quality REAL;
