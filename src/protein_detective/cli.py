@@ -190,10 +190,10 @@ def add_filter_parser(subparsers: argparse._SubParsersAction):
     parser.add_argument(
         "--top-uniprot-cluster",
         type=int,
-        default=1000,
+        default=4,
         help=(
             "Maximum number of structures to keep per UniProt cluster. "
-            "AlphaFold structures are excluded. Default is 1000."
+            "AlphaFold structures are excluded. Default is 4."
         ),
     )
     parser.add_argument(
