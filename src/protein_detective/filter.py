@@ -7,6 +7,7 @@ import logging
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -24,6 +25,7 @@ from protein_quest.parallel import SchedulerAddress, map_with_progress
 from protein_quest.pdbe.ws import Scores
 from protein_quest.structure.formats import read_structure, write_structure
 from protein_quest.structure.uniprot import add_uniprot_accessions2structure
+from protein_quest.uniprot_chains import Pdb2UniprotChainsMapping
 from protein_quest.utils import copyfile
 
 if TYPE_CHECKING:
@@ -214,23 +216,36 @@ def _filter_structures_on_secondary_structure(
     logger.info("Kept %i files after secondary structure filtering in %s", nr_kept, final_dir)
 
 
-def add_uniprot_accessions2structure_wrapper(t: tuple[Path, tuple[str, str | None]]) -> None:
-    input_file, (uniprot_acc, pdb_id) = t
-    if pdb_id is None:
-        return
+def add_uniprot_accessions2structure_wrapper(
+    input_file: Path,
+    pdb2uniprot_mapping: Pdb2UniprotChainsMapping,
+) -> None:
+    """Wrapper to add UniProt accessions to a structure file.
+
+    Args:
+        input_file: Path to the structure file to process.
+        pdb2uniprot_mapping: Full mapping of PDB IDs to UniProt chain mappings.
+    """
     s = read_structure(input_file)
-    pdb2uniprot = {pdb_id: {("A", uniprot_acc)}}
-    ns = add_uniprot_accessions2structure(s, pdb2uniprot)
+    ns = add_uniprot_accessions2structure(s, pdb2uniprot_mapping)
     if s is not ns:
         write_structure(ns, input_file)
 
 
 def add_uniprot_accessions2structures(
-    pdb_chain_out_file2upid: dict[Path, tuple[str, str | None]],
+    pdb_chain_out_files: list[Path],
+    pdb2uniprot_mapping: Pdb2UniprotChainsMapping,
     scheduler_address: SchedulerAddress,
 ):
-    items = [d for d in pdb_chain_out_file2upid.items() if d[1][1] is not None]
-    return map_with_progress(scheduler_address, add_uniprot_accessions2structure_wrapper, items, None)
+    """Add UniProt accessions to multiple structure files.
+
+    Args:
+        pdb_chain_out_files: List of structure file paths to process.
+        pdb2uniprot_mapping: Full mapping of PDB IDs to UniProt chain mappings.
+        scheduler_address: Scheduler address for distributed processing.
+    """
+    worker_fn = partial(add_uniprot_accessions2structure_wrapper, pdb2uniprot_mapping=pdb2uniprot_mapping)
+    return map_with_progress(scheduler_address, worker_fn, pdb_chain_out_files, None)
 
 
 def filter_structures_with_combined_filter(
@@ -278,8 +293,14 @@ def filter_structures_with_combined_filter(
     logger.info("Kept %i files after chain filtering in %s", len(pdb_chain_out_file2upid), pdb_chain_dir)
 
     # Some structure files are missing their Uniprot mapping, so we try to add it back
+    # Import here to avoid circular dependency with db module
+    from protein_detective.db import convert_proteinpdbs_to_pdb2uniprot_mapping  # noqa: PLC0415
+
+    pdb2uniprot_mapping = convert_proteinpdbs_to_pdb2uniprot_mapping(proteinpdbs)
+    pdb_files_to_update = list(pdb_chain_out_file2upid.keys())
     add_uniprot_accessions2structures(
-        pdb_chain_out_file2upid,
+        pdb_files_to_update,
+        pdb2uniprot_mapping,
         scheduler_address=scheduler_address,
     )
 

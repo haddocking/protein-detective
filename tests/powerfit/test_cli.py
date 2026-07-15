@@ -9,6 +9,7 @@ from textwrap import dedent
 import gemmi
 import pytest
 from protein_quest.structure.uniprot import add_uniprot_accessions2structure
+from protein_quest.uniprot_chains import UniprotChainMapping, UniprotChainRange
 
 from protein_detective.cli import handle_import_structures
 from protein_detective.powerfit.cli import (
@@ -40,7 +41,17 @@ def fake_archive_em_structure(pdb_id: str, output: Path):
     structure.add_model(model)
     structure.setup_entities()
     structure.assign_subchains()
-    structure = add_uniprot_accessions2structure(structure, {pdb_id: {("A", "P12345")}})
+    structure = add_uniprot_accessions2structure(
+        structure,
+        {
+            pdb_id: {
+                UniprotChainMapping(
+                    uniprot_accession="P12345",
+                    chain_ranges=(UniprotChainRange(chain_ids=("A",), start=1, end=100),),
+                )
+            }
+        },
+    )
     structure.setup_entities()
     doc = structure.make_mmcif_document(gemmi.MmcifOutputGroups(True, chem_comp=False))
 

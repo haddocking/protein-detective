@@ -1,6 +1,7 @@
 """Module for managing the DuckDB database used for storing metadata for session."""
 
 import logging
+from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -16,6 +17,11 @@ from protein_quest.converter import converter
 from protein_quest.pdbe.result import PdbResult
 from protein_quest.pdbe.ws import Scores
 from protein_quest.uniprot import UniprotDetails
+from protein_quest.uniprot_chains import (
+    Pdb2UniprotChainsMapping,
+    UniprotChainMapping,
+    parse_uniprot_chains,
+)
 
 from protein_detective.filter import FilteredStructure, FilterOptions
 from protein_detective.powerfit.options import PowerfitOptions
@@ -391,6 +397,49 @@ def load_pdbs(con: DuckDBPyConnection) -> list[ProteinPdbRow]:
         )
         for row in rows
     ]
+
+
+def convert_proteinpdbs_to_pdb2uniprot_mapping(
+    proteinpdbs: list[ProteinPdbRow],
+) -> Pdb2UniprotChainsMapping:
+    """Convert ProteinPdbRow entries to Pdb2UniprotChainsMapping.
+
+    Args:
+        proteinpdbs: List of ProteinPdbRow entries from the database.
+
+    Returns:
+        A Pdb2UniprotChainsMapping dictionary mapping PDB IDs to sets of UniprotChainMapping objects.
+    """
+
+    pdb2uniprot: dict[str, set[UniprotChainMapping]] = defaultdict(set)
+
+    for row in proteinpdbs:
+        if not row.uniprot_chains:
+            logger.warning(
+                "PDB %s for UniProt %s has no uniprot_chains, skipping",
+                row.pdb_id,
+                row.uniprot_acc,
+            )
+            continue
+
+        try:
+            chain_ranges = parse_uniprot_chains(row.uniprot_chains)
+            mapping = UniprotChainMapping(
+                uniprot_accession=row.uniprot_acc,
+                chain_ranges=chain_ranges,
+            )
+            pdb2uniprot[row.pdb_id].add(mapping)
+        except (ValueError, AttributeError) as e:
+            logger.warning(
+                "Failed to parse uniprot_chains '%s' for PDB %s, UniProt %s: %s",
+                row.uniprot_chains,
+                row.pdb_id,
+                row.uniprot_acc,
+                e,
+            )
+            continue
+
+    return dict(pdb2uniprot)
 
 
 def save_alphafolds(afs: dict[str, set[str]], con: DuckDBPyConnection) -> int:
