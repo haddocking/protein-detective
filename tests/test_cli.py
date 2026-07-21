@@ -134,7 +134,7 @@ def setup_retrieve(tmp_path):
     alphafold_csv.write_text("af_id\nA0A0C5B5G6\n")
 
     pdbe_csv = session_dir / "pdbe.csv"
-    pdbe_csv.write_text("pdb_id,chain\n2Y29,A\n")
+    pdbe_csv.write_text("pdb_id,uniprot_accession,uniprot_chains,chain\n2Y29,P05067,A=687-692,A\n")
 
     argv = ["retrieve", str(session_dir), "--alphafold-db-version", "6"]
     return session_dir, argv
@@ -249,6 +249,7 @@ def test_filter(tmp_path: Path):
         },
         output_ids={
             "single_chain",
+            "uniprots_verified",
             "combined_input",
             "combined_output",
             "combined_stats.csv",

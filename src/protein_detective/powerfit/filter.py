@@ -5,6 +5,7 @@ from typing import Annotated
 
 from cyclopts import Group, Parameter, validators
 from cyclopts.types import StdioPath
+from protein_quest.cli.convert import structures
 from protein_quest.cli.filter import chain, combined, secondary_structure
 from protein_quest.filters.combined import CombinedFilterQuery
 from protein_quest.filters.ss import SecondaryStructureFilterQuery
@@ -35,6 +36,7 @@ def _write_ro_crate(
     downloaded_af_dir: Path,
     pdbe_quality_json: StdioPath,
     single_chain_dir: Path,
+    uniprots_verified: Path,
     combined_input_dir: Path,
     combined_output_dir: Path,
     combined_stats_file: StdioPath,
@@ -73,6 +75,14 @@ def _write_ro_crate(
                 help=(
                     "Directory where the single chain structure files are written from "
                     f"{pdbe_download_dir.relative_to(session_dir)}."
+                ),
+            ),
+            IOArgumentPath(
+                name="uniprots_verified_dir",
+                path=uniprots_verified,
+                help=(
+                    "Directory where the uniprots are verified and injected if needed from "
+                    f"{single_chain_dir.relative_to(session_dir)}."
                 ),
             ),
             IOArgumentPath(
@@ -126,6 +136,14 @@ def _write_ro_crate(
     )
 
 
+def _merge_structure_files(downloaded_af_dir, with_uniprots, combined_input_dir):
+    combined_input_dir.mkdir()
+    for file in downloaded_af_dir.glob("*"):
+        copyfile(file, combined_input_dir / file.name, copy_method="symlink")
+    for file in with_uniprots.glob("*"):
+        copyfile(file, combined_input_dir / file.name, copy_method="symlink")
+
+
 def run_filter(
     session_dir: Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=True, exists=True))],
     /,
@@ -135,11 +153,15 @@ def run_filter(
 ):
     """Filter structure files based on specified parameters.
 
+    Steps:
+
     1. Convert PDBe structure files to single chain structure files.
         See [protein-quest filter chain](https://www.bonvinlab.org/protein-quest/cli.html#protein-quest-filter-chain).
-    2. Filters PDBE and AlphaFold structure files based on given parameters.
+    2. Verify expected uniprot accessions are in structure files and inject uniprot accession if missing.
+        See [protein-quest convert structure --uniprots](https://www.bonvinlab.org/protein-quest/cli.html#protein-quest-convert-structures).
+    3. Filters processed PDBe structure files and AlphaFold structure files based on given parameters.
         See [protein-quest filter combined](https://www.bonvinlab.org/protein-quest/cli.html#protein-quest-filter-combined).
-    3. If secondary structure options are given then
+    4. If secondary structure options are given then
         filters passed structure files based on secondary structure.
         See [protein-quest filter secondary-structure](https://www.bonvinlab.org/protein-quest/cli.html#protein-quest-filter-secondary-structure).
 
@@ -164,13 +186,12 @@ def run_filter(
         single_chain_dir,
     )
 
+    uniprots_verified = session_dir / "with_uniprots"
+    structures(single_chain_dir, output_dir=uniprots_verified, uniprots=pdbe_csv)
+
     # Combined filter works best if all structure files are in one directory
     combined_input_dir = session_dir / "combined_input"
-    combined_input_dir.mkdir()
-    for file in downloaded_af_dir.glob("*"):
-        copyfile(file, combined_input_dir / file.name, copy_method="symlink")
-    for file in single_chain_dir.glob("*"):
-        copyfile(file, combined_input_dir / file.name, copy_method="symlink")
+    _merge_structure_files(downloaded_af_dir, uniprots_verified, combined_input_dir)
 
     combined_output_dir = session_dir / "combined_output"
     combined_stats_file = StdioPath(session_dir / "combined_stats.csv")
@@ -199,6 +220,7 @@ def run_filter(
         pdbe_quality_json=pdbe_quality_json,
         # Output
         single_chain_dir=single_chain_dir,
+        uniprots_verified=uniprots_verified,
         combined_input_dir=combined_input_dir,
         combined_output_dir=combined_output_dir,
         combined_stats_file=combined_stats_file,
