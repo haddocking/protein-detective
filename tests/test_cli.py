@@ -44,6 +44,7 @@ def assert_crate(
     action_id: str | None = None,
     input_ids: set[str] | None = None,
     output_ids: set[str] | None = None,
+    nr_actions: int = 1,
 ) -> tuple[ROCrate, dict]:
     # Assert copied from tests/adapters/test_cyclopts.py in rocrate_action_recorder repo
     crate_path = crate_dir / BASENAME
@@ -51,8 +52,10 @@ def assert_crate(
 
     crate = ROCrate(crate_dir)
     actions = crate.get_by_type("CreateAction", exact=True)
-    assert len(actions) == 1, f"Expected exactly one CreateAction in the crate, found {len(actions)}"
-    action = actions[0]
+    assert len(actions) == nr_actions, (
+        f"Expected exactly {nr_actions} CreateAction(s) in the crate, found {len(actions)}"
+    )
+    action = actions[-1]
 
     if action_id is not None:
         assert action["@id"] == action_id
@@ -124,17 +127,22 @@ def test_search(tmp_path: Path):
     )
 
 
-@pytest.mark.vcr
-def test_retrieve(tmp_path: Path):
+def setup_retrieve(tmp_path):
     session_dir = tmp_path / "session"
     session_dir.mkdir()
     alphafold_csv = session_dir / "alphafold.csv"
     alphafold_csv.write_text("af_id\nA0A0C5B5G6\n")
 
     pdbe_csv = session_dir / "pdbe.csv"
-    pdbe_csv.write_text("pdb_id\n2Y29\n")
+    pdbe_csv.write_text("pdb_id,chain\n2Y29,A\n")
 
     argv = ["retrieve", str(session_dir), "--alphafold-db-version", "6"]
+    return session_dir, argv
+
+
+@pytest.mark.vcr
+def test_retrieve(tmp_path: Path):
+    session_dir, argv = setup_retrieve(tmp_path)
     cli(argv)
 
     downloads_dir = session_dir / "downloads"
@@ -155,4 +163,95 @@ def test_retrieve(tmp_path: Path):
             "downloads/alphafold",
             "downloads/pdbe",
         },
+    )
+
+
+def test_filter_help(capsys: pytest.CaptureFixture[str]):
+    cli(["filter", "--help"])
+
+    captured = capsys.readouterr()
+    assert "Filter structure files based on specified parameters" in captured.out
+
+
+@pytest.mark.vcr
+@pytest.mark.default_cassette("test_retrieve.yaml")
+def test_filter(tmp_path: Path):
+    session_dir, argv = setup_retrieve(tmp_path)
+    pdbe_quality_json = session_dir / "pdbe-quality.json"
+    pdbe_quality_json.write_text("{}")
+
+    cli(argv)
+
+    argv = [
+        "filter",
+        str(session_dir),
+    ]
+    cli(argv)
+
+    filtered_csv = session_dir / "combined_stats.csv"
+    assert filtered_csv.exists()
+    with filtered_csv.open() as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+    expected_rows = [
+        {
+            "chain_length": "16",
+            "geometry_quality": "",
+            "high_confidence_residues_count": "10",
+            "input_file": str(session_dir / "combined_input/AF-A0A0C5B5G6-F1-model_v6.cif.gz"),
+            "is_alphafold": "True",
+            "method": "Predicted",
+            "output_file": str(session_dir / "combined_output/AF-A0A0C5B5G6-F1-model_v6.cif.gz"),
+            "passed": "True",
+            "pdb_id": "AF-A0A0C5B5G6-F1",
+            "reason": "",
+            "resolution": "0.0",
+            "sequence_identity": "1.0",
+            "total_residue_count": "16",
+            "uniprot_accession": "A0A0C5B5G6",
+            "uniprot_end": "16",
+            "uniprot_start": "1",
+        },
+        {
+            "chain_length": "8",
+            "geometry_quality": "",
+            "high_confidence_residues_count": "",
+            "input_file": str(session_dir / "combined_input/2y29_updated_A2A.cif.gz"),
+            "is_alphafold": "False",
+            "method": "X-ray",
+            "output_file": str(session_dir / "combined_output/2y29_updated_A2A.cif.gz"),
+            "passed": "True",
+            "pdb_id": "2Y29",
+            "reason": "",
+            "resolution": "2.3",
+            "sequence_identity": "1.0",
+            "total_residue_count": "8",
+            "uniprot_accession": "P05067",
+            "uniprot_end": "692",
+            "uniprot_start": "687",
+        },
+    ]
+    assert rows == expected_rows
+
+    ss_output_dir = session_dir / "secondary_structure"
+    assert not ss_output_dir.exists()
+    ss_stats_file = session_dir / "secondary_structure_stats.csv"
+    assert not ss_stats_file.exists()
+
+    assert_crate(
+        session_dir,
+        action_id=f"protein-detective filter {session_dir}",
+        input_ids={
+            "pdbe.csv",
+            "downloads/pdbe",
+            "downloads/alphafold",
+            "pdbe-quality.json",
+        },
+        output_ids={
+            "single_chain",
+            "combined_input",
+            "combined_output",
+            "combined_stats.csv",
+        },
+        nr_actions=2,
     )
