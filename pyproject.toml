@@ -56,7 +56,7 @@ Documentation = "https://www.bonvinlab.org/protein-detective/"
 Source = "https://github.com/haddocking/protein-detective"
 
 [project.scripts]
-protein-detective = "protein_detective.cli:main"
+protein-detective = "protein_detective.cli:app"
 
 [project.optional-dependencies]
 cuda13 = [
