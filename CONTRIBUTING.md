@@ -89,15 +89,3 @@ uv run mkdocs build
 python3 -m http.server -d site
 ```
 
-<details>
-<summary>Type checking notebooks</summary>
-
-[Pyrefly](https://pyrefly.org/) does not support notebooks yet, so we need to convert them to python scripts and then run pyrefly on them.
-
-```shell
-find docs/ -name "*.ipynb" -exec uv run --group docs-type marimo convert {} -o {}.py \;
-uv run --group docs-type pyrefly check docs/*.ipynb.py
-rm docs/*.ipynb.py
-```
-
-</details>

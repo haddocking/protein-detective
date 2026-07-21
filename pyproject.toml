@@ -42,7 +42,7 @@ cuda12 = [
 
 [dependency-groups]
 type = [
-    "pyrefly>=0.42.0",
+    "pyrefly>=1.1.1",
     "types-aiofiles>=24.1.0.20250326",
     "types-tqdm>=4.67.0.20250513"
 ]
@@ -68,14 +68,6 @@ docs = [
     "mkdocs-rich-argparse>=0.1.2",
     "mkdocstrings[python]>=0.30.1",
     "nbconvert>=7.16.6"
-]
-marimo = [
-    "marimo[sql]>=0.17.2"
-]
-docs-type = [
-    {include-group = "marimo"},
-    {include-group = "type"},
-    {include-group = "docs"}
 ]
 
 [build-system]
@@ -181,8 +173,17 @@ displaylimit = 100
 protein-quest = { path = "../protein-quest", editable = true }
 
 [tool.pyrefly]
-project-includes = ["src", "tests", "benchmark"]
-search-paths = ["./src", "./benchmark"]
+preset = "strict"
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
+]
+
+[tool.pytest]
+minversion = "9.0"
+addopts = [
+    "--import-mode=importlib",
+]
 
 [tool.coverage.run]
 source = ["src/protein_detective"]
