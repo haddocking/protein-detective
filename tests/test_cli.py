@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from rocrate import Metadata
+from rocrate.metadata import BASENAME
 from rocrate.rocrate import ROCrate
 
 from protein_detective.__version__ import __version__
@@ -46,7 +46,7 @@ def assert_crate(
     output_ids: set[str] | None = None,
 ) -> tuple[ROCrate, dict]:
     # Assert copied from tests/adapters/test_cyclopts.py in rocrate_action_recorder repo
-    crate_path = crate_dir / Metadata.BASENAME
+    crate_path = crate_dir / BASENAME
     assert crate_path.exists()
 
     crate = ROCrate(crate_dir)

@@ -45,7 +45,7 @@ dependencies = [
     "pyopencl>=2025.2.5",
     "rich>=14.0.0",
     "rich-argparse>=1.7.1",
-    "rocrate-action-recorder>=0.5.1",
+    "rocrate-action-recorder>=0.5.3",
     "tqdm>=4.67.1"
 ]
 
@@ -77,6 +77,7 @@ test = [
     "pytest-cov>=7.1.0",
     "pytest-asyncio>=1.1.0",
     "pytest-recording>=0.13.4",
+    "rocrate==0.15.0",
 ]
 dev = [
     {include-group = "test"},

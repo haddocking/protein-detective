@@ -2052,6 +2052,7 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-recording" },
+    { name = "rocrate" },
     { name = "types-aiofiles" },
     { name = "types-tqdm" },
 ]
@@ -2075,6 +2076,7 @@ test = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-recording" },
+    { name = "rocrate" },
 ]
 type = [
     { name = "pyrefly" },
@@ -2102,7 +2104,7 @@ requires-dist = [
     { name = "pyopencl", specifier = ">=2025.2.5" },
     { name = "rich", specifier = ">=14.0.0" },
     { name = "rich-argparse", specifier = ">=1.7.1" },
-    { name = "rocrate-action-recorder", specifier = ">=0.5.1" },
+    { name = "rocrate-action-recorder", specifier = ">=0.5.3" },
     { name = "tqdm", specifier = ">=4.67.1" },
 ]
 provides-extras = ["cuda12", "cuda13"]
@@ -2114,6 +2116,7 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=1.1.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-recording", specifier = ">=0.13.4" },
+    { name = "rocrate", specifier = "==0.15.0" },
     { name = "types-aiofiles", specifier = ">=24.1.0.20250326" },
     { name = "types-tqdm", specifier = ">=4.67.0.20250513" },
 ]
@@ -2137,6 +2140,7 @@ test = [
     { name = "pytest-asyncio", specifier = ">=1.1.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-recording", specifier = ">=0.13.4" },
+    { name = "rocrate", specifier = "==0.15.0" },
 ]
 type = [
     { name = "pyrefly", specifier = ">=1.1.1" },
@@ -2671,7 +2675,7 @@ wheels = [
 
 [[package]]
 name = "rocrate"
-version = "0.14.2"
+version = "0.15.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "arcp" },
@@ -2680,21 +2684,21 @@ dependencies = [
     { name = "python-dateutil" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/59/30/68e6a46f01c643d5af5e151afd69608dde4f9009191436db4c94432dcc92/rocrate-0.14.2.tar.gz", hash = "sha256:22263f149b17edeb0bb55cccbcc307917e93f62fe64cfcd14de53bbf1e561d10", size = 309959, upload-time = "2025-10-13T15:14:04.966Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ac/4f/bd59926cd240ed55309f8ea71b94c43802d85ef3e0d778ad3c78cfa872fc/rocrate-0.15.0.tar.gz", hash = "sha256:20f0b518dcb1efbf9d25833ec5c24586dee4c39201ed1024e2277a3cd171df3e", size = 320997, upload-time = "2026-04-13T09:19:32.177Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cb/4c/d74018818d4cc53e113d6df178b4b8894b304b10abfa9f44eb89e3648a0d/rocrate-0.14.2-py3-none-any.whl", hash = "sha256:2fcb1452e81e2f54e4456a7d69c74b37a0a56e55a43428292f593d9deebc6de2", size = 340572, upload-time = "2025-10-13T15:14:03.862Z" },
+    { url = "https://files.pythonhosted.org/packages/38/81/c7fd0f15eb155fb74891fe9cd07f5c4838c509dc3e1b5da9da7d390b75a0/rocrate-0.15.0-py3-none-any.whl", hash = "sha256:faa7b8fe41f84a7a8085cf4e31a973565a391cc25a850e847cdab5c2c2e52cee", size = 349120, upload-time = "2026-04-13T09:19:30.744Z" },
 ]
 
 [[package]]
 name = "rocrate-action-recorder"
-version = "0.5.1"
+version = "0.5.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "rocrate" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/65/36/484e0f6748016bbb821b8f1400ca4ff0450a1a4b5498f6ff5f22c010cae7/rocrate_action_recorder-0.5.1.tar.gz", hash = "sha256:24ea66fca48219c94bd69819c720930ac0dcaca2cfc5e7d72200486d9975733c", size = 87974, upload-time = "2026-04-07T09:26:46.386Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f2/22/0d41311f8cd9cbfadedf93ce5ed0de3152cfa95248bbf4302ddc102746f2/rocrate_action_recorder-0.5.3.tar.gz", hash = "sha256:5f3f8a19e93cdf27ef9081fb52b0e45a63fbd754ff622a4b4ad6fef08f6b642a", size = 88035, upload-time = "2026-06-04T08:37:36.236Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8b/87/3db52bb30cbeeec6950a0b8b845fecbc3277ef1389cfa182feef3c038f37/rocrate_action_recorder-0.5.1-py3-none-any.whl", hash = "sha256:d8aa1f18220690731d4b3abb34fdc35160bbd3784457993641ac4d50cc32309a", size = 27051, upload-time = "2026-04-07T09:26:45.234Z" },
+    { url = "https://files.pythonhosted.org/packages/20/d4/9673c14a9fb2aa333637b2d4386088b4dacf963023402327a995144507e8/rocrate_action_recorder-0.5.3-py3-none-any.whl", hash = "sha256:ce218edd8cc6f296d0b373f844dcd3c659145a48603e5189cd944adf2cc8737e", size = 27048, upload-time = "2026-06-04T08:37:34.905Z" },
 ]
 
 [[package]]
