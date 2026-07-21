@@ -4,6 +4,30 @@ dynamic = ["version"]
 description = "Deduce the protein from a EM density"
 readme = "README.md"
 requires-python = ">=3.13"
+keywords = [
+    "alphafold",
+    "mmcif",
+    "pdb",
+    "protein structure",
+    "protein",
+    "uniprot",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Natural Language :: English",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Typing :: Typed",
+]
 dependencies = [
     "aiofiles>=24.1.0",
     "aiohttp[speedups]>=3.13.4",
@@ -16,11 +40,12 @@ dependencies = [
     "numpy>=2.3.1",
     "pandas>=2.3.0",
     "powerfit-em[opencl]>=5.0.0",
-    "protein-quest>=1.4.0",
+    "protein-quest>=1.5.2",
     "psutil>=7.0.0",
     "pyopencl>=2025.2.5",
     "rich>=14.0.0",
     "rich-argparse>=1.7.1",
+    "rocrate-action-recorder>=0.5.1",
     "tqdm>=4.67.1"
 ]
 
@@ -50,6 +75,8 @@ type = [
 test = [
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
+    "pytest-asyncio>=1.1.0",
+    "pytest-recording>=0.13.4",
 ]
 dev = [
     {include-group = "test"},
