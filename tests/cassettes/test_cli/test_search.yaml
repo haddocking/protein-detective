@@ -1,0 +1,580 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/sparql-results+json,application/json,text/javascript,application/javascript
+      Connection:
+      - close
+      Host:
+      - sparql.uniprot.org
+      User-Agent:
+      - sparqlwrapper 2.0.0 (rdflib.github.io/sparqlwrapper)
+    method: GET
+    uri: https://sparql.uniprot.org/sparql?query=%0A++++++++PREFIX+up%3A+%3Chttp%3A//purl.uniprot.org/core/%3E%0A++++++++PREFIX+taxon%3A+%3Chttp%3A//purl.uniprot.org/taxonomy/%3E%0A++++++++PREFIX+rdf%3A+%3Chttp%3A//www.w3.org/1999/02/22-rdf-syntax-ns%23%3E%0A++++++++PREFIX+rdfs%3A+%3Chttp%3A//www.w3.org/2000/01/rdf-schema%23%3E%0A++++++++PREFIX+skos%3A+%3Chttp%3A//www.w3.org/2004/02/skos/core%23%3E%0A++++++++PREFIX+GO%3A%3Chttp%3A//purl.obolibrary.org/obo/GO_%3E%0A%0A++++++++SELECT+DISTINCT+%3Fprotein%0A++++++++WHERE+%7B%0A%0A++++++++%23+---+Protein+Selection+---%0A++++++++%3Fprotein+a+up%3AProtein+.%0A++++++++%3Fprotein+up%3Aorganism+taxon%3A9606+.%0A%3Fprotein+up%3Areviewed+true+.%0A%0A%0A++++++++%7D%0A%0A++++++++LIMIT+50%0A&format=json&output=json&results=json
+  response:
+    body:
+      string: "{\n  \"head\" : {\n    \"vars\" : [\n      \"protein\"\n    ]\n  },\n
+        \ \"results\" : {\n    \"bindings\" : [\n      {\n        \"protein\" : {\n
+        \         \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A024R1R8\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A024RBG1\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6H7\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6H8\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6H9\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6I0\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6I1\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6I3\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6I4\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6I6\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6I7\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6I9\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6J1\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6J2\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6J6\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6J9\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6K0\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6K2\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6K4\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6K5\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6K6\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6L2\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6L6\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6N1\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6N2\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6N3\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6N4\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6P5\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6Q5\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6R0\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6R2\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6R9\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6S0\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6S2\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6S4\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6S5\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6S6\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6S9\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6T6\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6T7\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6T8\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6U4\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6V5\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6W5\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6X5\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6Y3\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6Y9\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B700\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B706\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B734\"\n
+        \       }\n      }\n    ]\n  }\n}"
+    headers:
+      Access-Control-Allow-Headers:
+      - origin, x-requested-with, content-type, X-Release, queryid
+      Access-Control-Allow-Origin:
+      - '*'
+      Access-Control-Expose-Headers:
+      - X-Total-Results, X-Release, queryid, content-type, user-agent, cache-control,
+        etag, range
+      Cache-Control:
+      - public
+      Connection:
+      - close
+      Content-Disposition:
+      - attachment; filename="sparql-17CA9BDFA759AC884F399E904F166FF9.srj"
+      Content-Length:
+      - '7102'
+      Content-Type:
+      - application/sparql-results+json
+      Date:
+      - Tue, 21 Jul 2026 10:35:26 GMT
+      ETag:
+      - W/"2026_02"
+      Expires:
+      - Wed, 22 Jul 2026 10:35:25 GMT
+      Server:
+      - Apache
+      Strict-Transport-Security:
+      - max-age=31536001; includeSubDomains
+      Vary:
+      - Negotiate,Accept,Accept-Encoding,Content-Type
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Powered-By:
+      - sib.swiss
+      X-Release:
+      - '2026_02'
+      queryid:
+      - '-404'
+    status:
+      code: 200
+      message: ''
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/sparql-results+json,application/json,text/javascript,application/javascript
+      Connection:
+      - close
+      Host:
+      - sparql.uniprot.org
+      User-Agent:
+      - sparqlwrapper 2.0.0 (rdflib.github.io/sparqlwrapper)
+    method: GET
+    uri: https://sparql.uniprot.org/sparql?query=%0A++++++++PREFIX+up%3A+%3Chttp%3A//purl.uniprot.org/core/%3E%0A++++++++PREFIX+taxon%3A+%3Chttp%3A//purl.uniprot.org/taxonomy/%3E%0A++++++++PREFIX+rdf%3A+%3Chttp%3A//www.w3.org/1999/02/22-rdf-syntax-ns%23%3E%0A++++++++PREFIX+rdfs%3A+%3Chttp%3A//www.w3.org/2000/01/rdf-schema%23%3E%0A++++++++PREFIX+skos%3A+%3Chttp%3A//www.w3.org/2004/02/skos/core%23%3E%0A++++++++PREFIX+GO%3A%3Chttp%3A//purl.obolibrary.org/obo/GO_%3E%0A%0A++++++++SELECT+%3Fprotein+%3Faf_db%0A++++++++WHERE+%7B%0A%0A++++++++%23+---+Protein+Selection+---%0A++++++++VALUES+%28%3Fac%29+%7B+%28%22A0A024R1R8%22%29+%28%22A0A024RBG1%22%29+%28%22A0A075B6H7%22%29+%28%22A0A075B6H8%22%29+%28%22A0A075B6H9%22%29+%28%22A0A075B6I0%22%29+%28%22A0A075B6I1%22%29+%28%22A0A075B6I3%22%29+%28%22A0A075B6I4%22%29+%28%22A0A075B6I6%22%29+%28%22A0A075B6I7%22%29+%28%22A0A075B6I9%22%29+%28%22A0A075B6J1%22%29+%28%22A0A075B6J2%22%29+%28%22A0A075B6J6%22%29+%28%22A0A075B6J9%22%29+%28%22A0A075B6K0%22%29+%28%22A0A075B6K2%22%29+%28%22A0A075B6K4%22%29+%28%22A0A075B6K5%22%29+%28%22A0A075B6K6%22%29+%28%22A0A075B6L2%22%29+%28%22A0A075B6L6%22%29+%28%22A0A075B6N1%22%29+%28%22A0A075B6N2%22%29+%28%22A0A075B6N3%22%29+%28%22A0A075B6N4%22%29+%28%22A0A075B6P5%22%29+%28%22A0A075B6Q5%22%29+%28%22A0A075B6R0%22%29+%28%22A0A075B6R2%22%29+%28%22A0A075B6R9%22%29+%28%22A0A075B6S0%22%29+%28%22A0A075B6S2%22%29+%28%22A0A075B6S4%22%29+%28%22A0A075B6S5%22%29+%28%22A0A075B6S6%22%29+%28%22A0A075B6S9%22%29+%28%22A0A075B6T6%22%29+%28%22A0A075B6T7%22%29+%28%22A0A075B6T8%22%29+%28%22A0A075B6U4%22%29+%28%22A0A075B6V5%22%29+%28%22A0A075B6W5%22%29+%28%22A0A075B6X5%22%29+%28%22A0A075B6Y3%22%29+%28%22A0A075B6Y9%22%29+%28%22A0A075B700%22%29+%28%22A0A075B706%22%29+%28%22A0A075B734%22%29%7D%0A++++++++BIND+%28IRI%28CONCAT%28%22http%3A//purl.uniprot.org/uniprot/%22%2C%3Fac%29%29+AS+%3Fprotein%29%0A++++++++%3Fprotein+a+up%3AProtein+.%0A%0A%0A%23+---+Protein+Selection+---%0A%3Fprotein+a+up%3AProtein+.%0A%0A%23+---+AlphaFoldDB+Info+---%0A%3Fprotein+rdfs%3AseeAlso+%3Faf_db+.%0A%3Faf_db+up%3Adatabase+%3Chttp%3A//purl.uniprot.org/database/AlphaFoldDB%3E+.%0A%0A%0A++++++++%7D%0A%0A++++++++LIMIT+10000%0A&format=json&output=json&results=json
+  response:
+    body:
+      string: "{\n  \"head\" : {\n    \"vars\" : [\n      \"protein\",\n      \"af_db\"\n
+        \   ]\n  },\n  \"results\" : {\n    \"bindings\" : [\n      {\n        \"protein\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A024R1R8\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A024R1R8\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A024RBG1\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A024RBG1\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6H7\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6H7\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6H8\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6H8\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6H9\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6H9\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6I0\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6I0\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6I1\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6I1\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6I3\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6I3\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6I4\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6I4\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6I6\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6I6\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6I7\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6I7\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6I9\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6I9\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6J1\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6J1\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6J2\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6J2\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6J6\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6J6\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6J9\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6J9\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6K0\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6K0\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6K2\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6K2\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6K4\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6K4\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6K5\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6K5\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6K6\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6K6\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6L2\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6L2\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6L6\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6L6\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6N1\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6N1\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6N2\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6N2\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6N3\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6N3\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6N4\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6N4\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6P5\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6P5\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6Q5\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6Q5\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6R0\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6R0\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6R2\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6R2\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6R9\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6R9\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6S0\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6S0\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6S2\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6S2\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6S4\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6S4\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6S5\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6S5\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6S6\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6S6\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6S9\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6S9\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6T6\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6T6\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6T7\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6T7\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6T8\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6T8\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6U4\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6U4\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6V5\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6V5\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6W5\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6W5\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6X5\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6X5\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B6Y3\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B6Y3\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6Y9\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B6Y9\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B700\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B700\"\n
+        \       }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B706\"\n
+        \       },\n        \"af_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/alphafolddb/A0A075B706\"\n        }\n      },\n
+        \     {\n        \"protein\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://purl.uniprot.org/uniprot/A0A075B734\"\n        },\n        \"af_db\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/alphafolddb/A0A075B734\"\n
+        \       }\n      }\n    ]\n  }\n}"
+    headers:
+      Access-Control-Allow-Headers:
+      - origin, x-requested-with, content-type, X-Release, queryid
+      Access-Control-Allow-Origin:
+      - '*'
+      Access-Control-Expose-Headers:
+      - X-Total-Results, X-Release, queryid, content-type, user-agent, cache-control,
+        etag, range
+      Cache-Control:
+      - public
+      Connection:
+      - close
+      Content-Disposition:
+      - attachment; filename="sparql-9404C7FB3B7CCC36C843C6F9DA26885B.srj"
+      Content-Length:
+      - '13417'
+      Content-Type:
+      - application/sparql-results+json
+      Date:
+      - Tue, 21 Jul 2026 10:35:26 GMT
+      ETag:
+      - W/"2026_02"
+      Expires:
+      - Wed, 22 Jul 2026 10:35:26 GMT
+      Server:
+      - Apache
+      Strict-Transport-Security:
+      - max-age=31536001; includeSubDomains
+      Vary:
+      - Negotiate,Accept,Accept-Encoding,Content-Type
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Powered-By:
+      - sib.swiss
+      X-Release:
+      - '2026_02'
+      queryid:
+      - '-404'
+    status:
+      code: 200
+      message: ''
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/sparql-results+json,application/json,text/javascript,application/javascript
+      Connection:
+      - close
+      Host:
+      - sparql.uniprot.org
+      User-Agent:
+      - sparqlwrapper 2.0.0 (rdflib.github.io/sparqlwrapper)
+    method: GET
+    uri: https://sparql.uniprot.org/sparql?query=%0A++++++++PREFIX+up%3A+%3Chttp%3A//purl.uniprot.org/core/%3E%0A++++++++PREFIX+taxon%3A+%3Chttp%3A//purl.uniprot.org/taxonomy/%3E%0A++++++++PREFIX+rdf%3A+%3Chttp%3A//www.w3.org/1999/02/22-rdf-syntax-ns%23%3E%0A++++++++PREFIX+rdfs%3A+%3Chttp%3A//www.w3.org/2000/01/rdf-schema%23%3E%0A++++++++PREFIX+skos%3A+%3Chttp%3A//www.w3.org/2004/02/skos/core%23%3E%0A++++++++PREFIX+GO%3A%3Chttp%3A//purl.obolibrary.org/obo/GO_%3E%0A%0A++++++++SELECT+%3Fprotein+%3Fpdb_db+%3Fpdb_method+%3Fpdb_resolution%0A+%28GROUP_CONCAT%28DISTINCT+%3Fpdb_chain%3B+separator%3D%22%2C%22%29+AS+%3Fpdb_chains%29%0A%0A++++++++WHERE+%7B%0A%0A++++++++%23+---+Protein+Selection+---%0A++++++++VALUES+%28%3Fac%29+%7B+%28%22A0A024R1R8%22%29+%28%22A0A024RBG1%22%29+%28%22A0A075B6H7%22%29+%28%22A0A075B6H8%22%29+%28%22A0A075B6H9%22%29+%28%22A0A075B6I0%22%29+%28%22A0A075B6I1%22%29+%28%22A0A075B6I3%22%29+%28%22A0A075B6I4%22%29+%28%22A0A075B6I6%22%29+%28%22A0A075B6I7%22%29+%28%22A0A075B6I9%22%29+%28%22A0A075B6J1%22%29+%28%22A0A075B6J2%22%29+%28%22A0A075B6J6%22%29+%28%22A0A075B6J9%22%29+%28%22A0A075B6K0%22%29+%28%22A0A075B6K2%22%29+%28%22A0A075B6K4%22%29+%28%22A0A075B6K5%22%29+%28%22A0A075B6K6%22%29+%28%22A0A075B6L2%22%29+%28%22A0A075B6L6%22%29+%28%22A0A075B6N1%22%29+%28%22A0A075B6N2%22%29+%28%22A0A075B6N3%22%29+%28%22A0A075B6N4%22%29+%28%22A0A075B6P5%22%29+%28%22A0A075B6Q5%22%29+%28%22A0A075B6R0%22%29+%28%22A0A075B6R2%22%29+%28%22A0A075B6R9%22%29+%28%22A0A075B6S0%22%29+%28%22A0A075B6S2%22%29+%28%22A0A075B6S4%22%29+%28%22A0A075B6S5%22%29+%28%22A0A075B6S6%22%29+%28%22A0A075B6S9%22%29+%28%22A0A075B6T6%22%29+%28%22A0A075B6T7%22%29+%28%22A0A075B6T8%22%29+%28%22A0A075B6U4%22%29+%28%22A0A075B6V5%22%29+%28%22A0A075B6W5%22%29+%28%22A0A075B6X5%22%29+%28%22A0A075B6Y3%22%29+%28%22A0A075B6Y9%22%29+%28%22A0A075B700%22%29+%28%22A0A075B706%22%29+%28%22A0A075B734%22%29%7D%0A++++++++BIND+%28IRI%28CONCAT%28%22http%3A//purl.uniprot.org/uniprot/%22%2C%3Fac%29%29+AS+%3Fprotein%29%0A++++++++%3Fprotein+a+up%3AProtein+.%0A%0A%0A%23+---+PDB+Info+---%0A%3Fprotein+rdfs%3AseeAlso+%3Fpdb_db+.%0A%3Fpdb_db+up%3Adatabase+%3Chttp%3A//purl.uniprot.org/database/PDB%3E+.%0A%3Fpdb_db+up%3Amethod+%3Fpdb_method+.%0A%3Fpdb_db+up%3AchainSequenceMapping+%3FchainSequenceMapping+.%0ABIND%28STRAFTER%28STR%28%3FchainSequenceMapping%29%2C+%22isoforms/%22%29+AS+%3FisoformPart%29%0AFILTER%28STRSTARTS%28%3FisoformPart%2C+CONCAT%28%3Fac%2C+%22-%22%29%29%29%0A%3FchainSequenceMapping+up%3Achain+%3Fpdb_chain+.%0AOPTIONAL+%7B+%3Fpdb_db+up%3Aresolution+%3Fpdb_resolution+.+%7D%0A%0A%0A++++++++%7D%0A+++++++++GROUP+BY+%3Fprotein+%3Fpdb_db+%3Fpdb_method+%3Fpdb_resolution%0A++++++++LIMIT+50%0A&format=json&output=json&results=json
+  response:
+    body:
+      string: "{\n  \"head\" : {\n    \"vars\" : [\n      \"protein\",\n      \"pdb_db\",\n
+        \     \"pdb_method\",\n      \"pdb_resolution\",\n      \"pdb_chains\"\n    ]\n
+        \ },\n  \"results\" : {\n    \"bindings\" : [\n      {\n        \"protein\"
+        : {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6T6\"\n
+        \       },\n        \"pdb_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://rdf.wwpdb.org/pdb/1AO7\"\n        },\n        \"pdb_method\" :
+        {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/core/X-Ray_Crystallography\"\n
+        \       },\n        \"pdb_resolution\" : {\n          \"datatype\" : \"http://www.w3.org/2001/XMLSchema#decimal\",\n
+        \         \"type\" : \"literal\",\n          \"value\" : \"2.6\"\n        },\n
+        \       \"pdb_chains\" : {\n          \"type\" : \"literal\",\n          \"value\"
+        : \"D=23-112\"\n        }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6T6\"\n
+        \       },\n        \"pdb_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://rdf.wwpdb.org/pdb/4ZDH\"\n        },\n        \"pdb_method\" :
+        {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/core/X-Ray_Crystallography\"\n
+        \       },\n        \"pdb_resolution\" : {\n          \"datatype\" : \"http://www.w3.org/2001/XMLSchema#decimal\",\n
+        \         \"type\" : \"literal\",\n          \"value\" : \"2.1\"\n        },\n
+        \       \"pdb_chains\" : {\n          \"type\" : \"literal\",\n          \"value\"
+        : \"A=24-112\"\n        }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6T6\"\n
+        \       },\n        \"pdb_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://rdf.wwpdb.org/pdb/5E9D\"\n        },\n        \"pdb_method\" :
+        {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/core/X-Ray_Crystallography\"\n
+        \       },\n        \"pdb_resolution\" : {\n          \"datatype\" : \"http://www.w3.org/2001/XMLSchema#decimal\",\n
+        \         \"type\" : \"literal\",\n          \"value\" : \"2.51\"\n        },\n
+        \       \"pdb_chains\" : {\n          \"type\" : \"literal\",\n          \"value\"
+        : \"D/I=22-112\"\n        }\n      },\n      {\n        \"protein\" : {\n
+        \         \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6N1\"\n
+        \       },\n        \"pdb_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://rdf.wwpdb.org/pdb/5HHM\"\n        },\n        \"pdb_method\" :
+        {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/core/X-Ray_Crystallography\"\n
+        \       },\n        \"pdb_resolution\" : {\n          \"datatype\" : \"http://www.w3.org/2001/XMLSchema#decimal\",\n
+        \         \"type\" : \"literal\",\n          \"value\" : \"2.5\"\n        },\n
+        \       \"pdb_chains\" : {\n          \"type\" : \"literal\",\n          \"value\"
+        : \"E/J=21-113\"\n        }\n      },\n      {\n        \"protein\" : {\n
+        \         \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6N1\"\n
+        \       },\n        \"pdb_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://rdf.wwpdb.org/pdb/5HHO\"\n        },\n        \"pdb_method\" :
+        {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/core/X-Ray_Crystallography\"\n
+        \       },\n        \"pdb_resolution\" : {\n          \"datatype\" : \"http://www.w3.org/2001/XMLSchema#decimal\",\n
+        \         \"type\" : \"literal\",\n          \"value\" : \"2.95\"\n        },\n
+        \       \"pdb_chains\" : {\n          \"type\" : \"literal\",\n          \"value\"
+        : \"E=21-114\"\n        }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6T6\"\n
+        \       },\n        \"pdb_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://rdf.wwpdb.org/pdb/5NHT\"\n        },\n        \"pdb_method\" :
+        {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/core/X-Ray_Crystallography\"\n
+        \       },\n        \"pdb_resolution\" : {\n          \"datatype\" : \"http://www.w3.org/2001/XMLSchema#decimal\",\n
+        \         \"type\" : \"literal\",\n          \"value\" : \"3.2\"\n        },\n
+        \       \"pdb_chains\" : {\n          \"type\" : \"literal\",\n          \"value\"
+        : \"A=21-112\"\n        }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6N1\"\n
+        \       },\n        \"pdb_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://rdf.wwpdb.org/pdb/5NQK\"\n        },\n        \"pdb_method\" :
+        {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/core/X-Ray_Crystallography\"\n
+        \       },\n        \"pdb_resolution\" : {\n          \"datatype\" : \"http://www.w3.org/2001/XMLSchema#decimal\",\n
+        \         \"type\" : \"literal\",\n          \"value\" : \"3.25\"\n        },\n
+        \       \"pdb_chains\" : {\n          \"type\" : \"literal\",\n          \"value\"
+        : \"B=22-113\"\n        }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6T6\"\n
+        \       },\n        \"pdb_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://rdf.wwpdb.org/pdb/6DKP\"\n        },\n        \"pdb_method\" :
+        {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/core/X-Ray_Crystallography\"\n
+        \       },\n        \"pdb_resolution\" : {\n          \"datatype\" : \"http://www.w3.org/2001/XMLSchema#decimal\",\n
+        \         \"type\" : \"literal\",\n          \"value\" : \"2.97\"\n        },\n
+        \       \"pdb_chains\" : {\n          \"type\" : \"literal\",\n          \"value\"
+        : \"D=22-113\"\n        }\n      },\n      {\n        \"protein\" : {\n          \"type\"
+        : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6T6\"\n
+        \       },\n        \"pdb_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://rdf.wwpdb.org/pdb/8RLT\"\n        },\n        \"pdb_method\" :
+        {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/core/X-Ray_Crystallography\"\n
+        \       },\n        \"pdb_resolution\" : {\n          \"datatype\" : \"http://www.w3.org/2001/XMLSchema#decimal\",\n
+        \         \"type\" : \"literal\",\n          \"value\" : \"2.25\"\n        },\n
+        \       \"pdb_chains\" : {\n          \"type\" : \"literal\",\n          \"value\"
+        : \"D/I=23-112\"\n        }\n      },\n      {\n        \"protein\" : {\n
+        \         \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6T6\"\n
+        \       },\n        \"pdb_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://rdf.wwpdb.org/pdb/8RLU\"\n        },\n        \"pdb_method\" :
+        {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/core/X-Ray_Crystallography\"\n
+        \       },\n        \"pdb_resolution\" : {\n          \"datatype\" : \"http://www.w3.org/2001/XMLSchema#decimal\",\n
+        \         \"type\" : \"literal\",\n          \"value\" : \"2.35\"\n        },\n
+        \       \"pdb_chains\" : {\n          \"type\" : \"literal\",\n          \"value\"
+        : \"D/I=23-112\"\n        }\n      },\n      {\n        \"protein\" : {\n
+        \         \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/uniprot/A0A075B6T6\"\n
+        \       },\n        \"pdb_db\" : {\n          \"type\" : \"uri\",\n          \"value\"
+        : \"http://rdf.wwpdb.org/pdb/8RLV\"\n        },\n        \"pdb_method\" :
+        {\n          \"type\" : \"uri\",\n          \"value\" : \"http://purl.uniprot.org/core/X-Ray_Crystallography\"\n
+        \       },\n        \"pdb_resolution\" : {\n          \"datatype\" : \"http://www.w3.org/2001/XMLSchema#decimal\",\n
+        \         \"type\" : \"literal\",\n          \"value\" : \"2.61\"\n        },\n
+        \       \"pdb_chains\" : {\n          \"type\" : \"literal\",\n          \"value\"
+        : \"D/I=23-112\"\n        }\n      }\n    ]\n  }\n}"
+    headers:
+      Access-Control-Allow-Headers:
+      - origin, x-requested-with, content-type, X-Release, queryid
+      Access-Control-Allow-Origin:
+      - '*'
+      Access-Control-Expose-Headers:
+      - X-Total-Results, X-Release, queryid, content-type, user-agent, cache-control,
+        etag, range
+      Cache-Control:
+      - public
+      Connection:
+      - close
+      Content-Disposition:
+      - attachment; filename="sparql-4A955F285DBAF63B42A83D67DD19124D.srj"
+      Content-Length:
+      - '7294'
+      Content-Type:
+      - application/sparql-results+json
+      Date:
+      - Tue, 21 Jul 2026 10:35:26 GMT
+      ETag:
+      - W/"2026_02"
+      Expires:
+      - Wed, 22 Jul 2026 10:35:26 GMT
+      Server:
+      - Apache
+      Strict-Transport-Security:
+      - max-age=31536001; includeSubDomains
+      Vary:
+      - Negotiate,Accept,Accept-Encoding,Content-Type
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Powered-By:
+      - sib.swiss
+      X-Release:
+      - '2026_02'
+      queryid:
+      - '-404'
+    status:
+      code: 200
+      message: ''
+- request:
+    body: '"1AO7,4ZDH,5E9D,5HHM,5HHO,5NHT,5NQK,6DKP,8RLT,8RLU,8RLV"'
+    headers:
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+    method: POST
+    uri: https://www.ebi.ac.uk/pdbe/api/v2/validation/summary_quality_scores/entry
+  response:
+    body:
+      string: '{"4zdh":{"geometry_quality":50.68,"data_quality":24.59,"overall_quality":35.58,"experiment_data_available":true},"5hhm":{"geometry_quality":38.38,"data_quality":9.16,"overall_quality":16.86,"experiment_data_available":true},"5nqk":{"geometry_quality":14.23,"data_quality":5.78,"overall_quality":8.98,"experiment_data_available":true},"5hho":{"geometry_quality":48.79,"data_quality":25.49,"overall_quality":35.72,"experiment_data_available":true},"8rlt":{"geometry_quality":54.54,"data_quality":32.0,"overall_quality":42.56,"experiment_data_available":true},"8rlv":{"geometry_quality":37.95,"data_quality":39.09,"overall_quality":38.4,"experiment_data_available":true},"8rlu":{"geometry_quality":36.76,"data_quality":24.8,"overall_quality":30.82,"experiment_data_available":true},"5nht":{"geometry_quality":12.53,"data_quality":8.28,"overall_quality":10.39,"experiment_data_available":true},"5e9d":{"geometry_quality":88.24,"data_quality":30.61,"overall_quality":50.34,"experiment_data_available":true},"6dkp":{"geometry_quality":44.39,"data_quality":10.73,"overall_quality":19.68,"experiment_data_available":true},"1ao7":{"geometry_quality":12.73,"data_quality":8.65,"overall_quality":10.71,"experiment_data_available":true}}'
+    headers:
+      Cache-Control:
+      - public, max-age=604800
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Length:
+      - '291'
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 21 Jul 2026 10:35:26 GMT
+      Strict-Transport-Security:
+      - max-age=0
+      Vary:
+      - Accept-Encoding,Origin
+      x-process-time:
+      - '0.11799263954162598'
+    status:
+      code: 200
+      message: OK
+version: 1
