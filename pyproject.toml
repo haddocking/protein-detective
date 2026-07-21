@@ -8,6 +8,7 @@ dependencies = [
     "aiofiles>=24.1.0",
     "aiohttp[speedups]>=3.13.4",
     "aiohttp-retry>=2.9.1",
+    "cyclopts>=4.16.1",
     "dask>=2025.5.1",
     "distributed>=2025.5.1",
     "duckdb>=1.2.2",
@@ -55,6 +56,7 @@ dev = [
     {include-group = "type"}
 ]
 docs = [
+    "cyclopts[mkdocs]>=4.5.4",
     "duckdb-engine>=0.17.0",
     "gemmi>=0.7.3",
     "ipykernel>=6.31.0",
@@ -65,7 +67,6 @@ docs = [
     "mkdocs-autoapi>=0.4.1",
     "mkdocs-jupyter>=0.25.1",
     "mkdocs-material>=9.6.22",
-    "mkdocs-rich-argparse>=0.1.2",
     "mkdocstrings[python]>=0.30.1",
     "nbconvert>=7.16.6"
 ]
