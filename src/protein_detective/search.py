@@ -10,10 +10,9 @@ from cyclopts._path_type import StdioPath
 from cyclopts.types import PositiveInt
 from protein_quest.cli.search import alphafold, complexes, pdbe, pdbe_quality, uniprot
 from protein_quest.uniprot import Query
-from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths, Program, record
+from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 
-from protein_detective.__version__ import __version__
-from protein_detective.common_cli import Common
+from protein_detective.common_cli import Common, write_ro_crate
 
 uniprot_group = Group.create_ordered("UniProt sub-search")
 alphafold_group = Group.create_ordered("AlphaFold sub-search")
@@ -184,22 +183,12 @@ def _write_ro_crate(
                 help=f"UniProt accessions of {uniprot_path} combined with uniprot accessions of interaction partners",
             )
         )
-    record(
-        program=Program(
-            name="protein-detective",
-            description="Detect proteins in EM density map",
-            version=__version__,
-            subcommands={
-                "search": Program(
-                    name="protein-detective search",
-                    description="Search for candidate protein structures",
-                )
-            },
-        ),
+    write_ro_crate(
+        session_dir,
+        start_time,
+        command_name="search",
+        command_description="Search for candidate protein structures",
         ioargs=ioargs,
-        dataset_license="CC-BY-4.0",
-        start_time=start_time,
-        crate_dir=session_dir,
     )
 
 

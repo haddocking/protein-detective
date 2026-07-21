@@ -1,8 +1,13 @@
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 from typing import Annotated
 
 from cyclopts import Group, Parameter
 from protein_quest.cli.common import setup_logging
+from rocrate_action_recorder import IOArgumentPaths, Program, record
+
+from protein_detective.__version__ import __version__
 
 common_group = Group("Common")
 
@@ -27,3 +32,40 @@ class Common:
     def __post_init__(self):
         """Automatically configure logging when Common instance is created."""
         setup_logging(verbose=self.verbose, quiet=self.quiet)
+
+
+def write_ro_crate(
+    session_dir: Path,
+    start_time: datetime,
+    /,
+    *,
+    command_name: str,
+    command_description: str,
+    ioargs: IOArgumentPaths,
+) -> None:
+    """Write RO-Crate metadata for the command execution.
+
+    Args:
+        session_dir: Directory where the RO-Crate metadata will be written.
+        start_time: The start time of the command execution.
+        command_name: Name of the command being executed.
+        command_description: Description of the command being executed.
+        ioargs: Input and output arguments for the command execution.
+    """
+    record(
+        program=Program(
+            name="protein-detective",
+            description="Detect proteins in EM density map",
+            version=__version__,
+            subcommands={
+                command_name: Program(
+                    name=f"protein-detective {command_name}",
+                    description=command_description,
+                )
+            },
+        ),
+        ioargs=ioargs,
+        dataset_license="CC-BY-4.0",
+        start_time=start_time,
+        crate_dir=session_dir,
+    )

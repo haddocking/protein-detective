@@ -44,7 +44,6 @@ def assert_crate(
     action_id: str | None = None,
     input_ids: set[str] | None = None,
     output_ids: set[str] | None = None,
-    instrument_id: str | None = None,
 ) -> tuple[ROCrate, dict]:
     # Assert copied from tests/adapters/test_cyclopts.py in rocrate_action_recorder repo
     crate_path = crate_dir / Metadata.BASENAME
@@ -58,8 +57,8 @@ def assert_crate(
     if action_id is not None:
         assert action["@id"] == action_id
         assert action["name"] == action_id
-    if instrument_id is not None:
-        assert action["instrument"]["@id"] == instrument_id
+
+    assert action["instrument"]["@id"] == f"protein-detective@{__version__}"
 
     input_ids = {i["@id"] for i in action.get("object", [])}
     if input_ids is not None:
@@ -122,5 +121,38 @@ def test_search(tmp_path: Path):
             "pdbe.csv",
             "pdbe-quality.json",
         },
-        instrument_id=f"protein-detective@{__version__}",
+    )
+
+
+@pytest.mark.vcr
+def test_retrieve(tmp_path: Path):
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    alphafold_csv = session_dir / "alphafold.csv"
+    alphafold_csv.write_text("af_id\nA0A0C5B5G6\n")
+
+    pdbe_csv = session_dir / "pdbe.csv"
+    pdbe_csv.write_text("pdb_id\n2Y29\n")
+
+    argv = ["retrieve", str(session_dir), "--alphafold-db-version", "6"]
+    cli(argv)
+
+    downloads_dir = session_dir / "downloads"
+    assert downloads_dir.exists()
+    assert list(downloads_dir.glob("**/*.cif.gz")) == [
+        downloads_dir / "alphafold" / "AF-A0A0C5B5G6-F1-model_v6.cif.gz",
+        downloads_dir / "pdbe" / "2y29_updated.cif.gz",
+    ]
+
+    assert_crate(
+        session_dir,
+        action_id=f"protein-detective retrieve {session_dir} --alphafold-db-version 6",
+        input_ids={
+            "alphafold.csv",
+            "pdbe.csv",
+        },
+        output_ids={
+            "downloads/alphafold",
+            "downloads/pdbe",
+        },
     )

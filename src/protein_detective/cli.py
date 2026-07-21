@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.traceback import install as install_rich_traceback
 
 from protein_detective.__version__ import __version__
+from protein_detective.retrieve import retrieve
 from protein_detective.search import search
 
 console = Console(stderr=True)
@@ -21,3 +22,4 @@ app.register_install_completion_command()
 install_rich_traceback(console=console, suppress=[cyclopts])
 
 app.command(search)
+app.command(retrieve)
