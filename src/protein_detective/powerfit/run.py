@@ -11,8 +11,7 @@ from powerfit_em.powerfit import (
 )
 from powerfit_em.powerfitter import PowerFitter
 
-from protein_detective.db import PowerfitOptions
-from protein_detective.powerfit.options import parse_first_visible_gpu_id
+from protein_detective.powerfit.options import PowerfitOptions, parse_first_visible_gpu_id
 
 logger = logging.getLogger(__name__)
 
