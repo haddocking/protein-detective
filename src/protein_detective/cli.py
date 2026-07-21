@@ -1,6 +1,5 @@
 """CLI entry point for protein-detective."""
 
-
 import cyclopts
 from cyclopts import App
 from rich.console import Console
