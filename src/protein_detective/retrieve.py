@@ -10,7 +10,7 @@ from protein_quest.cli.retrieve import (
 )
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 
-from protein_detective.common_cli import write_ro_crate
+from protein_detective.common_cli import Common, write_ro_crate
 
 
 def _write_ro_crate(
@@ -63,6 +63,7 @@ def retrieve(
     /,
     *,
     alphafold_db_version: str = "6",
+    _: Common | None = None,
 ) -> None:
     """Retrieve structure files from AlphaFold and PDBe.
 
