@@ -1,6 +1,7 @@
 import csv
 import logging
 import shutil
+from datetime import UTC, datetime
 from pathlib import Path
 from textwrap import dedent
 
@@ -10,7 +11,9 @@ from duckdb import connect
 from pandas import DataFrame
 from protein_quest.structure.formats import read_structure
 from protein_quest.structure.uniprot import structure2uniprot_accessions
+from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 
+from protein_detective.common_cli import write_ro_crate
 from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.powerfit.parallel import build_gpu_cycler, configure_dask_scheduler, detect_available_gpus
 from protein_detective.powerfit.run import clear_worker_cache, powerfit_worker
@@ -103,6 +106,47 @@ def powerfit_commands(
     return commands, powerfit_run_id
 
 
+def _write_ro_crate4runs(
+    session_dir: Path,
+    start_time: datetime,
+    /,
+    *,
+    density_map_target: Path,
+    structure_files_root: Path,
+    powerfit_run_dir: Path,
+) -> None:
+    ioargs = IOArgumentPaths(
+        input_files=[
+            IOArgumentPath(
+                name="density_map_target",
+                path=density_map_target,
+                help="Density map used for fitting.",
+            ),
+        ],
+        input_dirs=[
+            IOArgumentPath(
+                name="structure_files_root",
+                path=structure_files_root,
+                help="Directory containing the structure files used for fitting.",
+            ),
+        ],
+        output_dirs=[
+            IOArgumentPath(
+                name="powerfit_run_dir",
+                path=powerfit_run_dir,
+                help="Directory where the PowerFit results were stored.",
+            ),
+        ],
+    )
+    write_ro_crate(
+        session_dir,
+        start_time,
+        command_name="powerfit run",
+        command_description="Run PowerFit on structure files",
+        ioargs=ioargs,
+    )
+
+
 def powerfit_runs(
     target: Path,
     resolution: float,
@@ -124,6 +168,7 @@ def powerfit_runs(
         scheduler_address: Address of the Dask scheduler to use. If not provided, will create a local Dask cluster.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
+    start_time = datetime.now(tz=UTC)
     powerfit_run_id, powerfit_run_root_dir, density_map_target, structure_files = _initialize_powerfit_run(
         session_dir, target, powerfit_run_id=powerfit_run_id
     )
@@ -151,6 +196,16 @@ def powerfit_runs(
         progress(futures)
 
         client.gather(futures)
+
+    structure_files_root = structure_files[0].parent
+    powerfit_run_dir = powerfit_run_root_dir / powerfit_run_id
+    _write_ro_crate4runs(
+        session_dir,
+        start_time,
+        density_map_target=density_map_target,
+        structure_files_root=structure_files_root,
+        powerfit_run_dir=powerfit_run_dir,
+    )
 
     return powerfit_run_id
 
@@ -271,3 +326,31 @@ def powerfit_fit_models(
     else:
         solutions = all_solutions.head(top)
     return fit_models(solutions, powerfit_root_run_dir)
+
+
+def density_map_of_run_dir(run_dir: Path) -> Path:
+    for potential_file in run_dir.iterdir():
+        if potential_file.is_file():
+            # TODO check for extensions
+            return potential_file
+    msg = f"No density map found in {run_dir}"
+    raise FileNotFoundError(msg)
+
+
+def powerfit_list_runs(session_dir: Path) -> list[tuple[str, str, Path]]:
+    """List all PowerFit runs in the session directory.
+
+    Args:
+        session_dir: Directory containing the session data.
+
+    Returns:
+        A list of tuples containing the run ID, density map path, and directory path for each PowerFit run.
+    """
+    powerfit_root_dir = session_dir / "powerfit"
+    runs = []
+    for run_dir in sorted(powerfit_root_dir.iterdir()):
+        if run_dir.is_dir():
+            density_map = density_map_of_run_dir(run_dir)
+            # TODO from ro-crate-metadata.json parse command used to create run_dir
+            runs.append((run_dir.name, str(density_map), run_dir.relative_to(session_dir)))
+    return runs

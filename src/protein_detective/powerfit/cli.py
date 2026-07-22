@@ -4,10 +4,17 @@ from typing import Annotated
 
 from cyclopts import App, Parameter, validators
 from cyclopts.types import PositiveFloat, StdioPath
+from rich.table import Table
 
 from protein_detective.common_cli import Common, rprint
 from protein_detective.powerfit.options import PowerfitOptions, process_group
-from protein_detective.powerfit.workflow import powerfit_commands, powerfit_fit_models, powerfit_report, powerfit_runs
+from protein_detective.powerfit.workflow import (
+    powerfit_commands,
+    powerfit_fit_models,
+    powerfit_list_runs,
+    powerfit_report,
+    powerfit_runs,
+)
 
 powerfit_app = App(name="powerfit", help="PowerFit related commands")
 
@@ -96,8 +103,6 @@ def run(
     )
     rprint(f"PowerFit run completed with ID: {powerfit_run_id}. Use this ID for reporting or fitting models.")
 
-    # TODO rocrate
-
 
 @powerfit_app.command
 def report(
@@ -173,3 +178,27 @@ def fit_models(
         fitted.to_csv(sys.stdout, index=False)
     else:
         fitted.to_csv(output, index=False)
+
+
+@powerfit_app.command
+def list_runs(
+    session_dir: Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=True, exists=True))],
+    /,
+):
+    """List all PowerFit runs in the session directory.
+
+    Args:
+        session_dir: Directory containing the session data.
+    """
+    runs = powerfit_list_runs(session_dir)
+    if len(runs) == 0:
+        rprint("No PowerFit runs found.")
+        return
+
+    table = Table(title="PowerFit runs")
+    table.add_column("ID", justify="right", style="cyan")
+    table.add_column("Density map (copy)", style="green")
+    table.add_column("Directory", style="magenta")
+    for row in runs:
+        table.add_row(row[0], row[1], str(row[2]))
+    rprint(table)
