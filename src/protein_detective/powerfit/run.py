@@ -21,12 +21,17 @@ pf: PowerFitter | None = None
 
 
 def powerfit_worker(
-    template_structure: Path, density_map_target: Path, powerfit_run_root_dir: Path, options: PowerfitOptions
+    template_structure: Path,
+    resolution: float,
+    density_map_target: Path,
+    powerfit_run_root_dir: Path,
+    options: PowerfitOptions,
 ):
     """Worker function for running PowerFit on a template structure file.
 
     Args:
         template_structure: Path to the template structure file to process
+        resolution: Resolution of the density map in Angstrom
         density_map_target: Path to the density map file
         powerfit_run_root_dir: Root directory for PowerFit results
         options: PowerFit options
@@ -55,7 +60,7 @@ def powerfit_worker(
         with density_map_target.open("rb") as f:
             target = setup_target(
                 f,
-                options.resolution,
+                resolution,
                 options.no_resampling,
                 options.resampling_rate,
                 options.no_trimming,
@@ -66,7 +71,7 @@ def powerfit_worker(
 
         with template_structure.open("rb") as f:
             _, template, mask, z_sigma = setup_template_structure(
-                f, None, target, options.resolution, options.core_weighted
+                f, None, target, resolution, not options.no_core_weighted
             )
 
         pf = PowerFitter(
@@ -75,7 +80,7 @@ def powerfit_worker(
             template,
             mask,
             nproc=options.nproc,
-            laplace=options.laplace,
+            laplace=not options.no_laplace,
             queue=opencl_queue,
             cuda_stream=cuda_stream,
         )
@@ -83,7 +88,7 @@ def powerfit_worker(
         logger.info("Reusing cached PowerFitter instance on worker.")
         with template_structure.open("rb") as f:
             _, template, mask, z_sigma = setup_template_structure(
-                f, None, pf._target, options.resolution, options.core_weighted
+                f, None, pf._target, resolution, not options.no_core_weighted
             )
         pf.set_template(template, mask)
 

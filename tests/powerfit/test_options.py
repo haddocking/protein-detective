@@ -13,7 +13,7 @@ from protein_detective.powerfit.options import PowerfitOptions, parse_first_visi
     ],
 )
 def test_format_gpu_device(backend, gpu_id, expected):
-    options = PowerfitOptions(target=Path("target.mrc"), resolution=5.0, gpu_backend=backend)
+    options = PowerfitOptions(gpu_backend=backend)
     assert options.format_gpu_device(gpu_id) == expected
 
 
@@ -35,9 +35,10 @@ def test_parse_first_visible_gpu_id(visible_devices, expected):
 
 
 def test_to_command_uses_formatted_gpu_device_for_backend():
-    options = PowerfitOptions(target=Path("target.mrc"), resolution=5.0, gpu=1, gpu_backend="cuda")
+    options = PowerfitOptions(gpu_backend="cuda", gpu=True)
     command = options.to_command(
         density_map=Path("density.mrc"),
+        resolution=3.0,
         template=Path("template.pdb"),
         out_dir=Path("out"),
         gpu_cycler=(gpu_id for gpu_id in [3]),

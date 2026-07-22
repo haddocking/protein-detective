@@ -7,7 +7,7 @@ from rocrate.metadata import BASENAME
 from rocrate.rocrate import ROCrate
 
 from protein_detective.__version__ import __version__
-from tests.helpers import cli
+from tests.helpers import cli, fake_run_retrieve, fake_setup_retrieve
 
 
 def test_app_help(capsys: pytest.CaptureFixture[str]):
@@ -115,22 +115,9 @@ def test_search(tmp_path: Path):
     )
 
 
-def setup_retrieve(tmp_path):
-    session_dir = tmp_path / "session"
-    session_dir.mkdir()
-    alphafold_csv = session_dir / "alphafold.csv"
-    alphafold_csv.write_text("af_id\nA0A0C5B5G6\n")
-
-    pdbe_csv = session_dir / "pdbe.csv"
-    pdbe_csv.write_text("pdb_id,uniprot_accession,uniprot_chains,chain\n2Y29,P05067,A=687-692,A\n")
-
-    argv = ["retrieve", str(session_dir), "--alphafold-db-version", "6"]
-    return session_dir, argv
-
-
 @pytest.mark.vcr
 def test_retrieve(tmp_path: Path):
-    session_dir, argv = setup_retrieve(tmp_path)
+    session_dir, argv = fake_setup_retrieve(tmp_path)
     cli(argv)
 
     downloads_dir = session_dir / "downloads"
@@ -164,11 +151,9 @@ def test_filter_help(capsys: pytest.CaptureFixture[str]):
 @pytest.mark.vcr
 @pytest.mark.default_cassette("test_retrieve.yaml")
 def test_filter(tmp_path: Path):
-    session_dir, argv = setup_retrieve(tmp_path)
+    session_dir = fake_run_retrieve(tmp_path)
     pdbe_quality_json = session_dir / "pdbe-quality.json"
     pdbe_quality_json.write_text("{}")
-
-    cli(argv)
 
     argv = [
         "filter",
