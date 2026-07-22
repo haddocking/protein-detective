@@ -1,6 +1,7 @@
 import csv
 import logging
 import shutil
+from collections.abc import Generator
 from datetime import UTC, datetime
 from pathlib import Path
 from textwrap import dedent
@@ -354,3 +355,20 @@ def powerfit_list_runs(session_dir: Path) -> list[tuple[str, str, Path]]:
             # TODO from ro-crate-metadata.json parse command used to create run_dir
             runs.append((run_dir.name, str(density_map), run_dir.relative_to(session_dir)))
     return runs
+
+
+def list_lcc_files(session_dir: Path) -> Generator[tuple[str, str, Path]]:
+    """List all lcc.mrc files in the PowerFit runs in the session directory.
+
+    Args:
+        session_dir: Directory containing the session data.
+
+    Yields:
+        Tuples containing the run ID, structure name, and path to the lcc.mrc
+    """
+
+    powerfit_root_dir = session_dir / "powerfit"
+    for lcc_file in powerfit_root_dir.glob("**/lcc.mrc"):
+        structure = lcc_file.parent.name
+        run_dir = lcc_file.parent.parent.name
+        yield (run_dir, structure, lcc_file.relative_to(session_dir))

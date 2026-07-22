@@ -9,6 +9,7 @@ from rich.table import Table
 from protein_detective.common_cli import Common, rprint
 from protein_detective.powerfit.options import PowerfitOptions, process_group
 from protein_detective.powerfit.workflow import (
+    list_lcc_files,
     powerfit_commands,
     powerfit_fit_models,
     powerfit_list_runs,
@@ -201,4 +202,29 @@ def list_runs(
     table.add_column("Directory", style="magenta")
     for row in runs:
         table.add_row(row[0], row[1], str(row[2]))
+    rprint(table)
+
+
+@powerfit_app.command
+def list_lcc(
+    session_dir: Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=True, exists=True))],
+    /,
+):
+    """List Local Cross Validation (lcc.mrc) files for all PowerFit runs.
+
+    Args:
+        session_dir: Directory containing the session data.
+    """
+    lcc_files = list_lcc_files(session_dir)
+
+    if not lcc_files:
+        rprint("[yellow]No lcc.mrc files found. Please run at least one powerfit.[/yellow]")
+        return
+
+    table = Table(title="PowerFit LCC files")
+    table.add_column("Run ID", justify="right", style="cyan")
+    table.add_column("Structure", style="magenta")
+    table.add_column("LCC file", style="green")
+    for run_id, structure, lcc_file in lcc_files:
+        table.add_row(run_id, structure, str(lcc_file))
     rprint(table)
