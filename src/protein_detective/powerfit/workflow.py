@@ -1,15 +1,33 @@
+import csv
 import logging
 import shutil
 from pathlib import Path
+from textwrap import dedent
 
 from dask.distributed import Client, progress
 from distributed.deploy.cluster import Cluster
+from duckdb import connect
+from protein_quest.structure.formats import read_structure
+from protein_quest.structure.uniprot import structure2uniprot_accessions
 
 from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.powerfit.parallel import build_gpu_cycler, configure_dask_scheduler, detect_available_gpus
 from protein_detective.powerfit.run import clear_worker_cache, powerfit_worker
 
 logger = logging.getLogger(__name__)
+
+
+def _find_structure_files(session_dir: Path) -> list[Path]:
+    combined_filter_output = session_dir / "combined_output"
+    ss_output_dir = session_dir / "secondary_structure"
+    structure_files_dir = ss_output_dir if ss_output_dir.exists() else combined_filter_output
+    if not structure_files_dir.exists():
+        msg = (
+            f"Structure files directory '{structure_files_dir}' does not exist. "
+            "Please run `protein-detective filter` command."
+        )
+        raise FileNotFoundError(msg)
+    return sorted(structure_files_dir.glob("*"))
 
 
 def _initialize_powerfit_run(
@@ -33,16 +51,7 @@ def _initialize_powerfit_run(
     shutil.copy(density_map, density_map_target)
     logger.info(f"Copied density map from {density_map} to {density_map_target}")
 
-    combined_filter_output = session_dir / "combined_output"
-    ss_output_dir = session_dir / "secondary_structure"
-    structure_files_dir = ss_output_dir if ss_output_dir.exists() else combined_filter_output
-    if not structure_files_dir.exists():
-        msg = (
-            f"Structure files directory '{structure_files_dir}' does not exist. "
-            "Please run `protein-detective filter` command."
-        )
-        raise FileNotFoundError(msg)
-    structure_files = sorted(structure_files_dir.glob("*"))
+    structure_files = _find_structure_files(session_dir)
 
     return powerfit_run_id, powerfit_root_dir, density_map_target, structure_files
 
@@ -79,7 +88,7 @@ def powerfit_commands(
         raise ValueError(msg)
     gpu_cycler = build_gpu_cycler(workers_per_gpu=1, gpu_ids=gpu_ids)
     for structure_file in structure_files:
-        result_dir = powerfit_run_root_dir / powerfit_run_id / structure_file.stem
+        result_dir = powerfit_run_root_dir / powerfit_run_id / structure_file.name
         command = options.to_command(
             density_map=density_map_target,
             resolution=resolution,
@@ -90,6 +99,7 @@ def powerfit_commands(
         commands.append(command)
 
     return commands, powerfit_run_id
+
 
 def powerfit_runs(
     target: Path,
@@ -113,7 +123,7 @@ def powerfit_runs(
     """
     session_dir.mkdir(parents=True, exist_ok=True)
     powerfit_run_id, powerfit_run_root_dir, density_map_target, structure_files = _initialize_powerfit_run(
-            session_dir, target, powerfit_run_id=powerfit_run_id
+        session_dir, target, powerfit_run_id=powerfit_run_id
     )
     with (
         configure_dask_scheduler(
@@ -141,3 +151,93 @@ def powerfit_runs(
         client.gather(futures)
 
     return powerfit_run_id
+
+
+def make_structures_df(session_dir: Path) -> list[dict]:
+    structure_files = _find_structure_files(session_dir)
+    data: list[dict[str, str]] = []
+    for structure_file in structure_files:
+        name = structure_file.name
+        structure = read_structure(structure_file)
+        pdb_id = structure.name
+        uniprot_accession = next(iter(structure2uniprot_accessions(structure)))
+        data.append(
+            {
+                "structure_file": str(structure_file),
+                "structure": name,
+                "pdb_id": pdb_id,
+                "uniprot_accession": uniprot_accession,
+            }
+        )
+    return data
+
+
+def create_structures_csv(session_dir, structures_lookup_csv):
+    structures_data = make_structures_df(session_dir)
+    with structures_lookup_csv.open("wt", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=structures_data[0].keys())
+        writer.writeheader()
+        writer.writerows(structures_data)
+
+
+def powerfit_report(
+    session_dir: Path,
+    powerfit_run_id: str | None = None,
+):
+    structures_lookup_csv = session_dir / "powerfit" / "structures_lookup.csv"
+    if not structures_lookup_csv.exists():
+        create_structures_csv(session_dir, structures_lookup_csv)
+
+    solutions = session_dir / "powerfit" / "*" / "*" / "solutions.out"
+    if powerfit_run_id:
+        solutions = session_dir / "powerfit" / powerfit_run_id / "*" / "solutions.out"
+    with connect() as con:
+        query = dedent("""\
+        SELECT
+            powerfit_run_id,
+            structure,
+            rank,
+            cc,
+            fishz,
+            relz,
+            translation,
+            rotation,
+            structure_file AS template_file,
+            uniprot_accession,
+            pdb_id
+        FROM (
+            SELECT
+                parse_path(filename)[-3] AS powerfit_run_id,
+                parse_path(filename)[-2] AS structure,
+                rank, cc, fishz, relz,
+                [x,y,z]::FLOAT[3] AS translation,
+                [a11, a12, a13, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation,
+            FROM
+                read_csv(
+                    ?,
+                    filename=True, normalize_names=True,
+                    columns={
+                        'rank': 'INTEGER',
+                        'cc': 'FLOAT',
+                        'fishz': 'FLOAT',
+                        'relz': 'FLOAT',
+                        'x': 'FLOAT',
+                        'y': 'FLOAT',
+                        'z': 'FLOAT',
+                        'a11': 'FLOAT',
+                        'a12': 'FLOAT',
+                        'a13': 'FLOAT',
+                        'a21': 'FLOAT',
+                        'a22': 'FLOAT',
+                        'a23': 'FLOAT',
+                        'a31': 'FLOAT',
+                        'a32': 'FLOAT',
+                        'a33': 'FLOAT',
+                    }
+                )
+            ) AS solutions
+            JOIN read_csv(?) AS structures USING (structure)
+        ORDER BY cc DESC, rank ASC
+        """)
+        con.execute(query, (str(solutions), str(structures_lookup_csv)))
+        return con.df()

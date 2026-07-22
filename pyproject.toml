@@ -46,7 +46,7 @@ dependencies = [
     "rich>=14.0.0",
     "rich-argparse>=1.7.1",
     "rocrate-action-recorder>=0.5.3",
-    "tqdm>=4.67.1"
+    "tqdm>=4.67.1",
 ]
 
 [project.urls]
@@ -78,6 +78,7 @@ test = [
     "pytest-asyncio>=1.1.0",
     "pytest-recording>=0.13.4",
     "rocrate==0.15.0",
+    "gemmi>=0.7.5",
 ]
 dev = [
     {include-group = "test"},

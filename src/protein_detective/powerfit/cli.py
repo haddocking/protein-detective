@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -6,7 +7,7 @@ from cyclopts.types import PositiveFloat, StdioPath
 
 from protein_detective.common_cli import Common, rprint
 from protein_detective.powerfit.options import PowerfitOptions, process_group
-from protein_detective.powerfit.workflow import powerfit_commands, powerfit_runs
+from protein_detective.powerfit.workflow import powerfit_commands, powerfit_report, powerfit_runs
 
 powerfit_app = App(name="powerfit", help="PowerFit related commands")
 
@@ -94,3 +95,46 @@ def run(
         scheduler_address=scheduler_address,
     )
     rprint(f"PowerFit run completed with ID: {powerfit_run_id}. Use this ID for reporting or fitting models.")
+
+
+@powerfit_app.command
+def report(
+    session_dir: Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=True, exists=True))],
+    /,
+    *,
+    powerfit_run_id: str | None = None,
+    top: int = 1,
+    no_group_by_structure: Annotated[bool, Parameter(negative="")] = False,
+    output: StdioPath | None = None,
+):
+    """Generate a report of the best PowerFit solutions.
+
+    Args:
+        session_dir: Session directory containing PowerFit results
+        powerfit_run_id: ID of the PowerFit run to report on
+        top: Number of top solutions to report per structure.
+        no_group_by_structure: If absent, group solutions by structure.
+            If present, top will be overall instead of per structure.
+        output: Output file for solutions table. If set to '-' (default) will print to stdout.
+    """
+    if output is None:
+        output = StdioPath("-")
+    group_by_structure = not no_group_by_structure
+    all_solutions = powerfit_report(session_dir, powerfit_run_id)
+    if group_by_structure:  # noqa: SIM108 ternary is unclear
+        solutions = all_solutions.groupby("structure").head(top)
+    else:
+        solutions = all_solutions.head(top)
+
+    def array_to_str(arr):
+        return ":".join(map(str, arr.flatten()))
+
+    # Convert translation and rotation to : delimited string for CSV output
+    solutions.loc[:, "translation"] = solutions["translation"].apply(array_to_str)
+    solutions.loc[:, "rotation"] = solutions["rotation"].apply(array_to_str)
+
+    if output.is_stdio:
+        # Pandas does not like StdioPath
+        solutions.to_csv(sys.stdout, index=False)
+    else:
+        solutions.to_csv(output, index=False)

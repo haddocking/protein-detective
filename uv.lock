@@ -2047,6 +2047,7 @@ cuda13 = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "gemmi" },
     { name = "pyrefly" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -2072,6 +2073,7 @@ docs = [
     { name = "nbconvert" },
 ]
 test = [
+    { name = "gemmi" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -2111,6 +2113,7 @@ provides-extras = ["cuda12", "cuda13"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "gemmi", specifier = ">=0.7.5" },
     { name = "pyrefly", specifier = ">=1.1.1" },
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", specifier = ">=1.1.0" },
@@ -2136,6 +2139,7 @@ docs = [
     { name = "nbconvert", specifier = ">=7.16.6" },
 ]
 test = [
+    { name = "gemmi", specifier = ">=0.7.5" },
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", specifier = ">=1.1.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
