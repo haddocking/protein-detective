@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.traceback import install as install_rich_traceback
 
 from protein_detective.__version__ import __version__
+from protein_detective.powerfit.cli import powerfit_app
 from protein_detective.powerfit.filter import run_filter
 from protein_detective.retrieve import retrieve
 from protein_detective.search import search
@@ -25,3 +26,4 @@ install_rich_traceback(console=console, suppress=[cyclopts])
 app.command(search)
 app.command(retrieve)
 app.command(run_filter, name="filter")
+app.command(powerfit_app)

@@ -208,6 +208,8 @@ project-includes = [
     "**/*.py*",
     # "**/*.ipynb",
 ]
+# Needed for tests/helpers.py
+enable-fallback-search-path = true
 
 [tool.pytest]
 minversion = "9.0"

@@ -1,6 +1,5 @@
 import csv
 import json
-import sys
 from pathlib import Path
 
 import pytest
@@ -8,18 +7,7 @@ from rocrate.metadata import BASENAME
 from rocrate.rocrate import ROCrate
 
 from protein_detective.__version__ import __version__
-from protein_detective.cli import app
-
-
-def cli(tokens: list[str]):
-    # Replace default print_non_int_sys_exit result action,
-    # with action that does not throw SystemExit.
-    # Also mock sys.argv to simulate CLI invocation.
-    old_argv = sys.argv
-    sys.argv = ["protein-detective", *tokens]
-    result = app(tokens, result_action="return_value")
-    sys.argv = old_argv
-    return result
+from tests.helpers import cli
 
 
 def test_app_help(capsys: pytest.CaptureFixture[str]):
