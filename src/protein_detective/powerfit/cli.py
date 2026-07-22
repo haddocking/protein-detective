@@ -4,9 +4,9 @@ from typing import Annotated
 from cyclopts import App, Parameter, validators
 from cyclopts.types import PositiveFloat, StdioPath
 
-from protein_detective.common_cli import Common
+from protein_detective.common_cli import Common, rprint
 from protein_detective.powerfit.options import PowerfitOptions, process_group
-from protein_detective.powerfit.workflow import powerfit_commands
+from protein_detective.powerfit.workflow import powerfit_commands, powerfit_runs
 
 powerfit_app = App(name="powerfit", help="PowerFit related commands")
 
@@ -85,3 +85,12 @@ def run(
     """
     if options is None:
         options = PowerfitOptions()
+    powerfit_runs(
+        target,
+        resolution,
+        session_dir,
+        options=options,
+        powerfit_run_id=powerfit_run_id,
+        scheduler_address=scheduler_address,
+    )
+    rprint(f"PowerFit run completed with ID: {powerfit_run_id}. Use this ID for reporting or fitting models.")

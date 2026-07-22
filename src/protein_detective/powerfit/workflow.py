@@ -2,8 +2,12 @@ import logging
 import shutil
 from pathlib import Path
 
+from dask.distributed import Client, progress
+from distributed.deploy.cluster import Cluster
+
 from protein_detective.powerfit.options import PowerfitOptions
-from protein_detective.powerfit.parallel import build_gpu_cycler, detect_available_gpus
+from protein_detective.powerfit.parallel import build_gpu_cycler, configure_dask_scheduler, detect_available_gpus
+from protein_detective.powerfit.run import clear_worker_cache, powerfit_worker
 
 logger = logging.getLogger(__name__)
 
@@ -86,3 +90,54 @@ def powerfit_commands(
         commands.append(command)
 
     return commands, powerfit_run_id
+
+def powerfit_runs(
+    target: Path,
+    resolution: float,
+    session_dir: Path,
+    /,
+    *,
+    options: PowerfitOptions,
+    powerfit_run_id: str | None = None,
+    scheduler_address: str | Cluster | None = None,
+):
+    """Run PowerFit on PDB files in the session directory and store results.
+
+    Args:
+        target: Target density map to fit the model in. Data should either be in CCP4 or MRC format
+        resolution: Resolution of map in Angstrom
+        session_dir: Session directory for input and output
+        options: Powerfit options.
+        powerfit_run_id: ID of the PowerFit run to use. If not provided, will autoincrement based on existing runs.
+        scheduler_address: Address of the Dask scheduler to use. If not provided, will create a local Dask cluster.
+    """
+    session_dir.mkdir(parents=True, exist_ok=True)
+    powerfit_run_id, powerfit_run_root_dir, density_map_target, structure_files = _initialize_powerfit_run(
+            session_dir, target, powerfit_run_id=powerfit_run_id
+    )
+    with (
+        configure_dask_scheduler(
+            scheduler_address,
+            name=f"powerfit-run-{powerfit_run_id}",
+            workers_per_gpu=options.gpu,
+            nproc=options.nproc,
+            gpu_backend=options.gpu_backend,
+        ) as scheduler_address,
+        Client(scheduler_address) as client,
+    ):
+        logger.info(f"Follow progress on dask dashboard at: {client.dashboard_link}")
+        client.run(clear_worker_cache)
+        futures = client.map(
+            powerfit_worker,
+            structure_files,
+            density_map_target=density_map_target,
+            resolution=resolution,
+            powerfit_run_root_dir=powerfit_run_root_dir,
+            options=options,
+        )
+
+        progress(futures)
+
+        client.gather(futures)
+
+    return powerfit_run_id
