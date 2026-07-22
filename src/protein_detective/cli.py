@@ -2,17 +2,14 @@
 
 import cyclopts
 from cyclopts import App
-from rich.console import Console
 from rich.traceback import install as install_rich_traceback
 
 from protein_detective.__version__ import __version__
+from protein_detective.common_cli import console
 from protein_detective.powerfit.cli import powerfit_app
 from protein_detective.powerfit.filter import run_filter
 from protein_detective.retrieve import retrieve
 from protein_detective.search import search
-
-console = Console(stderr=True)
-rprint = console.print
 
 app = App(
     name="protein-detective",

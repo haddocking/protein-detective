@@ -5,10 +5,13 @@ from typing import Annotated
 
 from cyclopts import Group, Parameter
 from protein_quest.cli.common import setup_logging
+from rich.console import Console
 from rocrate_action_recorder import IOArgumentPaths, Program, record
 
 from protein_detective.__version__ import __version__
 
+console = Console(stderr=True)
+rprint = console.print
 common_group = Group("Common")
 
 
