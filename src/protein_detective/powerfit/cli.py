@@ -7,7 +7,7 @@ from cyclopts.types import PositiveFloat, StdioPath
 
 from protein_detective.common_cli import Common, rprint
 from protein_detective.powerfit.options import PowerfitOptions, process_group
-from protein_detective.powerfit.workflow import powerfit_commands, powerfit_report, powerfit_runs
+from protein_detective.powerfit.workflow import powerfit_commands, powerfit_fit_models, powerfit_report, powerfit_runs
 
 powerfit_app = App(name="powerfit", help="PowerFit related commands")
 
@@ -96,6 +96,8 @@ def run(
     )
     rprint(f"PowerFit run completed with ID: {powerfit_run_id}. Use this ID for reporting or fitting models.")
 
+    # TODO rocrate
+
 
 @powerfit_app.command
 def report(
@@ -138,3 +140,36 @@ def report(
         solutions.to_csv(sys.stdout, index=False)
     else:
         solutions.to_csv(output, index=False)
+
+
+@powerfit_app.command
+def fit_models(
+    session_dir: Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=True, exists=True))],
+    /,
+    *,
+    powerfit_run_id: str | None = None,
+    top: int = 1,
+    no_group_by_structure: Annotated[bool, Parameter(negative="")] = False,
+    output: StdioPath | None = None,
+):
+    """Fit models to the best PowerFit solutions.
+
+    Args:
+        session_dir: Session directory containing PowerFit results
+        powerfit_run_id: ID of the PowerFit run to report on
+        top: Number of top solutions to fit per structure.
+        no_group_by_structure: If absent, group solutions by structure.
+            If present, top will be overall instead of per structure.
+        output: Output file for fitted models table. If set to '-' (default) will print to stdout.
+
+    """
+    if output is None:
+        output = StdioPath("-")
+    group_by_structure = not no_group_by_structure
+
+    fitted = powerfit_fit_models(session_dir, powerfit_run_id, top, group_by_structure=group_by_structure)
+    if output.is_stdio:
+        # Pandas does not like StdioPath
+        fitted.to_csv(sys.stdout, index=False)
+    else:
+        fitted.to_csv(output, index=False)

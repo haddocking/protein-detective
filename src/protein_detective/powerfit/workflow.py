@@ -7,12 +7,14 @@ from textwrap import dedent
 from dask.distributed import Client, progress
 from distributed.deploy.cluster import Cluster
 from duckdb import connect
+from pandas import DataFrame
 from protein_quest.structure.formats import read_structure
 from protein_quest.structure.uniprot import structure2uniprot_accessions
 
 from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.powerfit.parallel import build_gpu_cycler, configure_dask_scheduler, detect_available_gpus
 from protein_detective.powerfit.run import clear_worker_cache, powerfit_worker
+from protein_detective.powerfit.solution import fit_models
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +188,7 @@ def powerfit_report(
 ):
     structures_lookup_csv = session_dir / "powerfit" / "structures_lookup.csv"
     if not structures_lookup_csv.exists():
+        # TODO create earlier or record in rocrate
         create_structures_csv(session_dir, structures_lookup_csv)
 
     solutions = session_dir / "powerfit" / "*" / "*" / "solutions.out"
@@ -241,3 +244,30 @@ def powerfit_report(
         """)
         con.execute(query, (str(solutions), str(structures_lookup_csv)))
         return con.df()
+
+
+def powerfit_fit_models(
+    session_dir: Path,
+    powerfit_run_id: str | None = None,
+    top: int = 1,
+    group_by_structure: bool = True,
+) -> DataFrame:
+    """Fit models using PowerFit solutions.
+
+    Args:
+        session_dir: Directory containing the session data.
+        powerfit_run_id: Optional ID of the PowerFit run to report. If None, reports over all runs.
+        top: Number of top solutions to fit.
+        group_by_structure: Whether to group solutions by structure before selecting top solutions.
+
+    Returns:
+        A DataFrame containing the fitted models. See protein_detective.db.save_fitted_models function
+            for details.
+    """
+    all_solutions = powerfit_report(session_dir, powerfit_run_id)
+    powerfit_root_run_dir = session_dir / "powerfit"
+    if group_by_structure:  # noqa: SIM108 ternary is unclear
+        solutions = all_solutions.groupby("structure").head(top)
+    else:
+        solutions = all_solutions.head(top)
+    return fit_models(solutions, powerfit_root_run_dir)
