@@ -78,7 +78,7 @@ def fake_archive_em_structure(pdb_id: str, output: Path, uniprot_accession: str 
     structure.add_model(model)
     structure.setup_entities()
     structure.assign_subchains()
-    structure = add_uniprot_accessions2structure(
+    structure, _injected, _uniprot_chains = add_uniprot_accessions2structure(
         structure,
         {
             pdb_id: {
@@ -140,7 +140,7 @@ def fake_solutions(session_dir: Path, powerfit_run_id: str) -> list[Path]:
 
 def assert_solutions(output: str, expected: list[dict[str, str]]) -> None:
     solutions = list(csv.DictReader(output.splitlines()))
-    trimmed_keys = {"powerfit_run_id", "structure", "rank", "cc", "uniprot_accession", "pdb_id", "template_file"}
+    trimmed_keys = {"powerfit_run_id", "structure", "rank", "cc", "uniprot_accessions", "pdb_id", "template_file"}
     trimmed_solutions = [{k: v for k, v in s.items() if k in trimmed_keys} for s in solutions]
     assert trimmed_solutions == expected
 
@@ -148,7 +148,6 @@ def assert_solutions(output: str, expected: list[dict[str, str]]) -> None:
 class TestHandlerPowerfitReport:
     def test_defaults(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
         session_dir = tmp_path
-        template_dir = session_dir / "combined_output"
         powerfit_run_id = "run_001"
         fake_solutions(session_dir, powerfit_run_id)
 
@@ -166,8 +165,8 @@ class TestHandlerPowerfitReport:
                 "structure": "3abc.cif.gz",
                 "rank": "1",
                 "cc": "0.499",
-                "template_file": str(template_dir / "3abc.cif.gz"),
-                "uniprot_accession": "P12345",
+                "template_file": "combined_output/3abc.cif.gz",
+                "uniprot_accessions": "P12345",
                 "pdb_id": "3abc",
             },
             {
@@ -175,8 +174,8 @@ class TestHandlerPowerfitReport:
                 "structure": "2abc.cif.gz",
                 "rank": "1",
                 "cc": "0.442",
-                "template_file": str(template_dir / "2abc.cif.gz"),
-                "uniprot_accession": "P42424",
+                "template_file": "combined_output/2abc.cif.gz",
+                "uniprot_accessions": "P42424",
                 "pdb_id": "2abc",
             },
             {
@@ -184,8 +183,8 @@ class TestHandlerPowerfitReport:
                 "structure": "1abc.cif.gz",
                 "rank": "1",
                 "cc": "0.399",
-                "template_file": str(template_dir / "1abc.cif.gz"),
-                "uniprot_accession": "P67890",
+                "template_file": "combined_output/1abc.cif.gz",
+                "uniprot_accessions": "P67890",
                 "pdb_id": "1abc",
             },
         ]
@@ -193,7 +192,6 @@ class TestHandlerPowerfitReport:
 
     def test_top2(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
         session_dir = tmp_path
-        template_dir = session_dir / "combined_output"
         powerfit_run_id = "run_001"
         fake_solutions(session_dir, powerfit_run_id)
 
@@ -214,8 +212,8 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "1",
                 "structure": "3abc.cif.gz",
-                "template_file": str(template_dir / "3abc.cif.gz"),
-                "uniprot_accession": "P12345",
+                "template_file": "combined_output/3abc.cif.gz",
+                "uniprot_accessions": "P12345",
             },
             {
                 "cc": "0.487",
@@ -223,8 +221,8 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "2",
                 "structure": "3abc.cif.gz",
-                "template_file": str(template_dir / "3abc.cif.gz"),
-                "uniprot_accession": "P12345",
+                "template_file": "combined_output/3abc.cif.gz",
+                "uniprot_accessions": "P12345",
             },
             {
                 "cc": "0.442",
@@ -232,8 +230,8 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "1",
                 "structure": "2abc.cif.gz",
-                "template_file": str(template_dir / "2abc.cif.gz"),
-                "uniprot_accession": "P42424",
+                "template_file": "combined_output/2abc.cif.gz",
+                "uniprot_accessions": "P42424",
             },
             {
                 "cc": "0.442",
@@ -241,8 +239,8 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "2",
                 "structure": "2abc.cif.gz",
-                "template_file": str(template_dir / "2abc.cif.gz"),
-                "uniprot_accession": "P42424",
+                "template_file": "combined_output/2abc.cif.gz",
+                "uniprot_accessions": "P42424",
             },
             {
                 "cc": "0.399",
@@ -250,8 +248,8 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "1",
                 "structure": "1abc.cif.gz",
-                "template_file": str(template_dir / "1abc.cif.gz"),
-                "uniprot_accession": "P67890",
+                "template_file": "combined_output/1abc.cif.gz",
+                "uniprot_accessions": "P67890",
             },
             {
                 "cc": "0.398",
@@ -259,15 +257,14 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "2",
                 "structure": "1abc.cif.gz",
-                "template_file": str(template_dir / "1abc.cif.gz"),
-                "uniprot_accession": "P67890",
+                "template_file": "combined_output/1abc.cif.gz",
+                "uniprot_accessions": "P67890",
             },
         ]
         assert_solutions(stdout, expected)
 
     def test_no_group_by_structure(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
         session_dir = tmp_path
-        template_dir = session_dir / "combined_output"
         powerfit_run_id = "run_001"
         fake_solutions(session_dir, powerfit_run_id)
 
@@ -289,8 +286,8 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "1",
                 "structure": "3abc.cif.gz",
-                "template_file": str(template_dir / "3abc.cif.gz"),
-                "uniprot_accession": "P12345",
+                "template_file": "combined_output/3abc.cif.gz",
+                "uniprot_accessions": "P12345",
             },
             {
                 "cc": "0.487",
@@ -298,8 +295,8 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "2",
                 "structure": "3abc.cif.gz",
-                "template_file": str(template_dir / "3abc.cif.gz"),
-                "uniprot_accession": "P12345",
+                "template_file": "combined_output/3abc.cif.gz",
+                "uniprot_accessions": "P12345",
             },
         ]
         assert_solutions(stdout, expected)

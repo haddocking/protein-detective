@@ -5,6 +5,7 @@ from collections.abc import Generator
 from datetime import UTC, datetime
 from pathlib import Path
 from textwrap import dedent
+from typing import TypedDict
 
 from dask.distributed import Client, progress
 from distributed.deploy.cluster import Cluster
@@ -113,6 +114,7 @@ def _write_ro_crate4runs(
     /,
     *,
     density_map_target: Path,
+    fittable_structures_csv: Path,
     structure_files_root: Path,
     powerfit_run_dir: Path,
 ) -> None:
@@ -136,6 +138,13 @@ def _write_ro_crate4runs(
                 name="powerfit_run_dir",
                 path=powerfit_run_dir,
                 help="Directory where the PowerFit results were stored.",
+            ),
+        ],
+        output_files=[
+            IOArgumentPath(
+                name="fittable_structures_csv",
+                path=fittable_structures_csv,
+                help="CSV file containing the fittable structures with PDB IDs and UniProt accessions.",
             ),
         ],
     )
@@ -173,6 +182,9 @@ def powerfit_runs(
     powerfit_run_id, powerfit_run_root_dir, density_map_target, structure_files = _initialize_powerfit_run(
         session_dir, target, powerfit_run_id=powerfit_run_id
     )
+    fittable_structures_csv = session_dir / "powerfit" / "fittable_structures.csv"
+    create_fittable_structures_csv(session_dir, fittable_structures_csv)
+
     with (
         configure_dask_scheduler(
             scheduler_address,
@@ -204,6 +216,7 @@ def powerfit_runs(
         session_dir,
         start_time,
         density_map_target=density_map_target,
+        fittable_structures_csv=fittable_structures_csv,
         structure_files_root=structure_files_root,
         powerfit_run_dir=powerfit_run_dir,
     )
@@ -211,28 +224,35 @@ def powerfit_runs(
     return powerfit_run_id
 
 
-def make_structures_df(session_dir: Path) -> list[dict]:
+class FittableStructure(TypedDict):
+    structure_file: str
+    structure: str
+    pdb_id: str
+    uniprot_accessions: str
+
+
+def make_fittable_structures_df(session_dir: Path) -> list[FittableStructure]:
     structure_files = _find_structure_files(session_dir)
-    data: list[dict[str, str]] = []
+    data: list[FittableStructure] = []
     for structure_file in structure_files:
         name = structure_file.name
         structure = read_structure(structure_file)
         pdb_id = structure.name
-        uniprot_accession = next(iter(structure2uniprot_accessions(structure)))
+        uniprot_accessions = ",".join(structure2uniprot_accessions(structure))
         data.append(
             {
-                "structure_file": str(structure_file),
+                "structure_file": str(structure_file.relative_to(session_dir)),
                 "structure": name,
                 "pdb_id": pdb_id,
-                "uniprot_accession": uniprot_accession,
+                "uniprot_accessions": uniprot_accessions,
             }
         )
     return data
 
 
-def create_structures_csv(session_dir, structures_lookup_csv):
-    structures_data = make_structures_df(session_dir)
-    with structures_lookup_csv.open("wt", newline="") as fh:
+def create_fittable_structures_csv(session_dir: Path, fittable_structures_csv: Path) -> None:
+    structures_data = make_fittable_structures_df(session_dir)
+    with fittable_structures_csv.open("wt", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=structures_data[0].keys())
         writer.writeheader()
         writer.writerows(structures_data)
@@ -242,10 +262,9 @@ def powerfit_report(
     session_dir: Path,
     powerfit_run_id: str | None = None,
 ):
-    structures_lookup_csv = session_dir / "powerfit" / "structures_lookup.csv"
-    if not structures_lookup_csv.exists():
-        # TODO create earlier or record in rocrate
-        create_structures_csv(session_dir, structures_lookup_csv)
+    fittable_structures_csv = session_dir / "powerfit" / "fittable_structures.csv"
+    if not fittable_structures_csv.exists():
+        create_fittable_structures_csv(session_dir, fittable_structures_csv)
 
     solutions = session_dir / "powerfit" / "*" / "*" / "solutions.out"
     if powerfit_run_id:
@@ -262,7 +281,7 @@ def powerfit_report(
             translation,
             rotation,
             structure_file AS template_file,
-            uniprot_accession,
+            uniprot_accessions,
             pdb_id
         FROM (
             SELECT
@@ -295,11 +314,68 @@ def powerfit_report(
                     }
                 )
             ) AS solutions
-            JOIN read_csv(?) AS structures USING (structure)
+            JOIN read_csv(?) AS fittable_structures USING (structure)
         ORDER BY cc DESC, rank ASC
         """)
-        con.execute(query, (str(solutions), str(structures_lookup_csv)))
+        con.execute(query, (str(solutions), str(fittable_structures_csv)))
         return con.df()
+
+
+def powerfit_filtered_report(
+    session_dir: Path,
+    powerfit_run_id: str | None = None,
+    top: int = 1,
+    group_by_structure: bool = True,
+) -> DataFrame:
+    """Return PowerFit solutions filtered by rank and grouping mode.
+
+    Args:
+        session_dir: Directory containing the session data.
+        powerfit_run_id: Optional ID of the PowerFit run to report. If None, reports over all runs.
+        top: Number of top solutions to return.
+        group_by_structure: Whether to group solutions by structure before selecting top solutions.
+
+    Returns:
+        A DataFrame containing the filtered PowerFit solutions.
+    """
+    all_solutions = powerfit_report(session_dir, powerfit_run_id)
+    if group_by_structure:
+        return all_solutions.groupby("structure").head(top)
+    return all_solutions.head(top)
+
+
+def _write_ro_crate4fit_models(
+    session_dir: Path,
+    start_time: datetime,
+    /,
+    *,
+    fitted_df: DataFrame,
+):
+    ioargs = IOArgumentPaths(
+        input_files=[
+            IOArgumentPath(
+                name=row.relative_to(session_dir),
+                path=row.relative_to(session_dir),
+                help="Unfitted model file.",
+            )
+            for row in fitted_df["unfitted_model_file"]
+        ],
+        output_files=[
+            IOArgumentPath(
+                name=row.relative_to(session_dir),
+                path=row.relative_to(session_dir),
+                help="Fitted model file.",
+            )
+            for row in fitted_df["fitted_model_file"]
+        ],
+    )
+    write_ro_crate(
+        session_dir,
+        start_time,
+        command_name="powerfit fit-models",
+        command_description="Fit models to the best PowerFit solutions.",
+        ioargs=ioargs,
+    )
 
 
 def powerfit_fit_models(
@@ -320,13 +396,22 @@ def powerfit_fit_models(
         A DataFrame containing the fitted models. See protein_detective.db.save_fitted_models function
             for details.
     """
-    all_solutions = powerfit_report(session_dir, powerfit_run_id)
+    start_time = datetime.now(tz=UTC)
     powerfit_root_run_dir = session_dir / "powerfit"
-    if group_by_structure:  # noqa: SIM108 ternary is unclear
-        solutions = all_solutions.groupby("structure").head(top)
-    else:
-        solutions = all_solutions.head(top)
-    return fit_models(solutions, powerfit_root_run_dir)
+    solutions = powerfit_filtered_report(
+        session_dir,
+        powerfit_run_id,
+        top,
+        group_by_structure=group_by_structure,
+    )
+    fitted_df = fit_models(solutions, powerfit_root_run_dir)
+
+    _write_ro_crate4fit_models(
+        session_dir,
+        start_time,
+        fitted_df=fitted_df,
+    )
+    return fitted_df
 
 
 def density_map_of_run_dir(run_dir: Path) -> Path:

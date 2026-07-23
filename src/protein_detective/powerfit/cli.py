@@ -11,9 +11,9 @@ from protein_detective.powerfit.options import PowerfitOptions, process_group
 from protein_detective.powerfit.workflow import (
     list_lcc_files,
     powerfit_commands,
+    powerfit_filtered_report,
     powerfit_fit_models,
     powerfit_list_runs,
-    powerfit_report,
     powerfit_runs,
 )
 
@@ -128,11 +128,12 @@ def report(
     if output is None:
         output = StdioPath("-")
     group_by_structure = not no_group_by_structure
-    all_solutions = powerfit_report(session_dir, powerfit_run_id)
-    if group_by_structure:  # noqa: SIM108 ternary is unclear
-        solutions = all_solutions.groupby("structure").head(top)
-    else:
-        solutions = all_solutions.head(top)
+    solutions = powerfit_filtered_report(
+        session_dir,
+        powerfit_run_id,
+        top,
+        group_by_structure=group_by_structure,
+    )
 
     def array_to_str(arr):
         return ":".join(map(str, arr.flatten()))

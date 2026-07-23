@@ -55,7 +55,7 @@ def fit_models(solutions: pd.DataFrame, powerfit_root_run_dir: Path) -> pd.DataF
         rank = row["rank"]
 
         powerfit_run_id = row["powerfit_run_id"]
-        fitted_model_file = powerfit_root_run_dir / powerfit_run_id / unfitted_model_file.stem / f"fit_{rank}.pdb"
+        fitted_model_file = powerfit_root_run_dir / powerfit_run_id / unfitted_model_file / f"fit_{rank}.pdb"
         if not fitted_model_file.parent.exists():
             msg = f"Directory {fitted_model_file.parent} does not exist. Unable to save fitted model file."
             raise FileNotFoundError(msg)

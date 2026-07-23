@@ -122,7 +122,7 @@ def test_retrieve(tmp_path: Path):
 
     downloads_dir = session_dir / "downloads"
     assert downloads_dir.exists()
-    assert list(downloads_dir.glob("**/*.cif.gz")) == [
+    assert sorted(downloads_dir.glob("**/*.cif.gz")) == [
         downloads_dir / "alphafold" / "AF-A0A0C5B5G6-F1-model_v6.cif.gz",
         downloads_dir / "pdbe" / "2y29_updated.cif.gz",
     ]
