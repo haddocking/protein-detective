@@ -4,7 +4,7 @@ repo_name: haddocking/protein-detective
 repo_url: https://github.com/haddocking/protein-detective
 watch: [mkdocs.yml, README.md, src/protein_detective]
 use_directory_urls: false
-theme: 
+theme:
   name: material
   features:
     - navigation.instant
@@ -19,7 +19,7 @@ theme:
         name: Switch to light mode
     # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
-      scheme: default 
+      scheme: default
       primary: teal
       accent: teal
       toggle:
@@ -38,9 +38,9 @@ plugins:
   - search
   - autorefs
   - mkdocs-jupyter:
-        remove_tag_config:
-            remove_input_tags:
-                - hide_code
+      remove_tag_config:
+        remove_input_tags:
+          - hide_code
   - mkdocs-autoapi:
       autoapi_dir: src
   - mkdocstrings:
@@ -75,10 +75,9 @@ nav:
   - Home: index.md
   - CLI Reference: cli.md
   - Notebooks:
-    - Prepare EM map: em_prepare.ipynb
-    - Determine the fraction of Secondary Structure Elements (SSE): SSE_elements.ipynb
-    - Workflow: workflow.ipynb
-    - Powerfit: powerfit.ipynb
-    - Visualization: visualization.ipynb
-    - Database: database.ipynb
+      - Prepare EM map: em_prepare.ipynb
+      - Determine the fraction of Secondary Structure Elements (SSE): SSE_elements.ipynb
+      - Workflow: workflow.ipynb
+      - Powerfit: powerfit.ipynb
+      - Visualization: visualization.ipynb
   - Contributing guidelines: CONTRIBUTING.md
