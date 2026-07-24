@@ -3,11 +3,8 @@ import json
 from pathlib import Path
 
 import pytest
-from rocrate.metadata import BASENAME
-from rocrate.rocrate import ROCrate
 
-from protein_detective.__version__ import __version__
-from tests.helpers import cli, fake_run_retrieve, fake_setup_retrieve
+from tests.helpers import assert_crate, cli, fake_run_retrieve, fake_setup_retrieve, read_csv
 
 
 def test_app_help(capsys: pytest.CaptureFixture[str]):
@@ -24,42 +21,6 @@ def test_search_help(capsys: pytest.CaptureFixture[str]):
 
     captured = capsys.readouterr()
     assert "Search for candidate protein structures" in captured.out
-
-
-def assert_crate(
-    crate_dir: Path,
-    *,
-    action_id: str | None = None,
-    input_ids: set[str] | None = None,
-    output_ids: set[str] | None = None,
-    nr_actions: int = 1,
-) -> tuple[ROCrate, dict]:
-    # Assert copied from tests/adapters/test_cyclopts.py in rocrate_action_recorder repo
-    crate_path = crate_dir / BASENAME
-    assert crate_path.exists()
-
-    crate = ROCrate(crate_dir)
-    actions = crate.get_by_type("CreateAction", exact=True)
-    assert len(actions) == nr_actions, (
-        f"Expected exactly {nr_actions} CreateAction(s) in the crate, found {len(actions)}"
-    )
-    action = actions[-1]
-
-    if action_id is not None:
-        assert action["@id"] == action_id
-        assert action["name"] == action_id
-
-    assert action["instrument"]["@id"] == f"protein-detective@{__version__}"
-
-    input_ids = {i["@id"] for i in action.get("object", [])}
-    if input_ids is not None:
-        assert input_ids <= input_ids
-
-    output_ids = {o["@id"] for o in action.get("result", [])}
-    if output_ids is not None:
-        assert output_ids <= output_ids
-
-    return crate, action
 
 
 @pytest.mark.vcr
@@ -83,19 +44,24 @@ def test_search(tmp_path: Path):
     lines = uniprot_file.read_text().strip().splitlines()
     assert len(lines) >= 1
 
-    with (session_dir / "alphafold.csv").open() as f:
-        reader = csv.DictReader(f)
-        af_rows = list(reader)
-    assert len(af_rows) >= 1
-    assert "uniprot_accession" in af_rows[0]
-    assert "af_id" in af_rows[0]
+    alphafolds = read_csv(session_dir / "alphafold.csv")
+    assert alphafolds[0] == {
+        "af_id": "A0A024R1R8",
+        "uniprot_accession": "A0A024R1R8",
+    }
+    assert len(alphafolds) == 50
 
-    with (session_dir / "pdbe.csv").open() as f:
-        reader = csv.DictReader(f)
-        pdbe_rows = list(reader)
-    assert len(pdbe_rows) >= 1
-    assert "uniprot_accession" in pdbe_rows[0]
-    assert "pdb_id" in pdbe_rows[0]
+    pdbes = read_csv(session_dir / "pdbe.csv")
+    assert pdbes[0] == {
+        "chain": "E",
+        "chain_length": "93",
+        "method": "X-Ray_Crystallography",
+        "pdb_id": "5HHM",
+        "resolution": "2.5",
+        "uniprot_accession": "A0A075B6N1",
+        "uniprot_chains": "E/J=21-113",
+    }
+    assert len(pdbes) == 8
 
     quality_file = session_dir / "pdbe-quality.json"
     assert quality_file.exists()
@@ -161,20 +127,15 @@ def test_filter(tmp_path: Path):
     ]
     cli(argv)
 
-    filtered_csv = session_dir / "combined_stats.csv"
-    assert filtered_csv.exists()
-    with filtered_csv.open() as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
-    expected_rows = [
+    assert read_csv(session_dir / "combined_stats.csv") == [
         {
             "chain_length": "16",
             "geometry_quality": "",
             "high_confidence_residues_count": "10",
-            "input_file": str(session_dir / "combined_input/AF-A0A0C5B5G6-F1-model_v6.cif.gz"),
+            "input_file": "combined_input/AF-A0A0C5B5G6-F1-model_v6.cif.gz",
             "is_alphafold": "True",
             "method": "Predicted",
-            "output_file": str(session_dir / "combined_output/AF-A0A0C5B5G6-F1-model_v6.cif.gz"),
+            "output_file": "combined_output/AF-A0A0C5B5G6-F1-model_v6.cif.gz",
             "passed": "True",
             "pdb_id": "AF-A0A0C5B5G6-F1",
             "reason": "",
@@ -189,10 +150,10 @@ def test_filter(tmp_path: Path):
             "chain_length": "8",
             "geometry_quality": "",
             "high_confidence_residues_count": "",
-            "input_file": str(session_dir / "combined_input/2y29_updated_A2A.cif.gz"),
+            "input_file": "combined_input/2y29_updated_A2A.cif.gz",
             "is_alphafold": "False",
             "method": "X-ray",
-            "output_file": str(session_dir / "combined_output/2y29_updated_A2A.cif.gz"),
+            "output_file": "combined_output/2y29_updated_A2A.cif.gz",
             "passed": "True",
             "pdb_id": "2Y29",
             "reason": "",
@@ -204,12 +165,31 @@ def test_filter(tmp_path: Path):
             "uniprot_start": "687",
         },
     ]
-    assert rows == expected_rows
 
     ss_output_dir = session_dir / "secondary_structure"
     assert not ss_output_dir.exists()
     ss_stats_file = session_dir / "secondary_structure_stats.csv"
     assert not ss_stats_file.exists()
+
+    assert read_csv(session_dir / "single_chain_stats.csv") == [
+        {
+            "chain2keep": "A",
+            "discard_reason": "",
+            "input_file": "2y29_updated.cif.gz",
+            "output_chain": "A",
+            "output_file": "2y29_updated_A2A.cif.gz",
+            "passed": "True",
+        },
+    ]
+
+    assert read_csv(session_dir / "uniprots_verified_stats.csv") == [
+        {
+            "injected": "False",
+            "input_file": "downloads/pdbe/2y29_updated.cif.gz",
+            "output_file": "with_uniprots/2y29_updated.cif.gz",
+            "uniprot_chain_mappings": "",
+        },
+    ]
 
     assert_crate(
         session_dir,
@@ -226,6 +206,8 @@ def test_filter(tmp_path: Path):
             "combined_input",
             "combined_output",
             "combined_stats.csv",
+            "uniprots_verified_stats.csv",
+            "single_chain_stats.csv",
         },
         nr_actions=2,
     )

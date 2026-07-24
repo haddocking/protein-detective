@@ -180,7 +180,11 @@ def _write_ro_crate(
             IOArgumentPath(
                 name="uniprot_with_interaction_partners",
                 path=uniprot_with_interaction_partners_path,
-                help=f"UniProt accessions of {uniprot_path} combined with uniprot accessions of interaction partners",
+                help=(
+                    "UniProt accessions of "
+                    f"{uniprot_path.relative_to(session_dir, walk_up=True)} "
+                    "combined with uniprot accessions of interaction partners"
+                ),
             )
         )
     write_ro_crate(

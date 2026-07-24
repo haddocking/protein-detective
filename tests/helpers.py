@@ -1,10 +1,14 @@
 """Helper functions for testing."""
 
+import csv
 import sys
 from pathlib import Path
 
+from rocrate.metadata import BASENAME
+from rocrate.rocrate import ROCrate
 from vcr import use_cassette
 
+from protein_detective.__version__ import __version__
 from protein_detective.cli import app
 
 
@@ -46,3 +50,44 @@ def fake_run_retrieve(tmp_path):
     with use_cassette(retrieve_cassette):
         cli(argv)
     return session_dir
+
+
+def assert_crate(
+    crate_dir: Path,
+    *,
+    action_id: str | None = None,
+    input_ids: set[str] | None = None,
+    output_ids: set[str] | None = None,
+    nr_actions: int = 1,
+) -> tuple[ROCrate, dict]:
+    # Assert copied from tests/adapters/test_cyclopts.py in rocrate_action_recorder repo
+    crate_path = crate_dir / BASENAME
+    assert crate_path.exists()
+
+    crate = ROCrate(crate_dir)
+    actions = crate.get_by_type("CreateAction", exact=True)
+    assert len(actions) == nr_actions, (
+        f"Expected exactly {nr_actions} CreateAction(s) in the crate, found {len(actions)}"
+    )
+    action = actions[-1]
+
+    if action_id is not None:
+        assert action["@id"] == action_id
+        assert action["name"] == action_id
+
+    assert action["instrument"]["@id"] == f"protein-detective@{__version__}"
+
+    input_ids = {i["@id"] for i in action.get("object", [])}
+    if input_ids is not None:
+        assert input_ids <= input_ids
+
+    output_ids = {o["@id"] for o in action.get("result", [])}
+    if output_ids is not None:
+        assert output_ids <= output_ids
+
+    return crate, action
+
+
+def read_csv(file: Path) -> list[dict[str, str]]:
+    with file.open() as f:
+        return list(csv.DictReader(f))

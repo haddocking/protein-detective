@@ -35,8 +35,10 @@ def _write_ro_crate(
     pdbe_download_dir: Path,
     downloaded_af_dir: Path,
     pdbe_quality_json: StdioPath,
-    single_chain_dir: Path,
     uniprots_verified: Path,
+    uniprots_verified_stats_file: Path,
+    single_chain_dir: Path,
+    single_chain_stats_file: Path,
     combined_input_dir: Path,
     combined_output_dir: Path,
     combined_stats_file: StdioPath,
@@ -74,7 +76,7 @@ def _write_ro_crate(
                 path=single_chain_dir,
                 help=(
                     "Directory where the single chain structure files are written from "
-                    f"{pdbe_download_dir.relative_to(session_dir)}."
+                    f"{uniprots_verified.relative_to(session_dir, walk_up=True)}."
                 ),
             ),
             IOArgumentPath(
@@ -82,7 +84,7 @@ def _write_ro_crate(
                 path=uniprots_verified,
                 help=(
                     "Directory where the uniprots are verified and injected if needed from "
-                    f"{single_chain_dir.relative_to(session_dir)}."
+                    f"{pdbe_download_dir.relative_to(session_dir, walk_up=True)}."
                 ),
             ),
             IOArgumentPath(
@@ -90,8 +92,8 @@ def _write_ro_crate(
                 path=combined_input_dir,
                 help=(
                     "Directory where files from "
-                    f"{single_chain_dir.relative_to(session_dir)} and "
-                    f"{downloaded_af_dir.relative_to(session_dir)} were copied into."
+                    f"{single_chain_dir.relative_to(session_dir, walk_up=True)} and "
+                    f"{downloaded_af_dir.relative_to(session_dir, walk_up=True)} were copied into."
                 ),
             ),
             IOArgumentPath(
@@ -101,6 +103,16 @@ def _write_ro_crate(
             ),
         ],
         output_files=[
+            IOArgumentPath(
+                name="uniprots_verified_stats_file",
+                path=uniprots_verified_stats_file,
+                help="CSV file containing statistics for the uniprot verification step.",
+            ),
+            IOArgumentPath(
+                name="single_chain_stats_file",
+                path=single_chain_stats_file,
+                help="CSV file containing statistics for the single chain filtering step.",
+            ),
             IOArgumentPath(
                 name="combined_stats_file",
                 path=combined_stats_file,
@@ -115,7 +127,7 @@ def _write_ro_crate(
                 path=ss_output_dir,
                 help=(
                     "Directory where the secondary structure filtered structure files are "
-                    f"written. Source {combined_output_dir.relative_to(session_dir)} dir."
+                    f"written. Source {combined_output_dir.relative_to(session_dir, walk_up=True)} dir."
                 ),
             )
         )
@@ -144,6 +156,13 @@ def _merge_structure_files(downloaded_af_dir, with_uniprots, combined_input_dir)
         copyfile(file, combined_input_dir / file.name, copy_method="symlink")
 
 
+def _make_stats_relative_to_session_dir(stats_file: Path, session_dir: Path):
+    """Replaces occurences of `session_dir/` with `/` in given stats text file."""
+    content = stats_file.read_text()
+    content = content.replace(f"{session_dir}/", "")
+    stats_file.write_text(content)
+
+
 def run_filter(
     session_dir: Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=True, exists=True))],
     /,
@@ -155,10 +174,10 @@ def run_filter(
 
     Steps:
 
-    1. Convert PDBe structure files to single chain structure files.
-        See [protein-quest filter chain](https://www.bonvinlab.org/protein-quest/cli.html#protein-quest-filter-chain).
-    2. Verify expected uniprot accessions are in structure files and inject uniprot accession if missing.
+    1. Verify expected uniprot accessions are in structure files and inject uniprot accession if missing.
         See [protein-quest convert structure --uniprots](https://www.bonvinlab.org/protein-quest/cli.html#protein-quest-convert-structures).
+    2. Convert PDBe structure files to single chain structure files.
+        See [protein-quest filter chain](https://www.bonvinlab.org/protein-quest/cli.html#protein-quest-filter-chain).
     3. Filters processed PDBe structure files and AlphaFold structure files based on given parameters.
         See [protein-quest filter combined](https://www.bonvinlab.org/protein-quest/cli.html#protein-quest-filter-combined).
     4. If secondary structure options are given then
@@ -179,19 +198,23 @@ def run_filter(
     pdbe_csv = StdioPath(session_dir / "pdbe.csv")
     pdbe_quality_json = StdioPath(session_dir / "pdbe-quality.json")
 
-    single_chain_dir = session_dir / "single_chain"
-    chain(
-        pdbe_csv,
-        downloaded_pdbe_dir,
-        single_chain_dir,
-    )
-
     uniprots_verified = session_dir / "with_uniprots"
-    structures(single_chain_dir, output_dir=uniprots_verified, uniprots=pdbe_csv)
+    uniprots_verified_stats = StdioPath(session_dir / "uniprots_verified_stats.csv")
+    structures(
+        downloaded_pdbe_dir,
+        output_dir=uniprots_verified,
+        uniprots=pdbe_csv,
+        write_stats=uniprots_verified_stats,
+    )
+    _make_stats_relative_to_session_dir(uniprots_verified_stats, session_dir)
+
+    single_chain_dir = session_dir / "single_chain"
+    single_chain_stats = StdioPath(session_dir / "single_chain_stats.csv")
+    chain(pdbe_csv, downloaded_pdbe_dir, single_chain_dir, write_stats=single_chain_stats)
 
     # Combined filter works best if all structure files are in one directory
     combined_input_dir = session_dir / "combined_input"
-    _merge_structure_files(downloaded_af_dir, uniprots_verified, combined_input_dir)
+    _merge_structure_files(downloaded_af_dir, single_chain_dir, combined_input_dir)
 
     combined_output_dir = session_dir / "combined_output"
     combined_stats_file = StdioPath(session_dir / "combined_stats.csv")
@@ -202,6 +225,7 @@ def run_filter(
         filters=options.combined,
         write_stats=combined_stats_file,
     )
+    _make_stats_relative_to_session_dir(combined_stats_file, session_dir)
 
     ss_output_dir = None
     ss_stats_file = None
@@ -219,8 +243,10 @@ def run_filter(
         downloaded_af_dir=downloaded_af_dir,
         pdbe_quality_json=pdbe_quality_json,
         # Output
-        single_chain_dir=single_chain_dir,
         uniprots_verified=uniprots_verified,
+        uniprots_verified_stats_file=uniprots_verified_stats,
+        single_chain_dir=single_chain_dir,
+        single_chain_stats_file=single_chain_stats,
         combined_input_dir=combined_input_dir,
         combined_output_dir=combined_output_dir,
         combined_stats_file=combined_stats_file,
