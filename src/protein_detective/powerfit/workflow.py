@@ -14,6 +14,7 @@ from pandas import DataFrame
 from protein_quest.structure.formats import read_structure
 from protein_quest.structure.uniprot import structure2uniprot_accessions
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
+from tqdm.auto import tqdm
 
 from protein_detective.common_cli import write_ro_crate
 from protein_detective.powerfit.options import PowerfitOptions
@@ -181,6 +182,7 @@ def powerfit_runs(
         options: Powerfit options.
         powerfit_run_id: ID of the PowerFit run to use. If not provided, will autoincrement based on existing runs.
         scheduler_address: Address of the Dask scheduler to use. If not provided, will create a local Dask cluster.
+            If set to "sequential", will run PowerFit sequentially without using Dask.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
     start_time = datetime.now(tz=UTC)
@@ -190,31 +192,41 @@ def powerfit_runs(
     fittable_structures_csv: Path = session_dir / "powerfit" / "fittable_structures.csv"
     create_fittable_structures_csv(session_dir, fittable_structures_csv)
 
-    workers_per_gpu = options.workers_per_gpu if options.gpu else 0
-    with (
-        configure_dask_scheduler(
-            scheduler_address,
-            name=f"powerfit-run-{powerfit_run_id}",
-            workers_per_gpu=workers_per_gpu,
-            nproc=options.nproc,
-            gpu_backend=options.gpu_backend,
-        ) as scheduler_address,
-        Client(scheduler_address) as client,
-    ):
-        logger.info(f"Follow progress on dask dashboard at: {client.dashboard_link}")
-        client.run(clear_worker_cache)
-        futures = client.map(
-            powerfit_worker,
-            structure_files,
-            density_map_target=density_map_target,
-            resolution=resolution,
-            powerfit_run_root_dir=powerfit_run_root_dir,
-            options=options,
-        )
+    if scheduler_address == "sequential":
+        for structure_file in tqdm(structure_files, unit="structure", desc="Running PowerFit sequentially"):
+            powerfit_worker(
+                structure_file,
+                density_map_target=density_map_target,
+                resolution=resolution,
+                powerfit_run_root_dir=powerfit_run_root_dir,
+                options=options,
+            )
+    else:
+        workers_per_gpu = options.workers_per_gpu if options.gpu else 0
+        with (
+            configure_dask_scheduler(
+                scheduler_address,
+                name=f"powerfit-run-{powerfit_run_id}",
+                workers_per_gpu=workers_per_gpu,
+                nproc=options.nproc,
+                gpu_backend=options.gpu_backend,
+            ) as scheduler_address,
+            Client(scheduler_address) as client,
+        ):
+            logger.info(f"Follow progress on dask dashboard at: {client.dashboard_link}")
+            client.run(clear_worker_cache)
+            futures = client.map(
+                powerfit_worker,
+                structure_files,
+                density_map_target=density_map_target,
+                resolution=resolution,
+                powerfit_run_root_dir=powerfit_run_root_dir,
+                options=options,
+            )
 
-        progress(futures)
+            progress(futures)
 
-        client.gather(futures)
+            client.gather(futures)
 
     structure_files_root = structure_files[0].parent
     _write_ro_crate4runs(
