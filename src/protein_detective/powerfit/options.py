@@ -50,7 +50,7 @@ class PowerfitOptions:
         resampling_rate: Resampling rate compared to Nyquist.
         no_trimming: Do not trim the density map.
         trimming_cutoff: Intensity cutoff to which the map will be trimmed. Default is 10 percent of maximum intensity.
-        gpu: Off-load the intensive calculations to the GPU. Otherwise uses CPU.
+        cpu: Use CPU for the intensive calculations. Otherwise off-loads to GPU.
         workers_per_gpu: Number of workers to run per GPU.
         gpu_backend: Backend to use for GPU processing.
         nproc: Number of processors used during search.
@@ -69,11 +69,16 @@ class PowerfitOptions:
     resampling_rate: PositiveFloat = 2.0
     no_trimming: Annotated[bool, Parameter(negative="")] = False
     trimming_cutoff: PositiveFloat | None = None
-    gpu: Annotated[bool, Parameter(group=process_group, negative="")] = True
+    cpu: Annotated[bool, Parameter(group=process_group, negative="")] = False
     workers_per_gpu: Annotated[PositiveInt, Parameter(group=process_group)] = 1
     gpu_backend: Annotated[GpuBackend, Parameter(group=process_group)] = "opencl"
     nproc: Annotated[PositiveInt, Parameter(group=process_group)] = 1
     batch_size: Annotated[PositiveInt, Parameter(group=process_group)] = DEFAULT_BATCH_SIZE
+
+    @property
+    def gpu(self) -> bool:
+        """Whether to use GPU for the intensive calculations."""
+        return not self.cpu
 
     def format_gpu_device(self, gpu_id: int) -> str:
         if self.gpu_backend == "cuda":

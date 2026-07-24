@@ -35,7 +35,7 @@ def test_parse_first_visible_gpu_id(visible_devices, expected):
 
 
 def test_to_command_uses_formatted_gpu_device_for_backend():
-    options = PowerfitOptions(gpu_backend="cuda", gpu=True)
+    options = PowerfitOptions(gpu_backend="cuda", cpu=False)
     command = options.to_command(
         density_map=Path("density.mrc"),
         resolution=3.0,

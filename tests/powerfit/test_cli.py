@@ -41,6 +41,7 @@ def test_commands_defaults(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
         str(target),
         "3.0",
         str(session_dir),
+        "--cpu",
     ]
     cli(argv)
 
