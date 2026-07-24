@@ -79,6 +79,7 @@ test = [
     "pytest-recording>=0.13.4",
     "rocrate==0.15.0",
     "gemmi>=0.7.5",
+    "pooch>=1.9.0",
 ]
 dev = [
     {include-group = "test"},
