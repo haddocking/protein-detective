@@ -26,13 +26,12 @@ def fit_model(unfitted_model_file: Path, translation: np.ndarray, rotation: np.n
     structure.tofile(str(fitted_model_file))
 
 
-def fit_models(solutions: pd.DataFrame, powerfit_root_run_dir: Path) -> pd.DataFrame:
+def fit_models(solutions: pd.DataFrame, session_dir: Path) -> pd.DataFrame:
     """Fit model PDB files according to the translation and rotation in solutions DataFrame.
 
     Args:
-        solutions: DataFrame with columns "pdb_file", "translation", "rotation", and "powerfit_run_id"
-        powerfit_root_run_dir: Directory to save the fitted model PDB files.
-            Should be directory where powerfit runs are stored.
+        solutions: DataFrame with columns "powerfit_run_id", "translation", "rotation", and "template_file"
+        session_dir: Path to the session directory.
 
     Returns:
         DataFrame with columns "powerfit_run_id", "structure", "rank", "fitted_model_file", and "unfitted_model_file"
@@ -43,11 +42,11 @@ def fit_models(solutions: pd.DataFrame, powerfit_root_run_dir: Path) -> pd.DataF
             msg = "index should be an int"
             raise TypeError(msg)
 
-        pdb_file = row["pdb_file"]
-        if not isinstance(pdb_file, str):
-            msg = "pdb_file should be a str"
+        template_file = row["template_file"]
+        if not isinstance(template_file, str):
+            msg = "template_file should be a str"
             raise TypeError(msg)
-        unfitted_model_file = Path(pdb_file)
+        unfitted_model_file = session_dir / template_file
 
         translation = row["translation"]
         rotation = row["rotation"].reshape(3, 3)
@@ -55,12 +54,12 @@ def fit_models(solutions: pd.DataFrame, powerfit_root_run_dir: Path) -> pd.DataF
         rank = row["rank"]
 
         powerfit_run_id = row["powerfit_run_id"]
-        fitted_model_file = powerfit_root_run_dir / powerfit_run_id / unfitted_model_file / f"fit_{rank}.pdb"
+        solutions_dir = session_dir / "powerfit" / powerfit_run_id / unfitted_model_file.name
+        fitted_model_file = solutions_dir / f"fit_{rank}.pdb"
         if not fitted_model_file.parent.exists():
             msg = f"Directory {fitted_model_file.parent} does not exist. Unable to save fitted model file."
             raise FileNotFoundError(msg)
 
-        # type: ignore[bad-argument-type]
         fit_model(unfitted_model_file, translation, rotation, fitted_model_file)
 
         fitted_files.append(

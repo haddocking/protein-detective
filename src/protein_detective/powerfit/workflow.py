@@ -25,9 +25,14 @@ logger = logging.getLogger(__name__)
 
 
 def _find_structure_files(session_dir: Path) -> list[Path]:
+    import_dir: Path = session_dir / "imported_structures"
     combined_filter_output = session_dir / "combined_output"
     ss_output_dir = session_dir / "secondary_structure"
-    structure_files_dir = ss_output_dir if ss_output_dir.exists() else combined_filter_output
+    structure_files_dir = combined_filter_output
+    if import_dir.exists():
+        structure_files_dir = import_dir
+    elif ss_output_dir.exists():
+        structure_files_dir = ss_output_dir
     if not structure_files_dir.exists():
         msg = (
             f"Structure files directory '{structure_files_dir}' does not exist. "
@@ -60,7 +65,7 @@ def _initialize_powerfit_run(
 
     structure_files = _find_structure_files(session_dir)
 
-    return powerfit_run_id, powerfit_root_dir, density_map_target, structure_files
+    return powerfit_run_id, powerfit_run_dir, density_map_target, structure_files
 
 
 def powerfit_commands(
@@ -95,7 +100,7 @@ def powerfit_commands(
         raise ValueError(msg)
     gpu_cycler = build_gpu_cycler(workers_per_gpu=1, gpu_ids=gpu_ids)
     for structure_file in structure_files:
-        result_dir = powerfit_run_root_dir / powerfit_run_id / structure_file.name
+        result_dir = powerfit_run_root_dir / structure_file.name
         command = options.to_command(
             density_map=density_map_target,
             resolution=resolution,
@@ -182,14 +187,15 @@ def powerfit_runs(
     powerfit_run_id, powerfit_run_root_dir, density_map_target, structure_files = _initialize_powerfit_run(
         session_dir, target, powerfit_run_id=powerfit_run_id
     )
-    fittable_structures_csv = session_dir / "powerfit" / "fittable_structures.csv"
+    fittable_structures_csv: Path = session_dir / "powerfit" / "fittable_structures.csv"
     create_fittable_structures_csv(session_dir, fittable_structures_csv)
 
+    workers_per_gpu = options.workers_per_gpu if options.gpu else 0
     with (
         configure_dask_scheduler(
             scheduler_address,
             name=f"powerfit-run-{powerfit_run_id}",
-            workers_per_gpu=options.gpu,
+            workers_per_gpu=workers_per_gpu,
             nproc=options.nproc,
             gpu_backend=options.gpu_backend,
         ) as scheduler_address,
@@ -211,14 +217,13 @@ def powerfit_runs(
         client.gather(futures)
 
     structure_files_root = structure_files[0].parent
-    powerfit_run_dir = powerfit_run_root_dir / powerfit_run_id
     _write_ro_crate4runs(
         session_dir,
         start_time,
         density_map_target=density_map_target,
         fittable_structures_csv=fittable_structures_csv,
         structure_files_root=structure_files_root,
-        powerfit_run_dir=powerfit_run_dir,
+        powerfit_run_dir=powerfit_run_root_dir,
     )
 
     return powerfit_run_id
@@ -241,7 +246,7 @@ def make_fittable_structures_df(session_dir: Path) -> list[FittableStructure]:
         uniprot_accessions = ",".join(structure2uniprot_accessions(structure))
         data.append(
             {
-                "structure_file": str(structure_file.relative_to(session_dir)),
+                "structure_file": str(structure_file.relative_to(session_dir, walk_up=True)),
                 "structure": name,
                 "pdb_id": pdb_id,
                 "uniprot_accessions": uniprot_accessions,
@@ -262,6 +267,28 @@ def powerfit_report(
     session_dir: Path,
     powerfit_run_id: str | None = None,
 ):
+    """Return a DataFrame containing the PowerFit solutions.
+
+    Args:
+        session_dir: Directory containing the session data.
+        powerfit_run_id: Optional ID of the PowerFit run to report. If None,
+
+    Returns:
+        A DataFrame containing the PowerFit solutions.
+        With following colums:
+
+        1, powerfit_run_id: ID of the PowerFit run
+        2, structure: Name of the structure file
+        3, rank: Rank of the solution
+        4, cc: Cross-correlation coefficient of the solution
+        5, fishz: FishZ score of the solution
+        6, relz: Relative Z-score of the solution
+        7, translation: Translation vector of the solution
+        8, rotation: Rotation matrix of the solution
+        9, template_file: Path to the template structure file, relative to the session directory
+        10, uniprot_accessions: Comma-separated list of UniProt accessions
+        11, pdb_id: PDB ID of the template structure
+    """
     fittable_structures_csv = session_dir / "powerfit" / "fittable_structures.csv"
     if not fittable_structures_csv.exists():
         create_fittable_structures_csv(session_dir, fittable_structures_csv)
@@ -289,7 +316,7 @@ def powerfit_report(
                 parse_path(filename)[-2] AS structure,
                 rank, cc, fishz, relz,
                 [x,y,z]::FLOAT[3] AS translation,
-                [a11, a12, a13, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation,
+                [a11, a12, a13, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation
             FROM
                 read_csv(
                     ?,
@@ -354,16 +381,16 @@ def _write_ro_crate4fit_models(
     ioargs = IOArgumentPaths(
         input_files=[
             IOArgumentPath(
-                name=row.relative_to(session_dir),
-                path=row.relative_to(session_dir),
+                name=row,
+                path=row,
                 help="Unfitted model file.",
             )
             for row in fitted_df["unfitted_model_file"]
         ],
         output_files=[
             IOArgumentPath(
-                name=row.relative_to(session_dir),
-                path=row.relative_to(session_dir),
+                name=row,
+                path=row,
                 help="Fitted model file.",
             )
             for row in fitted_df["fitted_model_file"]
@@ -397,14 +424,13 @@ def powerfit_fit_models(
             for details.
     """
     start_time = datetime.now(tz=UTC)
-    powerfit_root_run_dir = session_dir / "powerfit"
     solutions = powerfit_filtered_report(
         session_dir,
         powerfit_run_id,
         top,
         group_by_structure=group_by_structure,
     )
-    fitted_df = fit_models(solutions, powerfit_root_run_dir)
+    fitted_df = fit_models(solutions, session_dir)
 
     _write_ro_crate4fit_models(
         session_dir,
@@ -434,11 +460,12 @@ def powerfit_list_runs(session_dir: Path) -> list[tuple[str, str, Path]]:
     """
     powerfit_root_dir = session_dir / "powerfit"
     runs = []
+    cwd = Path.cwd()
     for run_dir in sorted(powerfit_root_dir.iterdir()):
         if run_dir.is_dir():
             density_map = density_map_of_run_dir(run_dir)
             # TODO from ro-crate-metadata.json parse command used to create run_dir
-            runs.append((run_dir.name, str(density_map), run_dir.relative_to(session_dir)))
+            runs.append((run_dir.name, str(density_map), run_dir.absolute().relative_to(cwd, walk_up=True)))
     return runs
 
 
@@ -452,8 +479,11 @@ def list_lcc_files(session_dir: Path) -> Generator[tuple[str, str, Path]]:
         Tuples containing the run ID, structure name, and path to the lcc.mrc
     """
 
+    # `protein-detective powerfit run` does not generate lcc.mrc files
+    # however commands of `protein-detective powerfit commands` do.
+    # TODO add flag run command to generate lcc.mrc in powerfit_worker function
     powerfit_root_dir = session_dir / "powerfit"
     for lcc_file in powerfit_root_dir.glob("**/lcc.mrc"):
         structure = lcc_file.parent.name
         run_dir = lcc_file.parent.parent.name
-        yield (run_dir, structure, lcc_file.relative_to(session_dir))
+        yield (run_dir, structure, lcc_file.relative_to(session_dir, walk_up=True))

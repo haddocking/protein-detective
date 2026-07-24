@@ -50,7 +50,8 @@ class PowerfitOptions:
         resampling_rate: Resampling rate compared to Nyquist.
         no_trimming: Do not trim the density map.
         trimming_cutoff: Intensity cutoff to which the map will be trimmed. Default is 10 percent of maximum intensity.
-        gpu: Off-load the intensive calculations to the GPU.
+        gpu: Off-load the intensive calculations to the GPU. Otherwise uses CPU.
+        workers_per_gpu: Number of workers to run per GPU.
         gpu_backend: Backend to use for GPU processing.
         nproc: Number of processors used during search.
             The number will be capped at the total number
@@ -68,7 +69,8 @@ class PowerfitOptions:
     resampling_rate: PositiveFloat = 2.0
     no_trimming: Annotated[bool, Parameter(negative="")] = False
     trimming_cutoff: PositiveFloat | None = None
-    gpu: Annotated[bool, Parameter(group=process_group, negative="")] = False
+    gpu: Annotated[bool, Parameter(group=process_group, negative="")] = True
+    workers_per_gpu: Annotated[PositiveInt, Parameter(group=process_group)] = 1
     gpu_backend: Annotated[GpuBackend, Parameter(group=process_group)] = "opencl"
     nproc: Annotated[PositiveInt, Parameter(group=process_group)] = 1
     batch_size: Annotated[PositiveInt, Parameter(group=process_group)] = DEFAULT_BATCH_SIZE

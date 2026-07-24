@@ -17,14 +17,14 @@ An example workflow:
 
 ```mermaid
 graph LR;
-    search{Search UniprotKB} --> |uniprot_accessions|fetchpdbe{Retrieve PDBe}
-    search{Search UniprotKB} --> |uniprot_accessions|fetchad{Retrieve AlphaFold}
-    fetchpdbe -->|mmcif_files| filter{Filter structures}
-    fetchad -->|mmcif_files| filter
+    search[Search UniprotKB] --> |uniprot_accessions|retrieve[Retrieve PDBe & AlphaFold structures]
+    retrieve -->|mmcif_files| filter[Filter structures]
     filter -->|mmcif_files| powerfit
-    powerfit -->|*/solutions.out| solutions{Best scoring solutions}
-    solutions -->|dataframe| fitmodels{Fit models}
+    powerfit -->|*/solutions.out| solutions[Best scoring solutions]
+    solutions -->|dataframe| fitmodels[Fit models]
 ```
+
+
 
 ## Install
 
@@ -50,7 +50,6 @@ pip install "protein-detective[cuda12]"
 
 The main entry point is the `protein-detective` command line tool which has multiple subcommands to perform actions.
 
-
 To use programmaticly, see the [notebooks](docs/notebooks) and [API documentation](https://www.bonvinlab.org/protein-detective/autoapi/summary/).
 
 ### Search Uniprot for structures
@@ -62,7 +61,8 @@ protein-detective search \
     --subcellular-location-uniprot nucleus \
     --subcellular-location-go GO:0005634 \
     --molecular-function-go GO:0003677 \
-    --limit 100 \
+    --limit-uniprot 100 \
+    --pdbe.limit 100 \
     ./mysession
 ```
 ([GO:0005634](https://www.ebi.ac.uk/QuickGO/term/GO:0005634) is "Nucleus" and [GO:0003677](https://www.ebi.ac.uk/QuickGO/term/GO:0003677) is  "DNA binding")
@@ -73,15 +73,16 @@ In `./mysession` directory, you will find session.db file, which is a [DuckDB](h
 <summary>You can also include interaction partners in the search</summary>
 
 ```shell
-protein-detective --log-level INFO search \
+protein-detective search --verbose \
     --taxon-id 9606 \
     --reviewed \
     --subcellular-location-uniprot nucleus \
     --subcellular-location-go GO:0005634 \
     --molecular-function-go GO:0003677 \
-    --interaction-partner-seed A8MT69 \
-    --interaction-partner-exclude B1APH4 \
-    --limit 100 \
+    --interaction.seed A8MT69 \
+    --interaction.exclude B1APH4 \
+    --limit-uniprot 100 \
+    --pdbe.limit 100 \
     ./mysession2
 ```
 
@@ -110,14 +111,14 @@ Filter structures based on
 Also uncompresses *.cif.gz files to *.cif files for compatibility with powerfit.
 
 ```shell
-protein-detective --log-level INFO filter \
-    --confidence-threshold 50 \
+protein-detective filter \
+    --min-confidence 50 \
     --min-residues 100 \
     --max-residues 1000 \
     ./mysession
 
-# or to filter only on secondary structure having some helices
-protein-detective filter mysession --abs-min-helix-residues 40
+# or to filter on secondary structure having some helices
+protein-detective filter mysession --secondary.abs-min-helix-residues 40
 ```
 
 ### Import filtered structures
@@ -137,6 +138,8 @@ Rotate and translate the prepared structures to fit and score them into the EM d
 
 ```shell
 protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession
+# or for with some flags
+protein-detective powerfit run --gpu --angle 40 --powerfit-run-id myrun1 ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession4
 ```
 
 This will use [dask-distributed](https://distributed.dask.org/en/latest/) to run powerfit for each structure in parallel on multiple CPU cores or GPUs.
@@ -177,8 +180,8 @@ protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 docs/se
 
 Powerfit is quickest on GPU, but can also run on CPU.
 
-To run powerfits on a GPU you can use the `--gpu <workers_per_gpu>`.
-The value of `workers_per_gpu` should be high enough so the GPU is fully utilized.
+To run powerfits on a GPU you can use the `--gpu`.
+If your GPU is underutilized, you can increase the number of workers per GPU with `--workers-per-gpu <int>`.
 You can start with 1 (the default) and monitor the GPU usage with `nvtop` if you see that the GPU is not 100% loaded, you can increase the number until there are no more valleys in the GPU usage graph.
 
 If you have multiple GPUs, then `--gpu 2` will run powerfits on all GPUs and run 2 powerfits concurrently on each GPU.
@@ -197,7 +200,7 @@ To use CUDA instead, you can set `--gpu-backend cuda` and make sure you installe
 For example
 
 ```shell
-protein-detective powerfit run --gpu 1 --batch-size 50 --gpu-backend cuda ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession
+protein-detective powerfit run --batch-size 50 --gpu-backend cuda ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession
 ```
 
 </details>
@@ -220,10 +223,10 @@ parallel --jobs 4 < commands.txt
 
 </details>
 
-To print top 10 solutions to the terminal, you can use:
+To print top 1 solutions per template structure to the terminal, you can use:
 
 ```shell
-protein-detective powerfit report docs/session1
+protein-detective powerfit report mysession
 ```
 
 Outputs something like:
@@ -238,7 +241,7 @@ powerfit_run_id,structure,rank,cc,fishz,relz,translation,rotation,pdb_id,pdb_fil
 To generate model PDB files rotated/translated to PowerFit solutions, you can use:
 
 ```shell
-protein-detective powerfit fit-models docs/session1
+protein-detective powerfit fit-models mysession
 ```
 
 ## Contributing

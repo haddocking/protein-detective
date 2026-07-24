@@ -39,7 +39,7 @@ def powerfit_worker(
     # This function is a refactor of powerfit_em.powerfit.powerfit function that caches
     # the PowerFitter instance on each worker to avoid re-initialization overhead and reuse of GPU queue.
     global pf  # noqa: PLW0603
-    result_dir = powerfit_run_root_dir / template_structure.stem
+    result_dir = powerfit_run_root_dir / template_structure.name
     solutions = result_dir / "solutions.out"
     logger.info(f"Running PowerFit on {density_map_target} against {template_structure} with options: {options}")
     if solutions.exists():

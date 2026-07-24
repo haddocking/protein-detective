@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -9,8 +10,28 @@ from protein_quest.structure.formats import read_structure
 from protein_quest.structure.uniprot import structure2uniprot_accessions
 from protein_quest.utils import CopyMethod
 from rich.progress import track
+from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 
-from protein_detective.common_cli import Common, console
+from protein_detective.common_cli import Common, console, write_ro_crate
+
+
+def _write_ro_crate(session_dir: Path, start_time: datetime, /, *, import_dir: Path):
+    ioargs = IOArgumentPaths(
+        output_dirs=[
+            IOArgumentPath(
+                name="imported_structures_dir",
+                path=import_dir,
+                help="Directory containing the imported structure files.",
+            ),
+        ],
+    )
+    write_ro_crate(
+        session_dir,
+        start_time,
+        command_name="import-structures",
+        command_description="Import structure files from a directory",
+        ioargs=ioargs,
+    )
 
 
 def import_structures(
@@ -34,6 +55,7 @@ def import_structures(
             UniProt accession). Without this flag, files that do not meet these criteria are skipped with
             a warning.
     """
+    start_time = datetime.now(tz=UTC)
     import_dir: Path = session_dir / "imported_structures"
     import_dir.mkdir(exist_ok=True, parents=True)
 
@@ -45,7 +67,6 @@ def import_structures(
             structure_file.resolve(), import_dir, copy_method=copy_method, output_format=".cif.gz"
         )
         output_file = conversion_stats.output_file
-        imported_files.append(output_file)
         structure = read_structure(output_file)
         chains = chains_in_structure(structure)
         chain_ids = {chain.name for chain in chains}
@@ -66,14 +87,13 @@ def import_structures(
             console.print(f"Warning: {msg} Skipping file.", style="yellow")
             output_file.unlink()
             continue
+        imported_files.append(output_file)
 
-    # TODO write uniprot.txt
-    # TODO write alphafold.csv
-    # TODO write pdbe.csv
-    # TODO for structures without resolution, fetch pdbe-quality reports
-    # and write pdbe-quality.json. It will require network access.
-    # Should this be toggled by a flag or just documented?
-    # TODO Write RO crate with imported_files as output_files
+    _write_ro_crate(
+        session_dir,
+        start_time,
+        import_dir=import_dir,
+    )
 
-    # TODO downstream commands should look if import_dir exists and if so, use it as input for powerfit.
-    # TODO determine if imported structures can be filtered with filter command.
+    # TODO allow imported structures to be filtered with filter command.
+    # will need pdbe.csv and pdbe-quality.json file generated from structures.
