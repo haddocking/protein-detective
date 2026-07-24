@@ -158,10 +158,7 @@ python3
 ```python
 from dask_jobqueue import SLURMCluster
 
-cluster = SLURMCluster(cores=8,
-                       processes=4,
-                       memory="16GB",
-                       queue="normal")
+cluster = SLURMCluster(cores=8, processes=4, memory="16GB", queue="normal")
 print(cluster.scheduler_address)
 # Prints something like: 'tcp://192.168.1.1:34059'
 # Keep this Python process running until powerfits are done
