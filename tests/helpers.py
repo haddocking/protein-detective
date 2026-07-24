@@ -1,9 +1,14 @@
 """Helper functions for testing."""
 
 import csv
+import gzip
 import sys
 from pathlib import Path
 
+import gemmi
+import pytest
+from protein_quest.structure.uniprot import add_uniprot_accessions2structure
+from protein_quest.uniprot_chains import UniprotChainMapping, UniprotChainRange
 from rocrate.metadata import BASENAME
 from rocrate.rocrate import ROCrate
 from vcr import use_cassette
@@ -91,3 +96,43 @@ def assert_crate(
 def read_csv(file: Path) -> list[dict[str, str]]:
     with file.open() as f:
         return list(csv.DictReader(f))
+
+
+def fake_structure_file(pdb_id: str, output: Path, uniprot_accession: str | None, chain_id: str = "A"):
+    structure = gemmi.Structure()
+    structure.name = pdb_id
+    structure.info["_entry.id"] = pdb_id
+    structure.info["_exptl.method"] = "X-RAY DIFFRACTION"
+    structure.resolution = 4.2
+    atom = gemmi.Atom()
+    atom.name = "CA"
+    atom.element = gemmi.Element("C")
+    residue = gemmi.Residue()
+    residue.name = "ALA"
+    residue.label_seq = 1
+    residue.seqid = gemmi.SeqId(1, " ")
+    residue.add_atom(atom)
+    residue.entity_type = gemmi.EntityType.Polymer
+    chain = gemmi.Chain(chain_id)
+    chain.add_residue(residue)
+    model = gemmi.Model(1)
+    model.add_chain(chain)
+    structure.add_model(model)
+    structure.setup_entities()
+    structure.assign_subchains()
+    if uniprot_accession:
+        structure, _injected, _uniprot_chains = add_uniprot_accessions2structure(
+            structure,
+            {
+                pdb_id: {
+                    UniprotChainMapping(
+                        uniprot_accession=uniprot_accession,
+                        chain_ranges=(UniprotChainRange(chain_ids=(chain_id,), start=1, end=100),),
+                    )
+                }
+            },
+        )
+        structure.setup_entities()
+    doc = structure.make_mmcif_document(gemmi.MmcifOutputGroups(True, chem_comp=False))
+
+    output.write_bytes(gzip.compress(doc.as_string().encode("utf-8")))
