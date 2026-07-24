@@ -12,7 +12,7 @@ from protein_quest.utils import CopyMethod
 from rich.progress import track
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 
-from protein_detective.common_cli import Common, console, write_ro_crate
+from protein_detective.common_cli import Common, console, rprint, write_ro_crate
 
 
 def _write_ro_crate(session_dir: Path, start_time: datetime, /, *, import_dir: Path):
@@ -70,8 +70,8 @@ def import_structures(
         structure = read_structure(output_file)
         chains = chains_in_structure(structure)
         chain_ids = {chain.name for chain in chains}
-        if chain_ids != {"A"}:
-            msg = f"Structure file {structure_file} contains chains {chain_ids}, expected single chain A."
+        if len(chain_ids) != 1:
+            msg = f"Structure file {structure_file} contains chains {chain_ids}, expected single chain."
             msg += " Use `protein-quest filter chain` to fix this."
             if strict:
                 raise ValueError(msg)
@@ -94,6 +94,7 @@ def import_structures(
         start_time,
         import_dir=import_dir,
     )
+    rprint(f"[green]Imported {len(imported_files)} structure files.[/green]")
 
     # TODO allow imported structures to be filtered with filter command.
     # will need pdbe.csv and pdbe-quality.json file generated from structures.

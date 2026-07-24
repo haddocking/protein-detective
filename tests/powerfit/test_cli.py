@@ -1,14 +1,10 @@
 import csv
-import gzip
 from pathlib import Path
 from textwrap import dedent
 
-import gemmi
 import pytest
-from protein_quest.structure.uniprot import add_uniprot_accessions2structure
-from protein_quest.uniprot_chains import UniprotChainMapping, UniprotChainRange
 
-from tests.helpers import cli, fake_run_retrieve
+from tests.helpers import assert_crate, cli, fake_run_retrieve, fake_structure_file, read_csv
 
 
 def test_commands_help(capsys: pytest.CaptureFixture[str]):
@@ -57,55 +53,16 @@ def test_commands_defaults(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     )
 
 
-def fake_archive_em_structure(pdb_id: str, output: Path, uniprot_accession: str = "P12345"):
-    structure = gemmi.Structure()
-    structure.name = pdb_id
-    structure.info["_entry.id"] = pdb_id
-    structure.info["_exptl.method"] = "X-RAY DIFFRACTION"
-    structure.resolution = 4.2
-    atom = gemmi.Atom()
-    atom.name = "CA"
-    atom.element = gemmi.Element("C")
-    residue = gemmi.Residue()
-    residue.name = "ALA"
-    residue.label_seq = 1
-    residue.seqid = gemmi.SeqId(1, " ")
-    residue.add_atom(atom)
-    residue.entity_type = gemmi.EntityType.Polymer
-    chain = gemmi.Chain("A")
-    chain.add_residue(residue)
-    model = gemmi.Model(1)
-    model.add_chain(chain)
-    structure.add_model(model)
-    structure.setup_entities()
-    structure.assign_subchains()
-    structure, _injected, _uniprot_chains = add_uniprot_accessions2structure(
-        structure,
-        {
-            pdb_id: {
-                UniprotChainMapping(
-                    uniprot_accession=uniprot_accession,
-                    chain_ranges=(UniprotChainRange(chain_ids=("A",), start=1, end=100),),
-                )
-            }
-        },
-    )
-    structure.setup_entities()
-    doc = structure.make_mmcif_document(gemmi.MmcifOutputGroups(True, chem_comp=False))
-
-    output.write_bytes(gzip.compress(doc.as_string().encode("utf-8")))
-
-
 def fake_solutions(session_dir: Path, powerfit_run_id: str) -> list[Path]:
     # Create structures
     structures_dir = session_dir / "combined_output"
     structures_dir.mkdir()
-    fake_archive_em_structure("1abc", structures_dir / "1abc.cif.gz", uniprot_accession="P67890")
-    fake_archive_em_structure("2abc", structures_dir / "2abc.cif.gz", uniprot_accession="P42424")
-    fake_archive_em_structure("3abc", structures_dir / "3abc.cif.gz", uniprot_accession="P12345")
+    fake_structure_file("1abc", structures_dir / "1abc.cif.gz", uniprot_accession="P67890")
+    fake_structure_file("2abc", structures_dir / "2abc.cif.gz", uniprot_accession="P42424")
+    fake_structure_file("3abc", structures_dir / "3abc.cif.gz", uniprot_accession="P12345")
 
-    # Write fake solutions
     powerfit_run_dir = session_dir / "powerfit" / powerfit_run_id
+    # Write fake solutions
     sr1 = powerfit_run_dir / "1abc.cif.gz" / "solutions.out"
     sr1.parent.mkdir(parents=True, exist_ok=True)
     solutions1 = dedent("""\
@@ -301,3 +258,201 @@ class TestHandlerPowerfitReport:
             },
         ]
         assert_solutions(stdout, expected)
+
+
+def test_run(tmp_path: Path, ribosome_map: Path, cif_2y29: Path, capsys: pytest.CaptureFixture[str]):
+    session_dir = tmp_path / "session"
+    target = ribosome_map
+    input_structure = cif_2y29
+    imported_structures_dir = session_dir / "imported_structures"
+    imported_structures_dir.mkdir(parents=True, exist_ok=True)
+    imported_structure = imported_structures_dir / input_structure.name
+    imported_structure.symlink_to(input_structure)
+
+    # Using very crude parameters to make test fast and have solutions which are bad, but useful.
+    argv = [
+        "powerfit",
+        "run",
+        str(target),
+        "50",
+        str(session_dir),
+        "--cpu",
+        "--angle",
+        "180",
+        # Using sequential so code coverage is tracked and its faster because Dask cluster does not need to be started.
+        "--scheduler-address",
+        "sequential",
+    ]
+    cli(argv)
+
+    powerfit_root_dir = session_dir / "powerfit"
+    assert powerfit_root_dir.exists()
+    powerfit_run_dir = powerfit_root_dir / "run_001"
+    fittable_csv = powerfit_root_dir / "fittable_structures.csv"
+    solutions_out = powerfit_run_dir / imported_structure.name / "solutions.out"
+
+    assert set(powerfit_root_dir.glob("**")) == {
+        powerfit_root_dir,
+        fittable_csv,
+        powerfit_run_dir,
+        powerfit_run_dir / target.name,
+        powerfit_run_dir / imported_structure.name,
+        solutions_out,
+    }
+
+    stderr = capsys.readouterr().err
+    assert "PowerFit run completed with ID" in stderr
+
+    assert_solutions(
+        solutions_out.read_text(),
+        [
+            {
+                "cc": "1.000",
+                "rank": "1",
+            },
+            {
+                "cc": "1.000",
+                "rank": "2",
+            },
+            {
+                "cc": "1.000",
+                "rank": "3",
+            },
+            {
+                "cc": "1.000",
+                "rank": "4",
+            },
+            {
+                "cc": "1.000",
+                "rank": "5",
+            },
+            {
+                "cc": "1.000",
+                "rank": "6",
+            },
+            {
+                "cc": "1.000",
+                "rank": "7",
+            },
+            {
+                "cc": "0.999",
+                "rank": "8",
+            },
+            {
+                "cc": "0.750",
+                "rank": "9",
+            },
+        ],
+    )
+
+    assert read_csv(fittable_csv) == [
+        {
+            "pdb_id": "2Y29",
+            "structure": "2y29_updated.cif.gz",
+            "structure_file": "imported_structures/2y29_updated.cif.gz",
+            "uniprot_accessions": "P05067",
+        },
+    ]
+
+    assert_crate(
+        session_dir,
+        action_id=f"protein-detective powerfit run {target} 50 {session_dir} --cpu --angle 180 --scheduler-address sequential",
+        input_ids={str(target), str(imported_structure)},
+        output_ids={str(solutions_out)},
+    )
+
+
+def test_fit_models(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    session_dir = tmp_path / "session"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    powerfit_run_id = "run_001"
+    fake_solutions(session_dir, powerfit_run_id)
+
+    fitted_csv = tmp_path / "fitted_models.csv"
+
+    argv = ["powerfit", "fit-models", str(session_dir), "--output", str(fitted_csv)]
+    cli(argv)
+
+    fitted_model1 = session_dir / "powerfit" / powerfit_run_id / "3abc.cif.gz" / "fit_1.pdb"
+    assert fitted_model1.exists()
+    fitted_model2 = session_dir / "powerfit" / powerfit_run_id / "2abc.cif.gz" / "fit_1.pdb"
+    assert fitted_model2.exists()
+    fitted_model3 = session_dir / "powerfit" / powerfit_run_id / "1abc.cif.gz" / "fit_1.pdb"
+    assert fitted_model3.exists()
+
+    unfitted_models = [
+        session_dir / "combined_output" / "3abc.cif.gz",
+        session_dir / "combined_output" / "2abc.cif.gz",
+        session_dir / "combined_output" / "1abc.cif.gz",
+    ]
+
+    assert read_csv(fitted_csv) == [
+        {
+            "fitted_model_file": str(fitted_model1),
+            "powerfit_run_id": "run_001",
+            "rank": "1",
+            "structure": "3abc.cif.gz",
+            "unfitted_model_file": str(unfitted_models[0]),
+        },
+        {
+            "fitted_model_file": str(fitted_model2),
+            "powerfit_run_id": "run_001",
+            "rank": "1",
+            "structure": "2abc.cif.gz",
+            "unfitted_model_file": str(unfitted_models[1]),
+        },
+        {
+            "fitted_model_file": str(fitted_model3),
+            "powerfit_run_id": "run_001",
+            "rank": "1",
+            "structure": "1abc.cif.gz",
+            "unfitted_model_file": str(unfitted_models[2]),
+        },
+    ]
+
+    assert_crate(
+        session_dir,
+        action_id=f"protein-detective powerfit fit-models {session_dir} --output {fitted_csv}",
+        input_ids={str(unfitted_models[0]), str(unfitted_models[1]), str(unfitted_models[2])},
+        output_ids={str(fitted_model1), str(fitted_model2), str(fitted_model3)},
+    )
+
+
+def test_list_runs(tmp_path):
+    session_dir = tmp_path / "session"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    powerfit_root_dir = session_dir / "powerfit"
+    powerfit_root_dir.mkdir(parents=True, exist_ok=True)
+    (powerfit_root_dir / "run_001").mkdir()
+    (powerfit_root_dir / "run_001" / "targetA.mrc").write_text("fake target")
+    (powerfit_root_dir / "run_002").mkdir()
+    (powerfit_root_dir / "run_002" / "targetB.mrc").write_text("fake target")
+    runs_csv = powerfit_root_dir / "runs.csv"
+
+    argv = ["powerfit", "list-runs", str(session_dir), "--output", str(runs_csv)]
+    cli(argv)
+
+    assert read_csv(runs_csv) == [
+        {
+            "density_map": str(powerfit_root_dir / "run_001" / "targetA.mrc"),
+            "run_dir": str(powerfit_root_dir / "run_001"),
+            "run_id": "run_001",
+        },
+        {
+            "density_map": str(powerfit_root_dir / "run_002" / "targetB.mrc"),
+            "run_dir": str(powerfit_root_dir / "run_002"),
+            "run_id": "run_002",
+        },
+    ]
+
+
+def test_list_lcc(tmp_path, capsys: pytest.CaptureFixture[str]):
+    fake_solutions(tmp_path, "run_001")
+
+    argv = ["powerfit", "list-lcc", str(tmp_path), "--output", str(tmp_path / "lcc.csv")]
+    cli(argv)
+
+    stderr = capsys.readouterr().err
+    assert "No lcc.mrc files found" in stderr
+
+    assert not (tmp_path / "lcc.csv").exists()

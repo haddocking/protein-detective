@@ -1,4 +1,3 @@
-import os
 from csv import DictReader
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -96,7 +95,7 @@ def _create_interaction_partner_seeds_file(session_dir, seeds: set[str]) -> Stdi
     seeds_path = StdioPath(session_dir / "interaction_partner_seeds.txt")
     with seeds_path.open("w") as f:
         for seed in sorted(seeds):
-            f.write(seed + os.sep)
+            f.write(seed + "\n")
     return seeds_path
 
 
@@ -120,7 +119,7 @@ def _add_complex_members_to_uniprot(
     uniprot_with_interaction_partners_path = StdioPath(uniprot_path.parent / "uniprot_with_interaction_partners.txt")
     with uniprot_with_interaction_partners_path.open("w") as f:
         for uniprot_accession in sorted(uniprot_accessions):
-            f.write(uniprot_accession + os.sep)
+            f.write(uniprot_accession + "\n")
     return uniprot_with_interaction_partners_path
 
 

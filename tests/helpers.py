@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 
 import gemmi
-import pytest
 from protein_quest.structure.uniprot import add_uniprot_accessions2structure
 from protein_quest.uniprot_chains import UniprotChainMapping, UniprotChainRange
 from rocrate.metadata import BASENAME
@@ -136,3 +135,10 @@ def fake_structure_file(pdb_id: str, output: Path, uniprot_accession: str | None
     doc = structure.make_mmcif_document(gemmi.MmcifOutputGroups(True, chem_comp=False))
 
     output.write_bytes(gzip.compress(doc.as_string().encode("utf-8")))
+
+
+def assert_lines(file: Path, expected_lines: set[str]):
+    """Assert that the lines in the file match the expected lines."""
+    with file.open() as f:
+        actual_lines = {line.strip() for line in f.readlines()}
+    assert actual_lines == expected_lines, f"Expected lines {expected_lines} but got {actual_lines} in file {file}"

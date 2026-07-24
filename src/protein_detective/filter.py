@@ -233,6 +233,7 @@ def run_filter(
         ss_output_dir = session_dir / "secondary_structure"
         ss_stats_file = StdioPath(session_dir / "secondary_structure_stats.csv")
         secondary_structure(combined_output_dir, ss_output_dir, filters=options.ss, write_stats=ss_stats_file)
+        _make_stats_relative_to_session_dir(ss_stats_file, session_dir)
 
     _write_ro_crate(
         session_dir,

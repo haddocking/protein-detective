@@ -472,12 +472,11 @@ def powerfit_list_runs(session_dir: Path) -> list[tuple[str, str, Path]]:
     """
     powerfit_root_dir = session_dir / "powerfit"
     runs = []
-    cwd = Path.cwd()
     for run_dir in sorted(powerfit_root_dir.iterdir()):
         if run_dir.is_dir():
-            density_map = density_map_of_run_dir(run_dir)
+            density_map = density_map_of_run_dir(run_dir).relative_to(session_dir, walk_up=True)
             # TODO from ro-crate-metadata.json parse command used to create run_dir
-            runs.append((run_dir.name, str(density_map), run_dir.absolute().relative_to(cwd, walk_up=True)))
+            runs.append((run_dir.name, str(density_map), run_dir.relative_to(session_dir, walk_up=True)))
     return runs
 
 

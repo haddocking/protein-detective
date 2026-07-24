@@ -3,7 +3,15 @@ from pathlib import Path
 
 import pytest
 
-from tests.helpers import assert_crate, cli, fake_run_retrieve, fake_setup_retrieve, read_csv
+from tests.helpers import (
+    assert_crate,
+    assert_lines,
+    cli,
+    fake_run_retrieve,
+    fake_setup_retrieve,
+    fake_structure_file,
+    read_csv,
+)
 
 
 def test_app_help(capsys: pytest.CaptureFixture[str]):
@@ -81,6 +89,120 @@ def test_search(tmp_path: Path):
 
 
 @pytest.mark.vcr
+def test_search_with_interaction_partners(tmp_path: Path):
+    session_dir = tmp_path / "session"
+    argv = [
+        "search",
+        str(session_dir),
+        "--taxon-id",
+        "9606",
+        "--reviewed",
+        "--limit-uniprot",
+        "50",
+        "--pdbe.limit",
+        "50",
+        "--interaction.seed",
+        "Q05471",
+    ]
+    cli(argv)
+
+    assert_lines(session_dir / "interaction_partner_seeds.txt", {"Q05471"})
+    complexes = read_csv(session_dir / "complexes.csv")
+    assert complexes == [
+        {
+            "complex_id": "CPX-2122",
+            "complex_title": "Swr1 chromatin remodelling complex",
+            "complex_url": "https://www.ebi.ac.uk/complexportal/complex/CPX-2122",
+            "members": "P31376;P35817;P38326;P53201;P53930;P60010;P80428;Q03388;Q03433;Q03940;Q05471;Q06707;Q12464;Q12509",
+            "query_protein": "Q05471",
+        }
+    ]
+    assert_lines(
+        session_dir / "uniprot_with_interaction_partners.txt",
+        {
+            "A0A024R1R8",
+            "A0A024RBG1",
+            "A0A075B6H7",
+            "A0A075B6H8",
+            "A0A075B6H9",
+            "A0A075B6I0",
+            "A0A075B6I1",
+            "A0A075B6I3",
+            "A0A075B6I4",
+            "A0A075B6I6",
+            "A0A075B6I7",
+            "A0A075B6I9",
+            "A0A075B6J1",
+            "A0A075B6J2",
+            "A0A075B6J6",
+            "A0A075B6J9",
+            "A0A075B6K0",
+            "A0A075B6K2",
+            "A0A075B6K4",
+            "A0A075B6K5",
+            "A0A075B6K6",
+            "A0A075B6L2",
+            "A0A075B6L6",
+            "A0A075B6N1",
+            "A0A075B6N2",
+            "A0A075B6N3",
+            "A0A075B6N4",
+            "A0A075B6P5",
+            "A0A075B6Q5",
+            "A0A075B6R0",
+            "A0A075B6R2",
+            "A0A075B6R9",
+            "A0A075B6S0",
+            "A0A075B6S2",
+            "A0A075B6S4",
+            "A0A075B6S5",
+            "A0A075B6S6",
+            "A0A075B6S9",
+            "A0A075B6T6",
+            "A0A075B6T7",
+            "A0A075B6T8",
+            "A0A075B6U4",
+            "A0A075B6V5",
+            "A0A075B6W5",
+            "A0A075B6X5",
+            "A0A075B6Y3",
+            "A0A075B6Y9",
+            "A0A075B700",
+            "A0A075B706",
+            "A0A075B734",
+            # Below are the interaction partners
+            "P31376",
+            "P35817",
+            "P38326",
+            "P53201",
+            "P53930",
+            "P60010",
+            "P80428",
+            "Q03388",
+            "Q03433",
+            "Q03940",
+            "Q06707",
+            "Q12464",
+            "Q12509",
+        },
+    )
+
+    assert_crate(
+        session_dir,
+        action_id=f"protein-detective search {session_dir} --taxon-id 9606 --reviewed --limit-uniprot 50 --pdbe.limit 50 --interaction.seed Q05471",
+        output_ids={
+            "uniprot.txt",
+            "alphafold.csv",
+            "pdbe.csv",
+            "pdbe-quality.json",
+            "interaction_partner_seeds.txt",
+            "complexes.csv",
+            "uniprot_with_interaction_partners.txt",
+        },
+    )
+
+
+@pytest.mark.vcr
 def test_retrieve(tmp_path: Path):
     session_dir, argv = fake_setup_retrieve(tmp_path)
     cli(argv)
@@ -115,7 +237,7 @@ def test_filter_help(capsys: pytest.CaptureFixture[str]):
 
 @pytest.mark.vcr
 @pytest.mark.default_cassette("test_retrieve.yaml")
-def test_filter(tmp_path: Path):
+def test_filter_defaults(tmp_path: Path):
     session_dir = fake_run_retrieve(tmp_path)
     pdbe_quality_json = session_dir / "pdbe-quality.json"
     pdbe_quality_json.write_text("{}")
@@ -210,3 +332,157 @@ def test_filter(tmp_path: Path):
         },
         nr_actions=2,
     )
+
+
+@pytest.mark.vcr
+@pytest.mark.default_cassette("test_retrieve.yaml")
+def test_filter_with_secondary_structure(tmp_path: Path):
+    session_dir = fake_run_retrieve(tmp_path)
+    pdbe_quality_json = session_dir / "pdbe-quality.json"
+    pdbe_quality_json.write_text("{}")
+
+    argv = ["filter", str(session_dir), "--secondary.abs-min-helix-residues", "5"]
+    cli(argv)
+
+    assert read_csv(session_dir / "secondary_structure_stats.csv") == [
+        {
+            "helix_ratio": "0.0",
+            "input_file": "combined_output/2y29_updated_A2A.cif.gz",
+            "nr_helix_residues": "0",
+            "nr_residues": "8",
+            "nr_sheet_residues": "0",
+            "output_file": "",
+            "passed": "False",
+            "sheet_ratio": "0.0",
+        },
+        {
+            "helix_ratio": "0.0",
+            "input_file": "combined_output/AF-A0A0C5B5G6-F1-model_v6.cif.gz",
+            "nr_helix_residues": "0",
+            "nr_residues": "10",
+            "nr_sheet_residues": "0",
+            "output_file": "",
+            "passed": "False",
+            "sheet_ratio": "0.0",
+        },
+    ]
+
+    ss_stats_file = session_dir / "secondary_structure_stats.csv"
+    assert ss_stats_file.exists()
+    assert read_csv(ss_stats_file) == [
+        {
+            "helix_ratio": "0.0",
+            "input_file": "combined_output/2y29_updated_A2A.cif.gz",
+            "nr_helix_residues": "0",
+            "nr_residues": "8",
+            "nr_sheet_residues": "0",
+            "output_file": "",
+            "passed": "False",
+            "sheet_ratio": "0.0",
+        },
+        {
+            "helix_ratio": "0.0",
+            "input_file": "combined_output/AF-A0A0C5B5G6-F1-model_v6.cif.gz",
+            "nr_helix_residues": "0",
+            "nr_residues": "10",
+            "nr_sheet_residues": "0",
+            "output_file": "",
+            "passed": "False",
+            "sheet_ratio": "0.0",
+        },
+    ]
+
+    ss_dir = session_dir / "secondary_structure"
+    assert ss_dir.exists()
+    assert len(list(ss_dir.iterdir())) == 0
+
+    assert_crate(
+        session_dir,
+        action_id=f"protein-detective filter {session_dir} --secondary.abs-min-helix-residues 5",
+        input_ids={
+            "pdbe.csv",
+            "downloads/pdbe",
+            "downloads/alphafold",
+            "pdbe-quality.json",
+        },
+        output_ids={
+            "single_chain",
+            "uniprots_verified",
+            "combined_input",
+            "combined_output",
+            "combined_stats.csv",
+            "uniprots_verified_stats.csv",
+            "single_chain_stats.csv",
+            "secondary_structure_stats.csv",
+            "secondary_structure",
+        },
+        nr_actions=2,
+    )
+
+
+class TestImportStructures:
+    def test_defaults_happy(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+        session_dir = tmp_path / "session"
+        session_dir.mkdir()
+        input_dir = session_dir / "input"
+        input_dir.mkdir()
+        fake_structure_file("1abc", input_dir / "1abc.cif.gz", uniprot_accession="P67890")
+
+        argv = [
+            "import-structures",
+            str(input_dir),
+            str(session_dir),
+        ]
+        cli(argv)
+
+        assert (session_dir / "imported_structures" / "1abc.cif.gz").exists()
+
+        stderr = capsys.readouterr().err
+        assert "Imported 1 structure files." in stderr
+
+        assert_crate(
+            session_dir,
+            action_id=f"protein-detective import-structures {input_dir} {session_dir}",
+            output_ids={
+                "imported_structures/1abc.cif.gz",
+            },
+        )
+
+    def test_loose_bad_structure(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+        session_dir = tmp_path / "session"
+        session_dir.mkdir()
+        input_dir = session_dir / "input"
+        input_dir.mkdir()
+        fake_structure_file("1abc", input_dir / "1abc.cif.gz", uniprot_accession=None, chain_id="A")
+        fake_structure_file("2def", input_dir / "2def.cif.gz", uniprot_accession="P67890", chain_id="B")
+
+        argv = [
+            "import-structures",
+            str(input_dir),
+            str(session_dir),
+        ]
+        cli(argv)
+
+        assert not (session_dir / "imported_structures" / "1abc.cif.gz").exists()
+        assert (session_dir / "imported_structures" / "2def.cif.gz").exists()
+
+        stderr = capsys.readouterr().err
+        assert "Imported 1 structure files." in stderr
+
+        assert "UniProt accessions, expected 1" in stderr
+
+    def test_strict_bad_structure(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+        session_dir = tmp_path / "session"
+        session_dir.mkdir()
+        input_dir = session_dir / "input"
+        input_dir.mkdir()
+        fake_structure_file("2def", input_dir / "2def.cif.gz", uniprot_accession=None, chain_id="B")
+
+        argv = [
+            "import-structures",
+            str(input_dir),
+            str(session_dir),
+            "--strict",
+        ]
+        with pytest.raises(ValueError, match="UniProt accessions, expected 1"):
+            cli(argv)
