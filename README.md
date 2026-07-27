@@ -14,6 +14,11 @@ It uses
 
 - [protein-quest](https://github.com/haddocking/protein-quest) to search, retrieve and filter protein structures from Uniprot, PDBe and AlphaFold DB.
 - [powerfit](https://pypi.org/project/powerfit-em/) to fit protein structure in a Electron Microscopy (EM) density map.
+- [cyclopts](https://cyclopts.readthedocs.io/en/latest/) for command line interface
+- [molviewspec](https://molstar.org/mol-view-spec/) to visualize the fitted structures and density map in a web browser.
+- [dask](https://dask.org/) to run powerfit in parallel on multiple CPU cores or GPUs.
+- [Research Object Crate](https://www.researchobject.org/ro-crate/) to keep track of commands and their input/output files/directories.
+- [duckdb](https://duckdb.org/) to query CSV files like powerfit/*/*/solutions.out files.
 
 Diagram how protein-detective calls protein-quest and powerfit:
 
@@ -87,8 +92,6 @@ pip install "protein-detective[cuda12]"
 ## Usage
 
 The main entry point is the `protein-detective` command line tool which has multiple subcommands to perform actions.
-
-To use programmaticly, see the [notebooks](docs/notebooks) and [API documentation](https://www.bonvinlab.org/protein-detective/autoapi/summary/).
 
 ### Search Uniprot for structures
 
@@ -177,7 +180,7 @@ Rotate and translate the prepared structures to fit and score them into the EM d
 ```shell
 protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession
 # or for with some flags
-protein-detective powerfit run --gpu --angle 40 --powerfit-run-id myrun1 ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession4
+protein-detective powerfit run --workers-per-gpu 2 --angle 40 --powerfit-run-id myrun1 ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession4
 ```
 
 This will use [dask-distributed](https://distributed.dask.org/en/latest/) to run powerfit for each structure in parallel on multiple CPU cores or GPUs.
@@ -261,7 +264,20 @@ parallel --jobs 4 < commands.txt
 
 </details>
 
-To print top 1 solutions per template structure to the terminal, you can use:
+To  list the completed powerfit runs, you can use:
+
+```shell
+protein-detective powerfit list-runs mysession
+```
+
+Which will output something like:
+
+```csv
+powerfit_run_id,density_map,run_dir,options
+myrun1,mysession/powerfit/myrun1/ribosome-KsgA.map,mysession/powerfit/myrun1,--workers-per-gpu 2 --angle 40 --powerfit-run-id myrun1 ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession
+```
+
+To print top 1 solution per template structure to the terminal, you can use:
 
 ```shell
 protein-detective powerfit report mysession
@@ -269,18 +285,31 @@ protein-detective powerfit report mysession
 
 Outputs something like:
 
-```
-powerfit_run_id,structure,rank,cc,fishz,relz,translation,rotation,pdb_id,pdb_file,uniprot_acc
-10,A8MT69_pdb4e45.ent_B2A,1,0.432,0.463,10.091,227.18:242.53:211.83,0.0:1.0:1.0:0.0:0.0:1.0:1.0:0.0:0.0,4E45,docs/session1/single_chain/A8MT69_pdb4e45.ent_B2A.pdb,A8MT69
-10,A8MT69_pdb4ne5.ent_B2A,1,0.423,0.452,10.053,227.18:242.53:214.9,0.0:-0.0:-0.0:-0.604:0.797:0.0:0.797:0.604:0.0,4NE5,docs/session1/single_chain/A8MT69_pdb4ne5.ent_B2A.pdb,A8MT69
+```csv
+powerfit_run_id,structure,rank,cc,fishz,relz,translation,rotation,template_file,uniprot_accessions,pdb_id
+myrun1,3i8z_updated_A2A.cif.gz,1,0.598,0.69,12.959,239.46:187.27:211.83,-0.238:0.322:0.916:0.916:-0.238:0.322:0.322:0.916:-0.238,mysession/combined_output/3i8z_updated_A2A.cif.gz,O00257,3I8Z
+myrun1,6mzc_updated_E2A.cif.gz,1,0.547,0.614,14.671,199.55:214.9:165.78,1.0:0.0:0.0:0.0:-1.0:0.0:0.0:0.0:-1.0,mysession/combined_output/6mzc_updated_E2A.cif.gz,O00268,6MZC
 ...
 ```
 
-To generate model PDB files rotated/translated to PowerFit solutions, you can use:
+To generate model PDB files rotated/translated to top 1 solution per template structure, you can use:
 
 ```shell
 protein-detective powerfit fit-models mysession
 ```
+
+Outputs something like:
+
+```csv
+powerfit_run_id,structure,rank,fitted_model_file,unfitted_model_file
+myrun1,3i8z_updated_A2A.cif.gz,1,mysession/powerfit/myrun1/3i8z_updated_A2A.cif.gz/fit_1.pdb,mysession/combined_output/3i8z_updated_A2A.cif.gz
+myrun1,6mzc_updated_E2A.cif.gz,1,mysession/powerfit/myrun1/6mzc_updated_E2A.cif.gz/fit_1.pdb,mysession/combined_output/6mzc_updated_E2A.cif.gz
+...
+```
+
+Where the `fitted_model_file` column is the structure file of the fitted model and `unfitted_model_file` is the original structure file.
+
+The results can also be visualized see [visualization.ipynb](https://bonvinlab.org/protein-detective/docs/visualization.html) for an example.
 
 ## Contributing
 

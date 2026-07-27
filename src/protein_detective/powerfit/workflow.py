@@ -13,6 +13,7 @@ from duckdb import connect
 from pandas import DataFrame
 from protein_quest.structure.formats import read_structure
 from protein_quest.structure.uniprot import structure2uniprot_accessions
+from rocrate.rocrate import ROCrate
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 from tqdm.auto import tqdm
 
@@ -255,7 +256,7 @@ def make_fittable_structures_df(session_dir: Path) -> list[FittableStructure]:
         name = structure_file.name
         structure = read_structure(structure_file)
         pdb_id = structure.name
-        uniprot_accessions = ",".join(structure2uniprot_accessions(structure))
+        uniprot_accessions = ":".join(structure2uniprot_accessions(structure))
         data.append(
             {
                 "structure_file": str(structure_file.relative_to(session_dir, walk_up=True)),
@@ -461,22 +462,64 @@ def density_map_of_run_dir(run_dir: Path) -> Path:
     raise FileNotFoundError(msg)
 
 
-def powerfit_list_runs(session_dir: Path) -> list[tuple[str, str, Path]]:
+def powerfit_run_options_from_rocrate(session_dir: Path) -> dict[str, str]:
+    """Extract PowerFit run options from the RO-Crate metadata.
+
+    Args:
+        session_dir: Directory containing the session data.
+
+    Returns:
+        A dictionary mapping PowerFit run IDs to their corresponding options.
+    """
+    crate = ROCrate(session_dir)
+    runs = {}
+    for action in crate.get_by_type("CreateAction"):
+        raw_cmd = action.id
+        if "protein-detective powerfit run" not in raw_cmd:
+            continue
+        # /home/verhoes/git/protein-detective/protein-detective/.venv/bin/protein-detective powerfit run \
+        # --workers-per-gpu 2 --angle 40 --powerfit-run-id myrun1 ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession
+        # ->
+        # --workers-per-gpu 2 --angle 40 --powerfit-run-id myrun1 ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession
+        options = raw_cmd.split("protein-detective powerfit run", 1)[1].strip()
+        for result in action["result"]:
+            if result.type != "Dataset":
+                continue
+            # powerfit/myrun1 -> myrun1
+            run_dir = Path(result["name"]).name
+            runs[run_dir] = options
+    return runs
+
+
+class RunInfo(TypedDict):
+    powerfit_run_id: str
+    density_map: Path
+    run_dir: Path
+    options: str
+
+
+def powerfit_list_runs(session_dir: Path) -> list[RunInfo]:
     """List all PowerFit runs in the session directory.
 
     Args:
         session_dir: Directory containing the session data.
 
     Returns:
-        A list of tuples containing the run ID, density map path, and directory path for each PowerFit run.
+        A list of RunInfo dictionaries for each PowerFit run.
     """
     powerfit_root_dir = session_dir / "powerfit"
     runs = []
+    options = powerfit_run_options_from_rocrate(session_dir)
     for run_dir in sorted(powerfit_root_dir.iterdir()):
         if run_dir.is_dir():
             density_map = density_map_of_run_dir(run_dir).relative_to(session_dir, walk_up=True)
-            # TODO from ro-crate-metadata.json parse command used to create run_dir
-            runs.append((run_dir.name, str(density_map), run_dir.relative_to(session_dir, walk_up=True)))
+            info = RunInfo(
+                powerfit_run_id=run_dir.name,
+                density_map=density_map,
+                run_dir=run_dir.relative_to(session_dir, walk_up=True),
+                options=options.get(run_dir.name, ""),
+            )
+            runs.append(info)
     return runs
 
 

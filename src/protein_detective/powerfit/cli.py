@@ -1,3 +1,4 @@
+import csv
 import sys
 from pathlib import Path
 from typing import Annotated
@@ -143,6 +144,11 @@ def report(
     solutions.loc[:, "translation"] = solutions["translation"].apply(array_to_str)
     solutions.loc[:, "rotation"] = solutions["rotation"].apply(array_to_str)
 
+    # Prepend session_dir so template_file points to files within the selected session.
+    solutions.loc[:, "template_file"] = solutions["template_file"].map(
+        lambda template_file: str(session_dir / Path(template_file))
+    )
+
     if output.is_stdio:
         # Pandas does not like StdioPath
         solutions.to_csv(sys.stdout, index=False)
@@ -176,6 +182,7 @@ def fit_models(
     group_by_structure = not no_group_by_structure
 
     fitted = powerfit_fit_models(session_dir, powerfit_run_id, top, group_by_structure=group_by_structure)
+
     if output.is_stdio:
         # Pandas does not like StdioPath
         fitted.to_csv(sys.stdout, index=False)
@@ -205,9 +212,13 @@ def list_runs(
         return
 
     with output.open("wt") as fh:
-        print("run_id,density_map,run_dir", file=fh)
-        for run_id, density_map, run_dir in runs:
-            print(f"{run_id},{session_dir / density_map},{session_dir / run_dir}", file=fh)
+        writer = csv.DictWriter(fh, fieldnames=["powerfit_run_id", "density_map", "run_dir", "options"])
+        writer.writeheader()
+        for run in runs:
+            # Make paths relative to session_dir
+            run["run_dir"] = session_dir / run["run_dir"]
+            run["density_map"] = session_dir / run["density_map"]
+            writer.writerow(run)
 
 
 @powerfit_app.command

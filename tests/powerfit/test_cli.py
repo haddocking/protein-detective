@@ -1,4 +1,5 @@
 import csv
+import json
 from pathlib import Path
 from textwrap import dedent
 
@@ -123,7 +124,7 @@ class TestHandlerPowerfitReport:
                 "structure": "3abc.cif.gz",
                 "rank": "1",
                 "cc": "0.499",
-                "template_file": "combined_output/3abc.cif.gz",
+                "template_file": str(session_dir / "combined_output" / "3abc.cif.gz"),
                 "uniprot_accessions": "P12345",
                 "pdb_id": "3abc",
             },
@@ -132,7 +133,7 @@ class TestHandlerPowerfitReport:
                 "structure": "2abc.cif.gz",
                 "rank": "1",
                 "cc": "0.442",
-                "template_file": "combined_output/2abc.cif.gz",
+                "template_file": str(session_dir / "combined_output" / "2abc.cif.gz"),
                 "uniprot_accessions": "P42424",
                 "pdb_id": "2abc",
             },
@@ -141,7 +142,7 @@ class TestHandlerPowerfitReport:
                 "structure": "1abc.cif.gz",
                 "rank": "1",
                 "cc": "0.399",
-                "template_file": "combined_output/1abc.cif.gz",
+                "template_file": str(session_dir / "combined_output" / "1abc.cif.gz"),
                 "uniprot_accessions": "P67890",
                 "pdb_id": "1abc",
             },
@@ -170,7 +171,7 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "1",
                 "structure": "3abc.cif.gz",
-                "template_file": "combined_output/3abc.cif.gz",
+                "template_file": str(session_dir / "combined_output" / "3abc.cif.gz"),
                 "uniprot_accessions": "P12345",
             },
             {
@@ -179,7 +180,7 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "2",
                 "structure": "3abc.cif.gz",
-                "template_file": "combined_output/3abc.cif.gz",
+                "template_file": str(session_dir / "combined_output" / "3abc.cif.gz"),
                 "uniprot_accessions": "P12345",
             },
             {
@@ -188,7 +189,7 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "1",
                 "structure": "2abc.cif.gz",
-                "template_file": "combined_output/2abc.cif.gz",
+                "template_file": str(session_dir / "combined_output" / "2abc.cif.gz"),
                 "uniprot_accessions": "P42424",
             },
             {
@@ -197,7 +198,7 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "2",
                 "structure": "2abc.cif.gz",
-                "template_file": "combined_output/2abc.cif.gz",
+                "template_file": str(session_dir / "combined_output" / "2abc.cif.gz"),
                 "uniprot_accessions": "P42424",
             },
             {
@@ -206,7 +207,7 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "1",
                 "structure": "1abc.cif.gz",
-                "template_file": "combined_output/1abc.cif.gz",
+                "template_file": str(session_dir / "combined_output" / "1abc.cif.gz"),
                 "uniprot_accessions": "P67890",
             },
             {
@@ -215,7 +216,7 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "2",
                 "structure": "1abc.cif.gz",
-                "template_file": "combined_output/1abc.cif.gz",
+                "template_file": str(session_dir / "combined_output" / "1abc.cif.gz"),
                 "uniprot_accessions": "P67890",
             },
         ]
@@ -244,7 +245,7 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "1",
                 "structure": "3abc.cif.gz",
-                "template_file": "combined_output/3abc.cif.gz",
+                "template_file": str(session_dir / "combined_output" / "3abc.cif.gz"),
                 "uniprot_accessions": "P12345",
             },
             {
@@ -253,7 +254,7 @@ class TestHandlerPowerfitReport:
                 "powerfit_run_id": "run_001",
                 "rank": "2",
                 "structure": "3abc.cif.gz",
-                "template_file": "combined_output/3abc.cif.gz",
+                "template_file": str(session_dir / "combined_output" / "3abc.cif.gz"),
                 "uniprot_accessions": "P12345",
             },
         ]
@@ -427,8 +428,119 @@ def test_list_runs(tmp_path):
     (powerfit_root_dir / "run_001" / "targetA.mrc").write_text("fake target")
     (powerfit_root_dir / "run_002").mkdir()
     (powerfit_root_dir / "run_002" / "targetB.mrc").write_text("fake target")
-    runs_csv = powerfit_root_dir / "runs.csv"
+    # Run options are stored in the RO-Crate metadata, so we need to create a fake RO-Crate metadata file for this test.
+    (session_dir / "ro-crate-metadata.json").write_text(
+        json.dumps(
+            {
+                "@context": ["https://w3id.org/ro/crate/1.1/context", "https://w3id.org/ro/terms/workflow-run/context"],
+                "@graph": [
+                    {
+                        "@id": "./",
+                        "@type": "Dataset",
+                        "conformsTo": {"@id": "https://w3id.org/ro/wfrun/process/0.5"},
+                        "datePublished": "2026-07-27T07:25:04.654513+00:00",
+                        "description": "An RO-Crate recording the files and directories that were used as input or output by protein-detective.",
+                        "hasPart": [
+                            {"@id": "combined_output/"},
+                            {"@id": "powerfit/run_001/ribosome-KsgA.map"},
+                            {"@id": "powerfit/run_002/ribosome-KsgA.map"},
+                            {"@id": "powerfit/fittable_structures.csv"},
+                            {"@id": "powerfit/run_001/"},
+                            {"@id": "powerfit/run_002/"},
+                        ],
+                        "license": "CC-BY-4.0",
+                        "name": "Files used by protein-detective",
+                    },
+                    {
+                        "@id": "ro-crate-metadata.json",
+                        "@type": "CreativeWork",
+                        "about": {"@id": "./"},
+                        "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
+                    },
+                    {
+                        "@id": "combined_output/",
+                        "@type": "Dataset",
+                        "description": "Directory where the combined filtered structure files are written to.",
+                        "name": "combined_output",
+                    },
+                    {
+                        "@id": "https://w3id.org/ro/wfrun/process/0.5",
+                        "@type": "CreativeWork",
+                        "name": "Process Run Crate",
+                        "version": "0.5",
+                    },
+                    {
+                        "@id": "protein-detective@0.8.0",
+                        "@type": "SoftwareApplication",
+                        "description": "Detect proteins in EM density map",
+                        "name": "protein-detective",
+                        "version": "0.8.0",
+                    },
+                    {"@id": "verhoes", "@type": "Person", "name": "verhoes"},
+                    {
+                        "@id": "powerfit/run_001/ribosome-KsgA.map",
+                        "@type": "File",
+                        "contentSize": 8389632,
+                        "description": "Density map used for fitting.",
+                        "encodingFormat": "application/octet-stream",
+                        "name": "powerfit/run_001/ribosome-KsgA.map",
+                    },
+                    {
+                        "@id": "powerfit/run_002/ribosome-KsgA.map",
+                        "@type": "File",
+                        "contentSize": 8389632,
+                        "description": "Density map used for fitting.",
+                        "encodingFormat": "application/octet-stream",
+                        "name": "powerfit/run_002/ribosome-KsgA.map",
+                    },
+                    {
+                        "@id": "powerfit/fittable_structures.csv",
+                        "@type": "File",
+                        "contentSize": 10780,
+                        "description": "CSV file containing the fittable structures with PDB IDs and UniProt accessions.",
+                        "encodingFormat": "text/csv",
+                        "name": "powerfit/fittable_structures.csv",
+                    },
+                    {
+                        "@id": "powerfit/run_001/",
+                        "@type": "Dataset",
+                        "description": "Directory where the PowerFit results were stored.",
+                        "name": "powerfit/run_001",
+                    },
+                    {
+                        "@id": "powerfit/run_002/",
+                        "@type": "Dataset",
+                        "description": "Directory where the PowerFit results were stored.",
+                        "name": "powerfit/run_002",
+                    },
+                    {
+                        "@id": "protein-detective powerfit run --workers-per-gpu 2 --angle 40 --powerfit-run-id run_001 ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession",
+                        "@type": "CreateAction",
+                        "agent": {"@id": "verhoes"},
+                        "endTime": "2026-07-27T07:25:04.654513+00:00",
+                        "instrument": {"@id": "protein-detective@0.8.0"},
+                        "name": "protein-detective powerfit run --workers-per-gpu 2 --angle 40 --powerfit-run-id run_001 ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession",
+                        "object": [{"@id": "powerfit/run_001/ribosome-KsgA.map"}, {"@id": "combined_output/"}],
+                        "result": [{"@id": "powerfit/fittable_structures.csv"}, {"@id": "powerfit/run_001/"}],
+                        "startTime": "2026-07-27T07:24:36.897924+00:00",
+                    },
+                    {
+                        "@id": "protein-detective powerfit run --powerfit-run-id run_002 ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession",
+                        "@type": "CreateAction",
+                        "agent": {"@id": "verhoes"},
+                        "endTime": "2026-07-27T07:25:04.654513+00:00",
+                        "instrument": {"@id": "protein-detective@0.8.0"},
+                        "name": "protein-detective powerfit run --powerfit-run-id run_002 ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession",
+                        "object": [{"@id": "powerfit/run_002/ribosome-KsgA.map"}, {"@id": "combined_output/"}],
+                        "result": [{"@id": "powerfit/fittable_structures.csv"}, {"@id": "powerfit/run_002/"}],
+                        "startTime": "2026-07-27T07:24:36.897924+00:00",
+                    },
+                ],
+            }
+        )
+    )
 
+    runs_csv = powerfit_root_dir / "runs.csv"
     argv = ["powerfit", "list-runs", str(session_dir), "--output", str(runs_csv)]
     cli(argv)
 
@@ -436,12 +548,14 @@ def test_list_runs(tmp_path):
         {
             "density_map": str(powerfit_root_dir / "run_001" / "targetA.mrc"),
             "run_dir": str(powerfit_root_dir / "run_001"),
-            "run_id": "run_001",
+            "powerfit_run_id": "run_001",
+            "options": "--workers-per-gpu 2 --angle 40 --powerfit-run-id run_001 ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession",
         },
         {
             "density_map": str(powerfit_root_dir / "run_002" / "targetB.mrc"),
             "run_dir": str(powerfit_root_dir / "run_002"),
-            "run_id": "run_002",
+            "powerfit_run_id": "run_002",
+            "options": "--powerfit-run-id run_002 ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession",
         },
     ]
 

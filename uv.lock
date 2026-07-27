@@ -2047,6 +2047,7 @@ dependencies = [
     { name = "pyopencl" },
     { name = "rich" },
     { name = "rich-argparse" },
+    { name = "rocrate" },
     { name = "rocrate-action-recorder" },
     { name = "tqdm" },
 ]
@@ -2122,6 +2123,7 @@ requires-dist = [
     { name = "pyopencl", specifier = ">=2025.2.5" },
     { name = "rich", specifier = ">=14.0.0" },
     { name = "rich-argparse", specifier = ">=1.7.1" },
+    { name = "rocrate", specifier = ">=0.15.0" },
     { name = "rocrate-action-recorder", specifier = ">=0.5.3" },
     { name = "tqdm", specifier = ">=4.67.1" },
 ]
