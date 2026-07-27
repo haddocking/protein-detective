@@ -123,7 +123,7 @@ select = [
     "EM",
     "ERA",
     "F",
-    # TODO enable FBT and factor out booleans args to seperate functions
+    # TODO enable FBT and factor out booleans args to separate functions
     # "FBT",
     "FURB",
     "I",

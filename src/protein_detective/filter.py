@@ -157,7 +157,7 @@ def _merge_structure_files(downloaded_af_dir: Path, with_uniprots: Path, combine
 
 
 def _make_stats_relative_to_session_dir(stats_file: Path, session_dir: Path):
-    """Replaces occurences of `session_dir/` with `/` in given stats text file."""
+    """Replaces occurrences of `session_dir/` with `/` in given stats text file."""
     content = stats_file.read_text()
     content = content.replace(f"{session_dir}/", "")
     stats_file.write_text(content)

@@ -8,17 +8,28 @@
 
 Python package to detect proteins in EM density maps.
 
-Have you ever had an coarse Electron Microscopy (EM) density map and was unable to identify part of it? This package can help you to identify the protein in the density map by searching for protein structures in Uniprot, PDBe and AlphaFold DB and fitting them into the density map.
+Have you ever had an coarse Electron Microscopy (EM) density map and was unable
+to identify part of it? This package can help you to identify the protein in the
+density map by searching for protein structures in Uniprot, PDBe and AlphaFold
+DB and fitting them into the density map.
 
 It uses
 
-- [protein-quest](https://github.com/haddocking/protein-quest) to search, retrieve and filter protein structures from Uniprot, PDBe and AlphaFold DB.
-- [powerfit](https://pypi.org/project/powerfit-em/) to fit protein structure in a Electron Microscopy (EM) density map.
-- [cyclopts](https://cyclopts.readthedocs.io/en/latest/) for command line interface
-- [molviewspec](https://molstar.org/mol-view-spec/) to visualize the fitted structures and density map in a web browser.
-- [dask](https://dask.org/) to run powerfit in parallel on multiple CPU cores or GPUs.
-- [Research Object Crate](https://www.researchobject.org/ro-crate/) and [rocrate-action-recorder](https://rocrate-action-recorder.readthedocs.io/)  to keep track of commands and their input/output files/directories.
-- [duckdb](https://duckdb.org/) to query CSV files like powerfit/*/*/solutions.out files.
+- [protein-quest](https://github.com/haddocking/protein-quest) to search,
+  retrieve and filter protein structures from Uniprot, PDBe and AlphaFold DB.
+- [powerfit](https://pypi.org/project/powerfit-em/) to fit protein structure in
+  a Electron Microscopy (EM) density map.
+- [cyclopts](https://cyclopts.readthedocs.io/en/latest/) for command line
+  interface
+- [molviewspec](https://molstar.org/mol-view-spec/) to visualize the fitted
+  structures and density map in a web browser.
+- [dask](https://dask.org/) to run powerfit in parallel on multiple CPU cores or
+  GPUs.
+- [Research Object Crate](https://www.researchobject.org/ro-crate/) and
+  [rocrate-action-recorder](https://rocrate-action-recorder.readthedocs.io/) to
+  keep track of commands and their input/output files/directories.
+- [duckdb](https://duckdb.org/) to query CSV files like
+  powerfit/_/_/solutions.out files.
 
 Diagram how protein-detective calls protein-quest and powerfit:
 
@@ -31,7 +42,7 @@ flowchart TB
         S4[protein-quest search pdbe]
         S5[protein-quest search pdbe-quality]
         S6[protein-quest search complexes]
-        S2 --> S3 & S4 
+        S2 --> S3 & S4
         S4 --> S5
         S2 -.-> S6
         S6 -.-> S4
@@ -67,6 +78,7 @@ flowchart TB
     F5:::dashedBorder
     I1:::dashedBorder
 ```
+
 (Dashed nodes are optional)
 
 ## Install
@@ -76,11 +88,13 @@ pip install protein-detective
 ```
 
 Or to use the latest development version:
-```
+
+```shel
 pip install git+https://github.com/haddocking/protein-detective.git
 ```
 
-By default OpenCL support is included, but if you want to use CUDA, you can install with:
+By default OpenCL support is included, but if you want to use CUDA, you can
+install with:
 
 ```shell
 # For CUDA version 13
@@ -91,7 +105,8 @@ pip install "protein-detective[cuda12]"
 
 ## Usage
 
-The main entry point is the `protein-detective` command line tool which has multiple subcommands to perform actions.
+The main entry point is the `protein-detective` command line tool which has
+multiple subcommands to perform actions.
 
 ### Search Uniprot for structures
 
@@ -106,7 +121,9 @@ protein-detective search \
     --pdbe.limit 100 \
     ./mysession
 ```
-([GO:0005634](https://www.ebi.ac.uk/QuickGO/term/GO:0005634) is "Nucleus" and [GO:0003677](https://www.ebi.ac.uk/QuickGO/term/GO:0003677) is  "DNA binding")
+
+([GO:0005634](https://www.ebi.ac.uk/QuickGO/term/GO:0005634) is "Nucleus" and
+[GO:0003677](https://www.ebi.ac.uk/QuickGO/term/GO:0003677) is "DNA binding")
 
 In `./mysession` directory, you will find the search results.
 
@@ -127,7 +144,8 @@ protein-detective search --verbose \
     ./mysession2
 ```
 
-Which will add `Q96H22` which is an interaction partner of `A8MT69` in a macromolecular complex.
+Which will add `Q96H22` which is an interaction partner of `A8MT69` in a
+macromolecular complex.
 
 </details>
 
@@ -137,19 +155,21 @@ Which will add `Q96H22` which is an interaction partner of `A8MT69` in a macromo
 protein-detective retrieve ./mysession
 ```
 
-In `./mysession` directory, you will find mmCIF files from PDBe and PDB files and AlphaFold DB.
+In `./mysession` directory, you will find mmCIF files from PDBe and PDB files
+and AlphaFold DB.
 
 ### To filter structure
 
 Filter structures based on
-                         
+
 - For PDBe structures the chain of Uniprot protein is written as chain A.
 - For AlphaFold structures filter by confidence (pLDDT) threshold
 - Number of residues in chain A
-  - For AlphaFold structures writes new files with low confidence residues (below threshold) removed
+  - For AlphaFold structures writes new files with low confidence residues
+    (below threshold) removed
 - Number of residues in secondary structure (helices and sheets)
 
-Also uncompresses *.cif.gz files to *.cif files for compatibility with powerfit.
+Also uncompresses _.cif.gz files to_.cif files for compatibility with powerfit.
 
 ```shell
 protein-detective filter \
@@ -164,8 +184,9 @@ protein-detective filter mysession --secondary.abs-min-helix-residues 40
 
 ### Import filtered structures
 
-If you have a directory of structures ((optionally gzipped) PDB/mmCIF files), each with a single chain called `A` and a single UniProt accession.
-You can import them into a new protein detective session with:
+If you have a directory of structures ((optionally gzipped) PDB/mmCIF files),
+each with a single chain called `A` and a single UniProt accession. You can
+import them into a new protein detective session with:
 
 ```shell
 protein-detective import-structures ./mysession/filtered ./mysession3
@@ -175,7 +196,8 @@ Imported structures can be used to run powerfit.
 
 ### Powerfit
 
-Rotate and translate the prepared structures to fit and score them into the EM density map using powerfit.
+Rotate and translate the prepared structures to fit and score them into the EM
+density map using powerfit.
 
 ```shell
 protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession
@@ -183,14 +205,15 @@ protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 ./myses
 protein-detective powerfit run --workers-per-gpu 2 --angle 40 --powerfit-run-id myrun1 ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession4
 ```
 
-This will use [dask-distributed](https://distributed.dask.org/en/latest/) to run powerfit for each structure in parallel on multiple CPU cores or GPUs.
+This will use [dask-distributed](https://distributed.dask.org/en/latest/) to run
+powerfit for each structure in parallel on multiple CPU cores or GPUs.
 
 <details>
 
 <summary>Run powerfits on Slurm</summary>
 
-You can use [dask-jobqueue](https://jobqueue.dask.org/en/latest/) to run the powerfits
-on a Slurm deployment on multiple machines on a shared filesystem.
+You can use [dask-jobqueue](https://jobqueue.dask.org/en/latest/) to run the
+powerfits on a Slurm deployment on multiple machines on a shared filesystem.
 
 In one terminal start the Dask cluster with
 
@@ -221,22 +244,29 @@ protein-detective powerfit run ../powerfit-tutorial/ribosome-KsgA.map 13 docs/se
 
 Powerfit is quickest on GPU, but can also run on CPU.
 
-To run powerfits on a CPU you can use the `--cpu`.
-If you do not use `--cpu` flag, then powerfit will run on GPU (the default).
-If your GPU is underutilized, you can increase the number of workers per GPU with `--workers-per-gpu <int>`.
-You can start with 1 (the default) and monitor the GPU usage with `nvtop` if you see that the GPU is not 100% loaded, you can increase the number until there are no more valleys in the GPU usage graph.
+To run powerfits on a CPU you can use the `--cpu`. If you do not use `--cpu`
+flag, then powerfit will run on GPU (the default). If your GPU is underutilized,
+you can increase the number of workers per GPU with `--workers-per-gpu <int>`.
+You can start with 1 (the default) and monitor the GPU usage with `nvtop` if you
+see that the GPU is not 100% loaded, you can increase the number until there are
+no more valleys in the GPU usage graph.
 
-If you have multiple GPUs, then `--workers-per-gpu 2` will run powerfits on all GPUs and run 2 powerfits concurrently on each GPU.
+If you have multiple GPUs, then `--workers-per-gpu 2` will run powerfits on all
+GPUs and run 2 powerfits concurrently on each GPU.
 
-With `--cpu` each powerfit will use 1 CPU core and run multiple powerfits in parallel
-according to the number of physical CPU cores available on the machine (so excluding hyperthreaded cores).
+With `--cpu` each powerfit will use 1 CPU core and run multiple powerfits in
+parallel according to the number of physical CPU cores available on the machine
+(so excluding hyperthreaded cores).
 
 You can set the `--nproc <int>` so each powerfit will use that many CPU cores.
-This is useful if you have more CPU cores available then there are structures to fit.
-If the number of structure to fit is greater than available CPU cores then using the default (1 core per powerfit) is recommended.
+This is useful if you have more CPU cores available then there are structures to
+fit. If the number of structure to fit is greater than available CPU cores then
+using the default (1 core per powerfit) is recommended.
 
-In testing on highend NVIDIA GPUs the OpenCL backend is faster than CUDA backend, so we default to using OpenCL.
-To use CUDA instead, you can set `--gpu-backend cuda` and make sure you installed protein-detective with the appropriate CUDA extra.
+In testing on highend NVIDIA GPUs the OpenCL backend is faster than CUDA
+backend, so we default to using OpenCL. To use CUDA instead, you can set
+`--gpu-backend cuda` and make sure you installed protein-detective with the
+appropriate CUDA extra.
 
 For example
 
@@ -248,12 +278,13 @@ protein-detective powerfit run --batch-size 50 --gpu-backend cuda ../powerfit-tu
 
 <details>
 
-<summary>Alternativly run powerfit yourself</summary>
+<summary>Alternatively run powerfit yourself</summary>
 
 You can use the `protein-detective powerfit commands` to print the commands.
 
-The commands can then be run in whatever way you prefer, like sequentially, with [GNU parallel](https://www.gnu.org/software/parallel/),
-or as a [Slurm array job](https://slurm.schedmd.com/job_array.html).
+The commands can then be run in whatever way you prefer, like sequentially, with
+[GNU parallel](https://www.gnu.org/software/parallel/), or as a
+[Slurm array job](https://slurm.schedmd.com/job_array.html).
 
 For example to run with parallel and 4 slots:
 
@@ -264,7 +295,7 @@ parallel --jobs 4 < commands.txt
 
 </details>
 
-To  list the completed powerfit runs, you can use:
+To list the completed powerfit runs, you can use:
 
 ```shell
 protein-detective powerfit list-runs mysession
@@ -292,7 +323,8 @@ myrun1,6mzc_updated_E2A.cif.gz,1,0.547,0.614,14.671,199.55:214.9:165.78,1.0:0.0:
 ...
 ```
 
-To generate model PDB files rotated/translated to top 1 solution per template structure, you can use:
+To generate model PDB files rotated/translated to top 1 solution per template
+structure, you can use:
 
 ```shell
 protein-detective powerfit fit-models mysession
@@ -307,10 +339,14 @@ myrun1,6mzc_updated_E2A.cif.gz,1,mysession/powerfit/myrun1/6mzc_updated_E2A.cif.
 ...
 ```
 
-Where the `fitted_model_file` column is the structure file of the fitted model and `unfitted_model_file` is the original structure file.
+Where the `fitted_model_file` column is the structure file of the fitted model
+and `unfitted_model_file` is the original structure file.
 
-The results can also be visualized see [visualization.ipynb](https://bonvinlab.org/protein-detective/docs/visualization.html) for an example.
+The results can also be visualized see
+[visualization.ipynb](https://bonvinlab.org/protein-detective/docs/visualization.html)
+for an example.
 
 ## Contributing
 
-For development information and contribution guidelines, please see [CONTRIBUTING.md](CONTRIBUTING.md).
+For development information and contribution guidelines, please see
+[CONTRIBUTING.md](CONTRIBUTING.md).

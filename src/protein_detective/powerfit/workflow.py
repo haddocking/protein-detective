@@ -288,7 +288,7 @@ def powerfit_report(
 
     Returns:
         A DataFrame containing the PowerFit solutions.
-        With following colums:
+        With following columns:
 
         1, powerfit_run_id: ID of the PowerFit run
         2, structure: Name of the structure file

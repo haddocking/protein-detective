@@ -1,3 +1,5 @@
+# Commands
+
 ```shell
 uv run pytest
 uvx ruff format
