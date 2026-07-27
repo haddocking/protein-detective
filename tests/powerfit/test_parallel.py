@@ -21,13 +21,13 @@ def test_gpu_cycler_non_contiguous_gpu_ids():
     assert cycles == [0, 2, 0, 2, 0, 2, 0, 2]
 
 
-def test_detect_available_gpus_from_cuda_visible_devices(monkeypatch):
+def test_detect_available_gpus_from_cuda_visible_devices(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,5")
     monkeypatch.delenv("ROCR_VISIBLE_DEVICES", raising=False)
     assert detect_available_gpus() == [2, 5]
 
 
-def test_detect_available_gpus_from_rocr_visible_devices(monkeypatch):
+def test_detect_available_gpus_from_rocr_visible_devices(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
     monkeypatch.setenv("ROCR_VISIBLE_DEVICES", "1,3")
     assert detect_available_gpus() == [1, 3]
@@ -40,7 +40,9 @@ def test_detect_available_gpus_from_rocr_visible_devices(monkeypatch):
         (None, []),
     ],
 )
-def test_detect_available_gpus_for_cuda_backend(monkeypatch, cuda_devices_arg, expected):
+def test_detect_available_gpus_for_cuda_backend(
+    monkeypatch: pytest.MonkeyPatch, cuda_devices_arg: list[int] | None, expected: list[int]
+):
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "4,6")
     monkeypatch.delenv("ROCR_VISIBLE_DEVICES", raising=False)
     # When CUDA_VISIBLE_DEVICES="4,6", CuPy sees 2 devices and reports [0, 1]

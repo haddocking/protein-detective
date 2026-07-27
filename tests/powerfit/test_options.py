@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from protein_detective.powerfit.options import PowerfitOptions, parse_first_visible_gpu_id
+from protein_detective.powerfit.options import GpuBackend, PowerfitOptions, parse_first_visible_gpu_id
 
 
 @pytest.mark.parametrize(
@@ -12,7 +12,7 @@ from protein_detective.powerfit.options import PowerfitOptions, parse_first_visi
         ("opencl", 2, "0:2"),
     ],
 )
-def test_format_gpu_device(backend, gpu_id, expected):
+def test_format_gpu_device(backend: GpuBackend, gpu_id: int, expected: str):
     options = PowerfitOptions(gpu_backend=backend)
     assert options.format_gpu_device(gpu_id) == expected
 
@@ -30,7 +30,7 @@ def test_format_gpu_device(backend, gpu_id, expected):
         ("not-an-int,1", 0),
     ],
 )
-def test_parse_first_visible_gpu_id(visible_devices, expected):
+def test_parse_first_visible_gpu_id(visible_devices: str | None, expected: int):
     assert parse_first_visible_gpu_id(visible_devices) == expected
 
 

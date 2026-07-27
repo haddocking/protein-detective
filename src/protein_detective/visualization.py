@@ -3,7 +3,16 @@ from textwrap import dedent
 from typing import Any, Literal
 
 import duckdb
-from molviewspec import MVSJ, GlobalMetadata, States, create_builder, molstar_html, molstar_notebook, molstar_streamlit
+from molviewspec import (
+    MVSJ,
+    GlobalMetadata,
+    State,
+    States,
+    create_builder,
+    molstar_html,
+    molstar_notebook,
+    molstar_streamlit,
+)
 from molviewspec.builder import Representation, Root, Snapshot, VolumeRepresentation
 from pandas import DataFrame
 
@@ -11,7 +20,9 @@ Renderer = Literal["html", "notebook", "streamlit"]
 """Which molstar renderer to use for visualization."""
 
 
-def _render_state(state, data, renderer: Renderer, ui: Literal["viewer", "stories"] = "viewer"):
+def _render_state(
+    state: MVSJ | State, data: dict[str, bytes], renderer: Renderer, ui: Literal["viewer", "stories"] = "viewer"
+):
     if renderer == "notebook":
         return molstar_notebook(state=state, data=data, ui=ui, width=1500, height=900)
     if renderer == "html":

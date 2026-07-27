@@ -419,7 +419,7 @@ def test_fit_models(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     )
 
 
-def test_list_runs(tmp_path):
+def test_list_runs(tmp_path: Path):
     session_dir = tmp_path / "session"
     session_dir.mkdir(parents=True, exist_ok=True)
     powerfit_root_dir = session_dir / "powerfit"
@@ -560,7 +560,7 @@ def test_list_runs(tmp_path):
     ]
 
 
-def test_list_lcc(tmp_path, capsys: pytest.CaptureFixture[str]):
+def test_list_lcc(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     fake_solutions(tmp_path, "run_001")
 
     argv = ["powerfit", "list-lcc", str(tmp_path), "--output", str(tmp_path / "lcc.csv")]

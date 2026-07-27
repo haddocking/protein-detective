@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 from typing import Annotated
 
+import pandas as pd
 from cyclopts import App, Parameter, validators
 from cyclopts.types import PositiveFloat, StdioPath
 
@@ -137,7 +138,7 @@ def report(
         group_by_structure=group_by_structure,
     )
 
-    def array_to_str(arr):
+    def array_to_str(arr: pd.Series):
         return ":".join(map(str, arr.flatten()))
 
     # Convert translation and rotation to : delimited string for CSV output

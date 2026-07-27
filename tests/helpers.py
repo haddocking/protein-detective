@@ -4,6 +4,7 @@ import csv
 import gzip
 import sys
 from pathlib import Path
+from typing import Any
 
 import gemmi
 from protein_quest.structure.uniprot import add_uniprot_accessions2structure
@@ -34,7 +35,7 @@ def cli(tokens: list[str]):
         sys.argv = old_argv
 
 
-def fake_setup_retrieve(tmp_path):
+def fake_setup_retrieve(tmp_path: Path):
     session_dir = tmp_path / "session"
     session_dir.mkdir()
     alphafold_csv = session_dir / "alphafold.csv"
@@ -47,7 +48,7 @@ def fake_setup_retrieve(tmp_path):
     return session_dir, argv
 
 
-def fake_run_retrieve(tmp_path):
+def fake_run_retrieve(tmp_path: Path):
     session_dir, argv = fake_setup_retrieve(tmp_path)
     repo_root = Path(__file__).resolve().parents[1]
     retrieve_cassette = repo_root / "tests" / "cassettes" / "test_cli" / "test_retrieve.yaml"
@@ -63,7 +64,7 @@ def assert_crate(
     input_ids: set[str] | None = None,
     output_ids: set[str] | None = None,
     nr_actions: int = 1,
-) -> tuple[ROCrate, dict]:
+) -> tuple[ROCrate, dict[str, Any]]:
     # Assert copied from tests/adapters/test_cyclopts.py in rocrate_action_recorder repo
     crate_path = crate_dir / BASENAME
     assert crate_path.exists()

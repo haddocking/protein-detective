@@ -91,7 +91,7 @@ class SearchOptions:
     )
 
 
-def _create_interaction_partner_seeds_file(session_dir, seeds: set[str]) -> StdioPath:
+def _create_interaction_partner_seeds_file(session_dir: Path, seeds: set[str]) -> StdioPath:
     seeds_path = StdioPath(session_dir / "interaction_partner_seeds.txt")
     with seeds_path.open("w") as f:
         for seed in sorted(seeds):

@@ -206,8 +206,7 @@ displaylimit = 100
 protein-quest = { path = "../protein-quest", editable = true }
 
 [tool.pyrefly]
-# TODO reenable strict and *.ipynb, once rewrite complete
-# preset = "strict"
+preset = "strict"
 project-includes = [
     "**/*.py*",
     # "**/*.ipynb",

@@ -148,7 +148,7 @@ def _write_ro_crate(
     )
 
 
-def _merge_structure_files(downloaded_af_dir, with_uniprots, combined_input_dir):
+def _merge_structure_files(downloaded_af_dir: Path, with_uniprots: Path, combined_input_dir: Path):
     combined_input_dir.mkdir()
     for file in downloaded_af_dir.glob("*"):
         copyfile(file, combined_input_dir / file.name, copy_method="symlink")
