@@ -62,7 +62,8 @@ def commands(
         print("# When you are done", file=fh)
         print(f"# in {Path().absolute()} directory", file=fh)
         print(
-            f"# run `protein-detective powerfit report {session_dir} {powerfit_run_id}` to show best solutions.",
+            f"# run `protein-detective powerfit report {session_dir} "
+            f"--powerfit-run-id {powerfit_run_id}` to show best solutions.",
             file=fh,
         )
         for command in commands:
@@ -97,7 +98,7 @@ def run(
     """
     if options is None:
         options = PowerfitOptions()
-    powerfit_runs(
+    powerfit_run_id = powerfit_runs(
         target,
         resolution,
         session_dir,

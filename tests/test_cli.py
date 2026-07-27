@@ -222,8 +222,8 @@ def test_retrieve(tmp_path: Path):
             "pdbe.csv",
         },
         output_ids={
-            "downloads/alphafold",
-            "downloads/pdbe",
+            "downloads/alphafold/",
+            "downloads/pdbe/",
         },
     )
 
@@ -307,7 +307,7 @@ def test_filter_defaults(tmp_path: Path):
         {
             "injected": "False",
             "input_file": "downloads/pdbe/2y29_updated.cif.gz",
-            "output_file": "with_uniprots/2y29_updated.cif.gz",
+            "output_file": "uniprots_verified/2y29_updated.cif.gz",
             "uniprot_chain_mappings": "",
         },
     ]
@@ -317,15 +317,15 @@ def test_filter_defaults(tmp_path: Path):
         action_id=f"protein-detective filter {session_dir}",
         input_ids={
             "pdbe.csv",
-            "downloads/pdbe",
-            "downloads/alphafold",
+            "downloads/pdbe/",
+            "downloads/alphafold/",
             "pdbe-quality.json",
         },
         output_ids={
-            "single_chain",
-            "uniprots_verified",
-            "combined_input",
-            "combined_output",
+            "single_chain/",
+            "uniprots_verified/",
+            "combined_input/",
+            "combined_output/",
             "combined_stats.csv",
             "uniprots_verified_stats.csv",
             "single_chain_stats.csv",
@@ -401,20 +401,20 @@ def test_filter_with_secondary_structure(tmp_path: Path):
         action_id=f"protein-detective filter {session_dir} --secondary.abs-min-helix-residues 5",
         input_ids={
             "pdbe.csv",
-            "downloads/pdbe",
-            "downloads/alphafold",
+            "downloads/pdbe/",
+            "downloads/alphafold/",
             "pdbe-quality.json",
         },
         output_ids={
-            "single_chain",
-            "uniprots_verified",
-            "combined_input",
-            "combined_output",
+            "single_chain/",
+            "uniprots_verified/",
+            "combined_input/",
+            "combined_output/",
             "combined_stats.csv",
             "uniprots_verified_stats.csv",
             "single_chain_stats.csv",
             "secondary_structure_stats.csv",
-            "secondary_structure",
+            "secondary_structure/",
         },
         nr_actions=2,
     )
@@ -444,7 +444,7 @@ class TestImportStructures:
             session_dir,
             action_id=f"protein-detective import-structures {input_dir} {session_dir}",
             output_ids={
-                "imported_structures/1abc.cif.gz",
+                "imported_structures/",
             },
         )
 

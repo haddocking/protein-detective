@@ -82,13 +82,13 @@ def assert_crate(
 
     assert action["instrument"]["@id"] == f"protein-detective@{__version__}"
 
-    input_ids = {i["@id"] for i in action.get("object", [])}
+    actual_input_ids = {i["@id"] for i in action.get("object", [])}
     if input_ids is not None:
-        assert input_ids <= input_ids
+        assert actual_input_ids <= input_ids
 
-    output_ids = {o["@id"] for o in action.get("result", [])}
+    actual_output_ids = {o["@id"] for o in action.get("result", [])}
     if output_ids is not None:
-        assert output_ids <= output_ids
+        assert actual_output_ids <= output_ids
 
     return crate, action
 

@@ -147,7 +147,8 @@ def show_fitted_models_and_density(fitted_models: DataFrame, renderer: Renderer 
     """Visualizes fitted models and their associated density map with molstar.
 
     Args:
-        fitted_models: The fitted models retrieved with [load_fitted_models][protein_detective.db.load_fitted_models].
+        fitted_models: The fitted models retrieved with
+            [load_fitted_models][protein_detective.visualization.load_fitted_models].
         renderer: Renderer to use for visualization.
     """
     snapshots = []

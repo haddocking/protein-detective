@@ -41,7 +41,11 @@ def _find_structure_files(session_dir: Path) -> list[Path]:
             "Please run `protein-detective filter` command."
         )
         raise FileNotFoundError(msg)
-    return sorted(structure_files_dir.glob("*"))
+    files = sorted(structure_files_dir.glob("*"))
+    if not files:
+        msg = f"No structure files found in '{structure_files_dir}'. Please run `protein-detective filter` command."
+        raise FileNotFoundError(msg)
+    return files
 
 
 def _initialize_powerfit_run(
@@ -88,6 +92,10 @@ def powerfit_commands(
         options: Powerfit options.
         powerfit_run_id: ID of the PowerFit run to use. If not provided, will autoincrement based on existing runs.
 
+    Raises:
+        FileNotFoundError: If no structure files are found in the session directory.
+        FileExistsError: If the PowerFit run directory already exists.
+
     Returns:
         A tuple containing a list of PowerFit commands and the PowerFit run ID.
     """
@@ -100,7 +108,7 @@ def powerfit_commands(
     if options.gpu and not gpu_ids:
         msg = "GPU execution requested, but no GPUs were detected."
         raise ValueError(msg)
-    gpu_cycler = build_gpu_cycler(workers_per_gpu=1, gpu_ids=gpu_ids)
+    gpu_cycler = build_gpu_cycler(workers_per_gpu=options.workers_per_gpu, gpu_ids=gpu_ids)
     for structure_file in structure_files:
         result_dir = powerfit_run_root_dir / structure_file.name
         command = options.to_command(
@@ -173,7 +181,7 @@ def powerfit_runs(
     options: PowerfitOptions,
     powerfit_run_id: str | None = None,
     scheduler_address: str | Cluster | None = None,
-):
+) -> str:
     """Run PowerFit on PDB files in the session directory and store results.
 
     Args:
@@ -184,6 +192,13 @@ def powerfit_runs(
         powerfit_run_id: ID of the PowerFit run to use. If not provided, will autoincrement based on existing runs.
         scheduler_address: Address of the Dask scheduler to use. If not provided, will create a local Dask cluster.
             If set to "sequential", will run PowerFit sequentially without using Dask.
+
+    Raises:
+        FileNotFoundError: If no structure files are found in the session directory.
+        FileExistsError: If the PowerFit run directory already exists.
+
+    Returns:
+        The PowerFit run ID.
     """
     session_dir.mkdir(parents=True, exist_ok=True)
     start_time = datetime.now(tz=UTC)

@@ -358,12 +358,12 @@ def test_run(tmp_path: Path, ribosome_map: Path, cif_2y29: Path, capsys: pytest.
     assert_crate(
         session_dir,
         action_id=f"protein-detective powerfit run {target} 50 {session_dir} --cpu --angle 180 --scheduler-address sequential",
-        input_ids={str(target), str(imported_structure)},
-        output_ids={str(solutions_out)},
+        input_ids={"powerfit/run_001/ribosome-KsgA.map", "imported_structures/"},
+        output_ids={"powerfit/run_001/", "powerfit/fittable_structures.csv"},
     )
 
 
-def test_fit_models(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+def test_fit_models(tmp_path: Path):
     session_dir = tmp_path / "session"
     session_dir.mkdir(parents=True, exist_ok=True)
     powerfit_run_id = "run_001"
@@ -414,8 +414,12 @@ def test_fit_models(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     assert_crate(
         session_dir,
         action_id=f"protein-detective powerfit fit-models {session_dir} --output {fitted_csv}",
-        input_ids={str(unfitted_models[0]), str(unfitted_models[1]), str(unfitted_models[2])},
-        output_ids={str(fitted_model1), str(fitted_model2), str(fitted_model3)},
+        input_ids={"combined_output/1abc.cif.gz", "combined_output/2abc.cif.gz", "combined_output/3abc.cif.gz"},
+        output_ids={
+            "powerfit/run_001/1abc.cif.gz/fit_1.pdb",
+            "powerfit/run_001/2abc.cif.gz/fit_1.pdb",
+            "powerfit/run_001/3abc.cif.gz/fit_1.pdb",
+        },
     )
 
 

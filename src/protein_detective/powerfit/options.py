@@ -5,7 +5,7 @@ from shlex import join
 from typing import Annotated, Literal, get_args
 
 from cyclopts import Group, Parameter
-from cyclopts.types import PositiveFloat, PositiveInt
+from cyclopts.types import NonNegativeInt, PositiveFloat, PositiveInt
 from powerfit_em.correlators.shared import DEFAULT_BATCH_SIZE
 
 type GpuBackend = Literal["opencl", "cuda"]
@@ -73,7 +73,7 @@ class PowerfitOptions:
     workers_per_gpu: Annotated[PositiveInt, Parameter(group=process_group)] = 1
     gpu_backend: Annotated[GpuBackend, Parameter(group=process_group)] = "opencl"
     nproc: Annotated[PositiveInt, Parameter(group=process_group)] = 1
-    batch_size: Annotated[PositiveInt, Parameter(group=process_group)] = DEFAULT_BATCH_SIZE
+    batch_size: Annotated[NonNegativeInt, Parameter(group=process_group)] = DEFAULT_BATCH_SIZE
 
     @property
     def gpu(self) -> bool:

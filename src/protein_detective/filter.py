@@ -72,19 +72,19 @@ def _write_ro_crate(
         ],
         output_dirs=[
             IOArgumentPath(
-                name="single_chain_dir",
-                path=single_chain_dir,
-                help=(
-                    "Directory where the single chain structure files are written from "
-                    f"{uniprots_verified.relative_to(session_dir, walk_up=True)}."
-                ),
-            ),
-            IOArgumentPath(
                 name="uniprots_verified_dir",
                 path=uniprots_verified,
                 help=(
                     "Directory where the uniprots are verified and injected if needed from "
                     f"{pdbe_download_dir.relative_to(session_dir, walk_up=True)}."
+                ),
+            ),
+            IOArgumentPath(
+                name="single_chain_dir",
+                path=single_chain_dir,
+                help=(
+                    "Directory where the single chain structure files are written from "
+                    f"{uniprots_verified.relative_to(session_dir, walk_up=True)}."
                 ),
             ),
             IOArgumentPath(
@@ -198,7 +198,7 @@ def run_filter(
     pdbe_csv = StdioPath(session_dir / "pdbe.csv")
     pdbe_quality_json = StdioPath(session_dir / "pdbe-quality.json")
 
-    uniprots_verified = session_dir / "with_uniprots"
+    uniprots_verified = session_dir / "uniprots_verified"
     uniprots_verified_stats = StdioPath(session_dir / "uniprots_verified_stats.csv")
     structures(
         downloaded_pdbe_dir,
@@ -210,7 +210,7 @@ def run_filter(
 
     single_chain_dir = session_dir / "single_chain"
     single_chain_stats = StdioPath(session_dir / "single_chain_stats.csv")
-    chain(pdbe_csv, downloaded_pdbe_dir, single_chain_dir, write_stats=single_chain_stats)
+    chain(pdbe_csv, uniprots_verified, single_chain_dir, write_stats=single_chain_stats)
 
     # Combined filter works best if all structure files are in one directory
     combined_input_dir = session_dir / "combined_input"
