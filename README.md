@@ -80,7 +80,8 @@ flowchart TB
     I1:::dashedBorder
 ```
 
-(Dashed nodes are optional)
+(Dashed nodes are optional) (The Mermaid figure might not be rendered, see
+<https://www.bonvinlab.org/protein-detective/> for rendered version)
 
 ## Install
 
@@ -90,7 +91,7 @@ pip install protein-detective
 
 Or to use the latest development version:
 
-```shel
+```shell
 pip install git+https://github.com/haddocking/protein-detective.git
 ```
 

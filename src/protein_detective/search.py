@@ -25,13 +25,9 @@ class AlphafoldOptions:
 
     Parameters:
         limit: Maximum number of AlphaFold entries to return.
-        min_sequence_length: Minimum sequence length for AlphaFold.
-        max_sequence_length: Maximum sequence length for AlphaFold.
     """
 
     limit: PositiveInt = 10_000
-    min_sequence_length: PositiveInt | None = None
-    max_sequence_length: PositiveInt | None = None
 
 
 @dataclass
@@ -255,8 +251,6 @@ def search(
     alphafold(
         final_uniprot_path,
         alphafold_file,
-        min_sequence_length=options.alphafold.min_sequence_length,
-        max_sequence_length=options.alphafold.max_sequence_length,
         limit=options.alphafold.limit,
     )
 
