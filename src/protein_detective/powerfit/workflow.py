@@ -301,6 +301,9 @@ def powerfit_report(
         session_dir: Directory containing the session data.
         powerfit_run_id: Optional ID of the PowerFit run to report. If None,
 
+    Raises:
+        FileNotFoundError: If no structure files are found in the session directory.
+
     Returns:
         A DataFrame containing the PowerFit solutions.
         With following columns:
@@ -390,6 +393,9 @@ def powerfit_filtered_report(
         top: Number of top solutions to return.
         group_by_structure: Whether to group solutions by structure before selecting top solutions.
 
+    Raises:
+        FileNotFoundError: If no structure files are found in the session directory.
+
     Returns:
         A DataFrame containing the filtered PowerFit solutions.
     """
@@ -447,6 +453,9 @@ def powerfit_fit_models(
         top: Number of top solutions to fit.
         group_by_structure: Whether to group solutions by structure before selecting top solutions.
 
+    Raises:
+        FileNotFoundError: If no structure files are found in the session directory.
+
     Returns:
         A DataFrame containing the fitted models. See protein_detective.db.save_fitted_models function
             for details.
@@ -483,6 +492,9 @@ def powerfit_run_options_from_rocrate(session_dir: Path) -> dict[str, str]:
     Args:
         session_dir: Directory containing the session data.
 
+    Raises:
+        FileNotFoundError: If the RO-Crate file is missing from the session directory.
+
     Returns:
         A dictionary mapping PowerFit run IDs to their corresponding options.
     """
@@ -518,6 +530,9 @@ def powerfit_list_runs(session_dir: Path) -> list[RunInfo]:
 
     Args:
         session_dir: Directory containing the session data.
+
+    Raises:
+        FileNotFoundError: If no density map is found in any run directory.
 
     Returns:
         A list of RunInfo dictionaries for each PowerFit run.
