@@ -65,3 +65,12 @@ jobs:
         run: uv sync --dev  --no-sources
       - name: Run type checkers
         run: uv run --no-sources pyrefly check
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install nodejs
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - uses: j178/prek-action@v1

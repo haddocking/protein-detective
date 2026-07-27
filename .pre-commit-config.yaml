@@ -1,0 +1,102 @@
+# Keeping pytest and pyrefly out of pre-commit as they need full venv.
+# To run needs docker and nodejs installed.
+
+# Do not check or fix downloaded files
+exclude: ^tests/.*(\.yaml|\.pdb)$
+
+repos:
+  - repo: https://github.com/adamchainz/blacken-docs
+    rev: "1.20.0"
+    hooks:
+      - id: blacken-docs
+        additional_dependencies: [black==25.*]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: "v6.0.0"
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-yaml
+      - id: debug-statements
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: name-tests-test
+        args: ["--pytest-test-first"]
+        exclude: "tests/helpers.py"
+      - id: requirements-txt-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: "v1.10.0"
+    hooks:
+      - id: rst-backticks
+      - id: rst-directive-colons
+      - id: rst-inline-touching-normal
+
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: "v3.7.4"
+    hooks:
+      - id: prettier
+        types_or: [yaml, markdown, html, css, scss, javascript, json]
+        args: [--prose-wrap=always]
+        exclude: ^docs/cli\.md$
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.16.0"
+    hooks:
+      - id: ruff-check
+        args: ["--fix", "--show-fixes"]
+      - id: ruff-format
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: "v2.4.1"
+    hooks:
+      - id: codespell
+        additional_dependencies:
+          - tomli; python_version<'3.11'
+        exclude: "docs/visualization.ipynb" # has binary data that triggers false positives
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: "v0.11.0.1"
+    hooks:
+      - id: shellcheck
+
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: "0.36.0"
+    hooks:
+      - id: check-github-workflows
+      - id: check-citation-file-format
+      # Not checking mkdocs.yml as hook does not support custom YAML tags like !!python/....
+      # see https://github.com/python-jsonschema/check-jsonschema/issues/489
+      # mkdocs schema exists at https://www.schemastore.org/mkdocs-1.6.json
+
+  # Tried to use official jscpd repo, but got jscpd not found error
+  - repo: local
+    hooks:
+      - id: jscpd
+        name: jscpd code duplication checker
+        entry: npx cpd@5.0.4
+        language: node
+        # v4 made distinction between docstring and code,
+        # v5 does not so we loosen line/token consideration
+        args:
+          [
+            "--exit-code",
+            "--no-tips",
+            "--min-tokens",
+            "100",
+            "--min-lines",
+            "15",
+            "src",
+          ]
+        types: [text]
+        pass_filenames: false
+
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.20.0
+    hooks:
+      - id: markdownlint-cli2
+        args: ["--fix"]
+        exclude: "docs/(index|CONTRIBUTING).md" # lint does not understand pymdownx extensions
