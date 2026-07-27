@@ -1,395 +1,256 @@
-"""Module dealing with filtering of protein structures.
-
-In protein_quest package the filters are more granular, here we combine them into coarse grained methods.
-"""
-
-import logging
-import sys
-from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import Annotated
 
-from distributed.deploy.cluster import Cluster
-from protein_quest.alphafold.confidence import ConfidenceFilterQuery, ConfidenceFilterResult, filter_files_on_confidence
-from protein_quest.alphafold.fetch import AlphaFoldEntry
-from protein_quest.filters.chain import ChainFilterStatistics, filter_files_on_chain
-from protein_quest.filters.residues import ResidueFilterStatistics, filter_files_on_residues
-from protein_quest.filters.ss import (
-    SecondaryStructureFilterQuery,
-    SecondaryStructureFilterResult,
-    filter_files_on_secondary_structure,
-)
+from cyclopts import Group, Parameter, validators
+from cyclopts.types import StdioPath
+from protein_quest.cli.convert import structures
+from protein_quest.cli.filter import chain, combined, secondary_structure
+from protein_quest.filters.combined import CombinedFilterQuery
+from protein_quest.filters.ss import SecondaryStructureFilterQuery
 from protein_quest.utils import copyfile
+from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 
-if TYPE_CHECKING:
-    from protein_detective.db import ProteinPdbRow
-else:
-    ProteinPdbRow = object  # pragma: no cover
+from protein_detective.common_cli import Common, write_ro_crate
 
-logger = logging.getLogger(__name__)
+ss_group = Group.create_ordered("Secondary structure sub-filter")
 
 
+@Parameter(name="*")
 @dataclass
 class FilterOptions:
-    """Filter query containing confidence and secondary structure filters.
-
-    Parameters:
-        confidence: The confidence filter query.
-        secondary_structure: The secondary structure filter query.
-    """
-
-    confidence: ConfidenceFilterQuery
-    secondary_structure: SecondaryStructureFilterQuery
+    combined: CombinedFilterQuery = field(default_factory=CombinedFilterQuery)
+    ss: Annotated[SecondaryStructureFilterQuery, Parameter(name="secondary", group=ss_group)] = field(
+        default_factory=SecondaryStructureFilterQuery
+    )
 
 
-@dataclass
-class FilteredStructure:
-    """Filter result of a single uniprot+[pdb] entry.
-
-    Parameters:
-        uniprot_accession: The UniProt accession.
-        pdb_id: The PDB ID if applicable.
-        confidence: The confidence filter result if applicable.
-        chain: The chain filter result if applicable.
-        residue: The residue filter result if applicable.
-        secondary_structure: A tuple containing:
-            - The input file path for the secondary structure filter.
-            - The secondary structure filter result.
-            - The output file path for the secondary structure filter, if passed.
-    """
-
-    uniprot_accession: str
-    pdb_id: str | None = None
-    confidence: ConfidenceFilterResult | None = None
-    chain: ChainFilterStatistics | None = None
-    residue: ResidueFilterStatistics | None = None
-    secondary_structure: tuple[Path, SecondaryStructureFilterResult, Path | None] | None = None
-
-    @property
-    def passed(self) -> bool:
-        """Whether the structure passed all filters."""
-        if self.secondary_structure is not None and not self.secondary_structure[1].passed:
-            return False
-        if self.residue is not None and not self.residue.passed:
-            return False
-        if self.chain is not None and not self.chain.passed:
-            return False
-        if self.confidence is not None and self.confidence.filtered_file is None:  # noqa: SIM103 -- use same logic as in output_file property
-            return False
-        return True
-
-    @property
-    def output_file(self) -> Path | None:
-        """Get the output file of the last filter that was applied
-
-        Only valid if the structure passed all filters.
-        """
-        if self.passed:
-            if self.secondary_structure is not None and self.secondary_structure[2] is not None:
-                return self.secondary_structure[2]
-            if self.residue is not None and self.residue.output_file is not None:
-                return self.residue.output_file
-            if self.chain is not None and self.chain.output_file is not None:
-                return self.chain.output_file
-            if self.confidence is not None and self.confidence.filtered_file is not None:
-                return self.confidence.filtered_file
-        return None
-
-    @output_file.setter
-    def output_file(self, path: Path) -> None:
-        """Set the output file of the last filter that was applied.
-
-        Only valid if the structure passed all filters.
-        """
-        if self.passed:
-            if self.secondary_structure is not None:
-                p1, ssr, _ = self.secondary_structure
-                self.secondary_structure = (p1, ssr, path)
-            elif self.residue is not None:
-                self.residue.output_file = path
-            elif self.chain is not None:
-                self.chain.output_file = path
-            elif self.confidence is not None:
-                self.confidence.filtered_file = path
-        else:
-            msg = "Cannot set output file for a structure that did not pass all filters."
-            raise ValueError(msg)
-
-    def make_relative_to(self, session_dir: Path) -> "FilteredStructure":
-        """Make all file paths relative to the given session directory.
-
-        Args:
-            session_dir: The session directory to make paths relative to.
-
-        Returns:
-            A new FilterResultRow object with paths made relative to the session directory.
-        """
-        new_row = deepcopy(self)
-        if new_row.confidence is not None and new_row.confidence.filtered_file is not None:
-            new_row.confidence.filtered_file = new_row.confidence.filtered_file.relative_to(session_dir)
-        if new_row.chain is not None and new_row.chain.output_file is not None:
-            new_row.chain.output_file = new_row.chain.output_file.relative_to(session_dir)
-        if new_row.residue is not None and new_row.residue.output_file is not None:
-            new_row.residue.output_file = new_row.residue.output_file.relative_to(session_dir)
-        if new_row.secondary_structure is not None:
-            p1, ssr, p2 = new_row.secondary_structure
-            p1 = p1.relative_to(session_dir)
-            if p2 is not None:
-                p2 = p2.relative_to(session_dir)
-            new_row.secondary_structure = (p1, ssr, p2)
-        return new_row
-
-
-type FilterResults = dict[tuple[str, str | None], FilteredStructure]
-"""Type alias for filter results mapping (uniprot_accession, pdb_id?) to FilteredStructure."""
-
-
-def _filter_alphafolds_on_secondary_structure(
-    secondary_structure: SecondaryStructureFilterQuery,
-    cf_out_files: list[Path],
-    final_dir: Path,
-    af_total_results: FilterResults,
-    alphafold_cif_files2upid: dict[str, tuple[str, None]],
-):
-    cf_ss_results = []
-    logger.info("Filtering AlphaFold files on secondary structure")
-    for cf_out_file, ss_result in filter_files_on_secondary_structure(cf_out_files, secondary_structure):
-        ss_out_file: Path | None = None
-        if ss_result.passed:
-            ss_out_file = final_dir / cf_out_file.name
-            if ss_out_file is None:
-                raise ValueError
-            copyfile(cf_out_file, ss_out_file, "symlink")
-        cf_ss_results.append((cf_out_file, ss_result, ss_out_file))
-        upid = alphafold_cif_files2upid[cf_out_file.name]
-        if upid not in af_total_results:
-            msg = f"Confidence filter result not found for {cf_out_file} aka {upid}"
-            raise ValueError(msg)
-        af_total_results[upid].secondary_structure = (cf_out_file, ss_result, ss_out_file)
-    nr_ss_kept = len([r for r in cf_ss_results if r[2] is not None])
-    logger.info("Kept %i files after secondary structure filtering in %s", nr_ss_kept, final_dir)
-
-
-def filter_alphafold_structures(
-    afs: list[AlphaFoldEntry],
+def _write_ro_crate(
     session_dir: Path,
-    options: FilterOptions,
-    final_dir: Path,
-    scheduler_address: str | Cluster | Literal["sequential"] | None = None,
-) -> FilterResults:
-    """Filter AlphaFold structures in the session directory based on confidence and secondary structure.
-
-    Args:
-        afs: The list of AlphaFold entries to filter.
-        session_dir: The directory containing the session data, including AlphaFold structure files.
-        options: The filter options containing confidence and secondary structure filter queries.
-        final_dir: The directory to store the final filtered structures.
-        scheduler_address: The address of the Dask scheduler.
-            If not provided, will create a local cluster.
-            If set to `sequential` will run tasks sequentially.
-
-    Returns:
-        A dictionary mapping (uniprot_accession, pdb_id) to FilteredStructure objects
-
-    Raises:
-        ValueError: If there are inconsistencies in the filtering results.
-    """
-    confidence = options.confidence
-    secondary_structure = options.secondary_structure
-    do_ss = secondary_structure.is_actionable()
-
-    af_total_results: FilterResults = {}
-
-    alphafold_cif_files = [e.cif_file for e in afs if e.cif_file is not None]
-    alphafold_cif_files2upid = {e.cif_file.name: (e.uniprot_accession, None) for e in afs if e.cif_file is not None}
-
-    logger.info("Filtering AlphaFold files on confidence")
-    cf_dir = session_dir / "confidence_filtered" if do_ss else final_dir
-    cf_dir.mkdir(parents=True, exist_ok=True)
-    cf_result = filter_files_on_confidence(
-        alphafold_cif_files, confidence, cf_dir, copy_method="symlink", scheduler_address=scheduler_address
+    start_time: datetime,
+    /,
+    *,
+    pdbe_path: StdioPath,
+    pdbe_download_dir: Path,
+    downloaded_af_dir: Path,
+    pdbe_quality_json: StdioPath,
+    uniprots_verified: Path,
+    uniprots_verified_stats_file: Path,
+    single_chain_dir: Path,
+    single_chain_stats_file: Path,
+    combined_input_dir: Path,
+    combined_output_dir: Path,
+    combined_stats_file: StdioPath,
+    ss_output_dir: Path | None = None,
+    ss_stats_file: StdioPath | None = None,
+) -> None:
+    ioargs = IOArgumentPaths(
+        input_files=[
+            IOArgumentPath(
+                name="pdbe_ids_file",
+                path=pdbe_path,
+                help="CSV file containing the PDBe identifiers and Uniprot to chain assignments.",
+            ),
+            IOArgumentPath(
+                name="pdbe_quality_json",
+                path=pdbe_quality_json,
+                help="JSON file containing the PDBe quality scores.",
+            ),
+        ],
+        input_dirs=[
+            IOArgumentPath(
+                name="pdbe_download_dir",
+                path=pdbe_download_dir,
+                help="Directory where the PDBe files were downloaded.",
+            ),
+            IOArgumentPath(
+                name="alphafold_download_dir",
+                path=downloaded_af_dir,
+                help="Directory where the AlphaFold files were downloaded.",
+            ),
+        ],
+        output_dirs=[
+            IOArgumentPath(
+                name="uniprots_verified_dir",
+                path=uniprots_verified,
+                help=(
+                    "Directory where the uniprots are verified and injected if needed from "
+                    f"{pdbe_download_dir.relative_to(session_dir, walk_up=True)}."
+                ),
+            ),
+            IOArgumentPath(
+                name="single_chain_dir",
+                path=single_chain_dir,
+                help=(
+                    "Directory where the single chain structure files are written from "
+                    f"{uniprots_verified.relative_to(session_dir, walk_up=True)}."
+                ),
+            ),
+            IOArgumentPath(
+                name="combined_input_dir",
+                path=combined_input_dir,
+                help=(
+                    "Directory where files from "
+                    f"{single_chain_dir.relative_to(session_dir, walk_up=True)} and "
+                    f"{downloaded_af_dir.relative_to(session_dir, walk_up=True)} were copied into."
+                ),
+            ),
+            IOArgumentPath(
+                name="combined_output_dir",
+                path=combined_output_dir,
+                help="Directory where the combined filtered structure files are written to.",
+            ),
+        ],
+        output_files=[
+            IOArgumentPath(
+                name="uniprots_verified_stats_file",
+                path=uniprots_verified_stats_file,
+                help="CSV file containing statistics for the uniprot verification step.",
+            ),
+            IOArgumentPath(
+                name="single_chain_stats_file",
+                path=single_chain_stats_file,
+                help="CSV file containing statistics for the single chain filtering step.",
+            ),
+            IOArgumentPath(
+                name="combined_stats_file",
+                path=combined_stats_file,
+                help="CSV file containing statistics for the combined filtering step.",
+            ),
+        ],
     )
-    for e in cf_result:
-        upid = alphafold_cif_files2upid[e.input_file]
-        af_total_results[upid] = FilteredStructure(uniprot_accession=upid[0], confidence=e)
-    cf_out_files = [e.filtered_file for e in cf_result if e.filtered_file is not None]
-    nr_cf_kept = len(cf_out_files)
-    logger.info("Kept %i files after confidence filtering in %s", nr_cf_kept, cf_dir)
-
-    if nr_cf_kept > 0 and do_ss:
-        _filter_alphafolds_on_secondary_structure(
-            secondary_structure=secondary_structure,
-            cf_out_files=cf_out_files,
-            final_dir=final_dir,
-            af_total_results=af_total_results,
-            alphafold_cif_files2upid=alphafold_cif_files2upid,
-        )
-
-    return af_total_results
-
-
-type FileNameChain2UniprotPdb = dict[tuple[str, str], tuple[str, str]]
-"""Type alias for mapping (pdb_file_name, chain) to (uniprot_accession, pdb_id)."""
-
-
-def _filter_pdb_structures_on_secondary_structure(
-    final_dir: Path,
-    secondary_structure: SecondaryStructureFilterQuery,
-    pdbe_total_results: FilterResults,
-    pc2upid: FileNameChain2UniprotPdb,
-    do_pdb_residue: bool,
-    chain_filtered: list[ChainFilterStatistics],
-    chain_filtered_files: list[Path],
-    residue_filtered: list[ResidueFilterStatistics],
-    residue_filtered_files: list[Path],
-):
-    pdb_ss_in_files = residue_filtered_files if do_pdb_residue else chain_filtered_files
-    pdb_chain_out_file2upid = {
-        f.output_file: pc2upid[(f.input_file.name, f.chain_id)] for f in chain_filtered if f.output_file is not None
-    }
-    if do_pdb_residue:
-        residue_in2residue_out = {f.input_file: f.output_file for f in residue_filtered if f.output_file is not None}
-        pdb_chain_out_file2upid = {
-            residue_in2residue_out[f]: upid
-            for f, upid in pdb_chain_out_file2upid.items()
-            if f in residue_in2residue_out
-        }
-
-    logger.info("Filtering %i PDBe files on secondary structure", len(pdb_ss_in_files))
-    pdb_ss_results: list[tuple[Path, SecondaryStructureFilterResult, Path | None]] = []
-    for input_file, result in filter_files_on_secondary_structure(
-        file_paths=pdb_ss_in_files, query=secondary_structure
-    ):
-        output_file: Path | None = None
-        upid = pdb_chain_out_file2upid[input_file]
-        if upid not in pdbe_total_results:
-            msg = f"Residue filter result not found for {input_file} aka {upid}"
-            raise ValueError(msg)
-        if result.passed:
-            output_file = final_dir / input_file.name
-            if output_file is None:
-                raise ValueError
-            copyfile(input_file, output_file, "symlink")
-        pdbe_total_results[upid].secondary_structure = (input_file, result, output_file)
-        pdb_ss_results.append((input_file, result, output_file))
-    nr_pdb_ss_kept = len([r for r in pdb_ss_results if r[2] is not None])
-    logger.info("Kept %i files after secondary structure filtering in %s", nr_pdb_ss_kept, final_dir)
-
-
-def _filter_pdb_structures_by_residue_count(
-    confidence: ConfidenceFilterQuery,
-    chain_filtered_files: list[Path],
-    chain_filtered: list[ChainFilterStatistics],
-    output_dir: Path,
-    pdbe_total_results: FilterResults,
-    pc2upid: FileNameChain2UniprotPdb,
-):
-    logger.info("Filtering PDBe files on number of residues")
-    residue_filtered = list(
-        filter_files_on_residues(
-            chain_filtered_files,
-            output_dir,
-            confidence.min_residues,
-            confidence.max_residues,
-            copy_method="symlink",
-        )
-    )
-    input_file2residue_filtered = {f.input_file: f for f in residue_filtered}
-    for f in chain_filtered:
-        upid = pc2upid[(f.input_file.name, f.chain_id)]
-        rc = pdbe_total_results[upid].chain
-        if rc is None:
-            msg = f"Chain filter result not found for {f.input_file} {f.chain_id}"
-            raise ValueError(msg)
-        rc_out = rc.output_file
-        if rc_out is None:
-            continue
-        residue_out = input_file2residue_filtered[rc_out]
-        pdbe_total_results[upid].residue = residue_out
-    residue_filtered_files = [f.output_file for f in residue_filtered if f.output_file is not None]
-    logger.info("Kept %i files after residue filtering in %s", len(residue_filtered_files), output_dir)
-    return residue_filtered, residue_filtered_files
-
-
-def filter_pdbe_structures(
-    proteinpdbs: list[ProteinPdbRow],
-    session_dir: Path,
-    options: FilterOptions,
-    final_dir: Path,
-    scheduler_address: str | Cluster | None,
-) -> FilterResults:
-    """Filter PDBe structures in the session directory based on chain, number of residues, and secondary structure.
-
-    Args:
-        proteinpdbs: The list of ProteinPdbRow entries to filter.
-        session_dir: The directory containing the session data, including PDBe structure files.
-        options: The filter options containing confidence and secondary structure filter queries.
-        final_dir: The directory to store the final filtered structures.
-        scheduler_address: Address of the Dask scheduler for distributed filtering. If None then local cluster is used.
-
-    Returns:
-        A dictionary mapping (uniprot_accession, pdb_id) to FilteredStructure objects
-    """
-    # In protein-quest we are just working with pdb files,
-    # but in protein-detective we keep track which
-    # pdb+chain belongs to which uniprot entry
-    # so there is a lot of bookkeeping needed
-    path2chains = {(p.mmcif_file, p.chain) for p in proteinpdbs if p.mmcif_file is not None}
-    pc2upid: FileNameChain2UniprotPdb = {
-        (p.mmcif_file.name, p.chain): (p.uniprot_acc, p.pdb_id) for p in proteinpdbs if p.mmcif_file is not None
-    }
-
-    confidence = options.confidence
-    do_pdb_residue = not (confidence.min_residues == 0 and confidence.max_residues == sys.maxsize)
-    secondary_structure = options.secondary_structure
-    do_ss = secondary_structure.is_actionable()
-    pdb_residue_dir = session_dir / "pdb_residue_filtered" if do_ss else final_dir
-    pdb_residue_dir.mkdir(parents=True, exist_ok=True)
-    pdb_chain_dir = session_dir / "pdb_chain_filtered"
-    if not do_pdb_residue and not do_ss:
-        pdb_chain_dir = final_dir
-    pdb_chain_dir.mkdir(parents=True, exist_ok=True)
-    logger.info("Filtering PDBe files on chain of Uniprot to chain A")
-    chain_filtered = filter_files_on_chain(
-        path2chains, pdb_chain_dir, scheduler_address=scheduler_address, copy_method="symlink"
-    )
-    pdbe_total_results: FilterResults = {}
-    for f in chain_filtered:
-        # upid is tuple of uniprot_acc and pdb_id
-        upid = pc2upid[(f.input_file.name, f.chain_id)]
-        if upid not in pdbe_total_results:
-            pdbe_total_results[upid] = FilteredStructure(
-                uniprot_accession=upid[0],
-                pdb_id=upid[1],
+    if ss_output_dir:
+        ioargs.output_dirs.append(
+            IOArgumentPath(
+                name="secondary_structure_output_dir",
+                path=ss_output_dir,
+                help=(
+                    "Directory where the secondary structure filtered structure files are "
+                    f"written. Source {combined_output_dir.relative_to(session_dir, walk_up=True)} dir."
+                ),
             )
-        pdbe_total_results[upid].chain = f
-    chain_filtered_files = [f.output_file for f in chain_filtered if f.output_file is not None]
-    logger.info("Kept %i files after chain filtering in %s", len(chain_filtered_files), pdb_chain_dir)
-
-    residue_filtered = []
-    residue_filtered_files = []
-    if do_pdb_residue:
-        residue_filtered, residue_filtered_files = _filter_pdb_structures_by_residue_count(
-            confidence=confidence,
-            chain_filtered_files=chain_filtered_files,
-            chain_filtered=chain_filtered,
-            output_dir=pdb_residue_dir,
-            pdbe_total_results=pdbe_total_results,
-            pc2upid=pc2upid,
         )
-
-    if do_ss:
-        _filter_pdb_structures_on_secondary_structure(
-            final_dir=final_dir,
-            secondary_structure=secondary_structure,
-            pdbe_total_results=pdbe_total_results,
-            pc2upid=pc2upid,
-            do_pdb_residue=do_pdb_residue,
-            chain_filtered=chain_filtered,
-            chain_filtered_files=chain_filtered_files,
-            residue_filtered=residue_filtered,
-            residue_filtered_files=residue_filtered_files,
+    if ss_stats_file:
+        ioargs.output_files.append(
+            IOArgumentPath(
+                name="secondary_structure_stats_file",
+                path=ss_stats_file,
+                help="CSV file containing statistics for the secondary structure filtering step.",
+            )
         )
+    write_ro_crate(
+        session_dir,
+        start_time,
+        command_name="filter",
+        command_description="Filter structure files based on specified parameters",
+        ioargs=ioargs,
+    )
 
-    return pdbe_total_results
+
+def _merge_structure_files(downloaded_af_dir: Path, with_uniprots: Path, combined_input_dir: Path):
+    combined_input_dir.mkdir()
+    for file in downloaded_af_dir.glob("*"):
+        copyfile(file, combined_input_dir / file.name, copy_method="symlink")
+    for file in with_uniprots.glob("*"):
+        copyfile(file, combined_input_dir / file.name, copy_method="symlink")
+
+
+def _make_stats_relative_to_session_dir(stats_file: Path, session_dir: Path):
+    """Replaces occurrences of `session_dir/` with `/` in given stats text file."""
+    content = stats_file.read_text()
+    content = content.replace(f"{session_dir}/", "")
+    stats_file.write_text(content)
+
+
+def run_filter(
+    session_dir: Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=True, exists=True))],
+    /,
+    *,
+    options: FilterOptions | None = None,
+    _: Common | None = None,
+):
+    """Filter structure files based on specified parameters.
+
+    Steps:
+
+    1. Verify expected uniprot accessions are in structure files and inject uniprot accession if missing.
+        See [protein-quest convert structure --uniprots](https://www.bonvinlab.org/protein-quest/cli.html#protein-quest-convert-structures).
+    2. Convert PDBe structure files to single chain structure files.
+        See [protein-quest filter chain](https://www.bonvinlab.org/protein-quest/cli.html#protein-quest-filter-chain).
+    3. Filters processed PDBe structure files and AlphaFold structure files based on given parameters.
+        See [protein-quest filter combined](https://www.bonvinlab.org/protein-quest/cli.html#protein-quest-filter-combined).
+    4. If secondary structure options are given then
+        filters passed structure files based on secondary structure.
+        See [protein-quest filter secondary-structure](https://www.bonvinlab.org/protein-quest/cli.html#protein-quest-filter-secondary-structure).
+
+    Args:
+        session_dir: Directory where the structure files are located.
+        options: The filtering options.
+    """
+    if options is None:
+        options = FilterOptions()
+
+    start_time = datetime.now(tz=UTC)
+
+    downloaded_pdbe_dir = session_dir / "downloads" / "pdbe"
+    downloaded_af_dir = session_dir / "downloads" / "alphafold"
+    pdbe_csv = StdioPath(session_dir / "pdbe.csv")
+    pdbe_quality_json = StdioPath(session_dir / "pdbe-quality.json")
+
+    uniprots_verified = session_dir / "uniprots_verified"
+    uniprots_verified_stats = StdioPath(session_dir / "uniprots_verified_stats.csv")
+    structures(
+        downloaded_pdbe_dir,
+        output_dir=uniprots_verified,
+        uniprots=pdbe_csv,
+        write_stats=uniprots_verified_stats,
+    )
+    _make_stats_relative_to_session_dir(uniprots_verified_stats, session_dir)
+
+    single_chain_dir = session_dir / "single_chain"
+    single_chain_stats = StdioPath(session_dir / "single_chain_stats.csv")
+    chain(pdbe_csv, uniprots_verified, single_chain_dir, write_stats=single_chain_stats)
+
+    # Combined filter works best if all structure files are in one directory
+    combined_input_dir = session_dir / "combined_input"
+    _merge_structure_files(downloaded_af_dir, single_chain_dir, combined_input_dir)
+
+    combined_output_dir = session_dir / "combined_output"
+    combined_stats_file = StdioPath(session_dir / "combined_stats.csv")
+    combined(
+        combined_input_dir,
+        pdbe_quality_json,
+        combined_output_dir,
+        filters=options.combined,
+        write_stats=combined_stats_file,
+    )
+    _make_stats_relative_to_session_dir(combined_stats_file, session_dir)
+
+    ss_output_dir = None
+    ss_stats_file = None
+    if options.ss.is_actionable():
+        ss_output_dir = session_dir / "secondary_structure"
+        ss_stats_file = StdioPath(session_dir / "secondary_structure_stats.csv")
+        secondary_structure(combined_output_dir, ss_output_dir, filters=options.ss, write_stats=ss_stats_file)
+        _make_stats_relative_to_session_dir(ss_stats_file, session_dir)
+
+    _write_ro_crate(
+        session_dir,
+        start_time,
+        # Input
+        pdbe_path=pdbe_csv,
+        pdbe_download_dir=downloaded_pdbe_dir,
+        downloaded_af_dir=downloaded_af_dir,
+        pdbe_quality_json=pdbe_quality_json,
+        # Output
+        uniprots_verified=uniprots_verified,
+        uniprots_verified_stats_file=uniprots_verified_stats,
+        single_chain_dir=single_chain_dir,
+        single_chain_stats_file=single_chain_stats,
+        combined_input_dir=combined_input_dir,
+        combined_output_dir=combined_output_dir,
+        combined_stats_file=combined_stats_file,
+        ss_output_dir=ss_output_dir,
+        ss_stats_file=ss_stats_file,
+    )

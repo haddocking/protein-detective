@@ -4,10 +4,35 @@ dynamic = ["version"]
 description = "Deduce the protein from a EM density"
 readme = "README.md"
 requires-python = ">=3.13"
+keywords = [
+    "alphafold",
+    "mmcif",
+    "pdb",
+    "protein structure",
+    "protein",
+    "uniprot",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Natural Language :: English",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Typing :: Typed",
+]
 dependencies = [
     "aiofiles>=24.1.0",
     "aiohttp[speedups]>=3.13.4",
     "aiohttp-retry>=2.9.1",
+    "cyclopts>=4.16.1",
     "dask>=2025.5.1",
     "distributed>=2025.5.1",
     "duckdb>=1.2.2",
@@ -15,12 +40,14 @@ dependencies = [
     "numpy>=2.3.1",
     "pandas>=2.3.0",
     "powerfit-em[opencl]>=5.0.0",
-    "protein-quest>=1.4.0",
+    "protein-quest>=1.5.4",
     "psutil>=7.0.0",
     "pyopencl>=2025.2.5",
     "rich>=14.0.0",
     "rich-argparse>=1.7.1",
-    "tqdm>=4.67.1"
+    "rocrate-action-recorder>=0.5.3",
+    "tqdm>=4.67.1",
+    "rocrate>=0.15.0",
 ]
 
 [project.urls]
@@ -30,31 +57,30 @@ Documentation = "https://www.bonvinlab.org/protein-detective/"
 Source = "https://github.com/haddocking/protein-detective"
 
 [project.scripts]
-protein-detective = "protein_detective.cli:main"
+protein-detective = "protein_detective.cli:app"
 
 [project.optional-dependencies]
-cuda13 = [
-    "powerfit-em[cuda13x]>=5.0.0",
-]
-cuda12 = [
-    "powerfit-em[cuda12x]>=5.0.0",
-]
+cuda13 = ["powerfit-em[cuda13x]>=5.0.0"]
+cuda12 = ["powerfit-em[cuda12x]>=5.0.0"]
 
 [dependency-groups]
 type = [
-    "pyrefly>=0.42.0",
+    "pyrefly>=1.1.1",
     "types-aiofiles>=24.1.0.20250326",
-    "types-tqdm>=4.67.0.20250513"
+    "types-tqdm>=4.67.0.20250513",
 ]
 test = [
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
+    "pytest-asyncio>=1.1.0",
+    "pytest-recording>=0.13.4",
+    "rocrate==0.15.0",
+    "gemmi>=0.7.5",
+    "pooch>=1.9.0",
 ]
-dev = [
-    {include-group = "test"},
-    {include-group = "type"}
-]
+dev = [{ include-group = "test" }, { include-group = "type" }]
 docs = [
+    "cyclopts[mkdocs]>=4.5.4",
     "duckdb-engine>=0.17.0",
     "gemmi>=0.7.3",
     "ipykernel>=6.31.0",
@@ -65,17 +91,8 @@ docs = [
     "mkdocs-autoapi>=0.4.1",
     "mkdocs-jupyter>=0.25.1",
     "mkdocs-material>=9.6.22",
-    "mkdocs-rich-argparse>=0.1.2",
     "mkdocstrings[python]>=0.30.1",
-    "nbconvert>=7.16.6"
-]
-marimo = [
-    "marimo[sql]>=0.17.2"
-]
-docs-type = [
-    {include-group = "marimo"},
-    {include-group = "type"},
-    {include-group = "docs"}
+    "nbconvert>=7.16.6",
 ]
 
 [build-system]
@@ -106,7 +123,7 @@ select = [
     "EM",
     "ERA",
     "F",
-    # TODO enable FBT and factor out booleans args to seperate functions
+    # TODO enable FBT and factor out booleans args to separate functions
     # "FBT",
     "FURB",
     "I",
@@ -140,7 +157,7 @@ select = [
     "TRY",
     "UP",
     "W",
-    "YTT"
+    "YTT",
 ]
 ignore = [
     # Conflicts with formatting
@@ -151,7 +168,15 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*" = [
-    "ARG", "ANN", "D", "E501", "DTZ001", "N802", "S101", "S108", "PLR2004"
+    "ARG",
+    "ANN",
+    "D",
+    "E501",
+    "DTZ001",
+    "N802",
+    "S101",
+    "S108",
+    "PLR2004",
 ]
 "docs/**/*.ipynb" = [
     # Allow wide lines in notebooks
@@ -165,7 +190,7 @@ ignore = [
     # Allow generic variable name
     "PD901",
     # Allow suspicious-url-open-usage
-    "S310"
+    "S310",
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -181,8 +206,17 @@ displaylimit = 100
 protein-quest = { path = "../protein-quest", editable = true }
 
 [tool.pyrefly]
-project-includes = ["src", "tests", "benchmark"]
-search-paths = ["./src", "./benchmark"]
+preset = "strict"
+project-includes = [
+    "**/*.py*",
+    # "**/*.ipynb",
+]
+# Needed for tests/helpers.py
+enable-fallback-search-path = true
+
+[tool.pytest]
+minversion = "9.0"
+addopts = ["--import-mode=importlib"]
 
 [tool.coverage.run]
 source = ["src/protein_detective"]

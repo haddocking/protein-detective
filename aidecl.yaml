@@ -1,0 +1,43 @@
+# See https://ai-declaration.org/ for more information.
+schema_version: 1.0.0
+project:
+  name: protein-quest
+  repository: https://github.com/haddocking/protein-detective
+  license: Apache-2.0
+  content_type: software
+ai_usage:
+  used: true
+  summary:
+    GitHub Copilot and local LLMs were used a lot, but always reviewed by human
+  level: significant
+  scope:
+    code_completion: true
+    code_review: true
+    code_generation: true
+    documentation: true
+    refactoring: true
+  tools:
+    - name: GitHub Copilot
+      type: assistant
+      hosting: cloud_vendor
+      purpose:
+        - code completion
+    - name: GitHub Copilot
+      type: agent
+      hosting: cloud_vendor
+      purpose:
+        - agent in Visual Studio Code
+        - code review on GitHub
+    - name: DeepSeek-V4-Flash
+      type: assistant
+      hosting: local_offline
+      purpose:
+        - agent in Visual Studio Code
+    - name: Ornith-1.0-35B-GGUF
+      type: assistant
+      hosting: local_offline
+      purpose:
+        - agent in Visual Studio Code
+declaration:
+  declared_by: Stefan Verhoeven
+  date: "2026-07-27"

@@ -1,23 +1,15 @@
-from argparse import Namespace
 from collections.abc import Generator
 from dataclasses import dataclass
-from io import BufferedReader
 from pathlib import Path
 from shlex import join
-from typing import Literal, TypeGuard, get_args
+from typing import Annotated, Literal, get_args
 
+from cyclopts import Group, Parameter
+from cyclopts.types import NonNegativeInt, PositiveFloat, PositiveInt
 from powerfit_em.correlators.shared import DEFAULT_BATCH_SIZE
-
-# Copy of
-# https://github.com/haddocking/powerfit/blob/092c5bc387ad90d046601afa9fe79f4fb67f7408/src/powerfit_em/powerfit.py#L31-L164
-# with slight modifications to fit the protein_detective requirements.
 
 type GpuBackend = Literal["opencl", "cuda"]
 gpu_backends: tuple[GpuBackend, ...] = get_args(GpuBackend.__value__)
-
-
-def _is_gpu_backend(value: object) -> TypeGuard[GpuBackend]:
-    return isinstance(value, str) and value in gpu_backends
 
 
 def parse_first_visible_gpu_id(visible_devices: str | None) -> int:
@@ -36,72 +28,57 @@ def parse_first_visible_gpu_id(visible_devices: str | None) -> int:
         return 0
 
 
+powerfit_group = Group.create_ordered("PowerFit specific parameters")
+process_group = Group.create_ordered("Process parameters")
+
+
+# Copy of
+# https://github.com/haddocking/powerfit/blob/092c5bc387ad90d046601afa9fe79f4fb67f7408/src/powerfit_em/powerfit.py#L31-L164
+# with slight modifications to fit the protein_detective requirements.
+@Parameter(name="*", group=powerfit_group)
 @dataclass
 class PowerfitOptions:
-    """Options for the Powerfit command.
+    """PowerFit specific options.
 
-    Parameters:
-        target: Path to the density map file.
-        resolution: Resolution of the density map.
-        angle: Angle for the fitting.
-        laplace: Whether to use Laplace smoothing.
-        core_weighted: Whether to use core weighted fitting.
-        no_resampling: Whether to disable resampling.
-        resampling_rate: Rate of resampling.
-        no_trimming: Whether to disable trimming .
-        trimming_cutoff: Cutoff for trimming.
-        gpu: Number of workers per GPU. If > 0 then Powerfit will use GPU acceleration otherwise CPU.
-        gpu_backend: GPU backend to use for PowerFit device selection.
-        nproc: Number of processes to use. Ignored if GPU is used.
-        batch_size: Batch size for processing. Use 0 to do one rotation at a time.
+    Attributes:
+        angle: Rotational sampling density in degree. Increasing
+            this number by a factor of 2 results in approximately
+            8 times more rotations sampled.
+        no_laplace: Do not use the Laplace pre-filter density data.
+        no_core_weighted: Do not use core-weighted local cross-correlation score.
+        no_resampling: Do not resample the density map.
+        resampling_rate: Resampling rate compared to Nyquist.
+        no_trimming: Do not trim the density map.
+        trimming_cutoff: Intensity cutoff to which the map will be trimmed. Default is 10 percent of maximum intensity.
+        cpu: Use CPU for the intensive calculations. Otherwise off-loads to GPU.
+        workers_per_gpu: Number of workers to run per GPU.
+        gpu_backend: Backend to use for GPU processing.
+        nproc: Number of processors used during search.
+            The number will be capped at the total number
+            of available processors on your machine.
+        batch_size: GPU batch size to use.
+            Use 0 to disable batching entirely, or a positive integer to force a specific batch size.
+            Applies to GPU backends (CUDA/OpenCL).
+            If set too high will cause out-of-memory errors.
     """
 
-    target: Path
-    resolution: float
-    angle: float = 10
-    laplace: bool = True
-    core_weighted: bool = True
-    no_resampling: bool = False
-    resampling_rate: float = 2
-    no_trimming: bool = False
-    trimming_cutoff: float | None = None
-    gpu: int = 0
-    gpu_backend: GpuBackend = "opencl"
-    nproc: int = 1
-    batch_size: int = DEFAULT_BATCH_SIZE
+    angle: PositiveFloat = 10.0
+    no_laplace: Annotated[bool, Parameter(negative="")] = False
+    no_core_weighted: Annotated[bool, Parameter(negative="")] = False
+    no_resampling: Annotated[bool, Parameter(negative="")] = False
+    resampling_rate: PositiveFloat = 2.0
+    no_trimming: Annotated[bool, Parameter(negative="")] = False
+    trimming_cutoff: PositiveFloat | None = None
+    cpu: Annotated[bool, Parameter(group=process_group, negative="")] = False
+    workers_per_gpu: Annotated[PositiveInt, Parameter(group=process_group)] = 1
+    gpu_backend: Annotated[GpuBackend, Parameter(group=process_group)] = "opencl"
+    nproc: Annotated[PositiveInt, Parameter(group=process_group)] = 1
+    batch_size: Annotated[NonNegativeInt, Parameter(group=process_group)] = DEFAULT_BATCH_SIZE
 
-    @staticmethod
-    def from_args(parsed_args: Namespace) -> "PowerfitOptions":
-        """Create PowerfitOptions from parsed command line arguments.
-
-        Args:
-            parsed_args: Parsed command line arguments.
-
-        Returns:
-            PowerfitOptions: An instance of PowerfitOptions populated with the parsed arguments.
-        """
-        target = parsed_args.target
-        if isinstance(target, BufferedReader):
-            target = target.name
-        gpu_backend = parsed_args.gpu_backend
-        if not _is_gpu_backend(gpu_backend):
-            msg = f"Unsupported gpu backend: {gpu_backend!r}. Expected one of {gpu_backends}."
-            raise ValueError(msg)
-        return PowerfitOptions(
-            target=Path(target),
-            resolution=parsed_args.resolution,
-            angle=parsed_args.angle,
-            laplace=not parsed_args.no_laplace,
-            core_weighted=not parsed_args.no_core_weighted,
-            no_resampling=parsed_args.no_resampling,
-            resampling_rate=parsed_args.resampling_rate,
-            no_trimming=parsed_args.no_trimming,
-            trimming_cutoff=parsed_args.trimming_cutoff,
-            gpu=parsed_args.gpu,
-            gpu_backend=gpu_backend,
-            nproc=parsed_args.nproc,
-            batch_size=parsed_args.batch_size,
-        )
+    @property
+    def gpu(self) -> bool:
+        """Whether to use GPU for the intensive calculations."""
+        return not self.cpu
 
     def format_gpu_device(self, gpu_id: int) -> str:
         if self.gpu_backend == "cuda":
@@ -111,6 +88,7 @@ class PowerfitOptions:
     def to_command(
         self,
         density_map: Path,
+        resolution: float,
         template: Path,
         out_dir: Path,
         powerfit_cmd: str = "powerfit",
@@ -120,6 +98,7 @@ class PowerfitOptions:
 
         Args:
             density_map: Path to the density map file.
+            resolution: Resolution of the density map in Angstroms.
             template: Path to the template PDB file.
             out_dir: Directory to save the output files.
             powerfit_cmd: Command to run Powerfit (default is "powerfit").
@@ -131,10 +110,10 @@ class PowerfitOptions:
         args = [
             powerfit_cmd,
             str(density_map.absolute()),
-            str(self.resolution),
+            str(resolution),
             str(template.absolute()),
-            "--laplace" if self.laplace else "",
-            "--core-weighted" if self.core_weighted else "",
+            "--no-laplace" if self.no_laplace else "",
+            "--no-core-weighted" if self.no_core_weighted else "",
             "--no-resampling" if self.no_resampling else "",
             "--resampling-rate",
             str(self.resampling_rate),
@@ -151,7 +130,7 @@ class PowerfitOptions:
             "--delimiter",
             ",",
         ]
-        if self.gpu > 0 and gpu_cycler is not None:
+        if self.gpu and gpu_cycler is not None:
             gpu_id = next(gpu_cycler)
             args.extend(["--gpu", self.format_gpu_device(gpu_id)])
         if self.batch_size != DEFAULT_BATCH_SIZE:
