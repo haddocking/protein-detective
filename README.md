@@ -17,7 +17,7 @@ It uses
 - [cyclopts](https://cyclopts.readthedocs.io/en/latest/) for command line interface
 - [molviewspec](https://molstar.org/mol-view-spec/) to visualize the fitted structures and density map in a web browser.
 - [dask](https://dask.org/) to run powerfit in parallel on multiple CPU cores or GPUs.
-- [Research Object Crate](https://www.researchobject.org/ro-crate/) to keep track of commands and their input/output files/directories.
+- [Research Object Crate](https://www.researchobject.org/ro-crate/) and [rocrate-action-recorder](https://rocrate-action-recorder.readthedocs.io/)  to keep track of commands and their input/output files/directories.
 - [duckdb](https://duckdb.org/) to query CSV files like powerfit/*/*/solutions.out files.
 
 Diagram how protein-detective calls protein-quest and powerfit:
