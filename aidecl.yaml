@@ -7,7 +7,8 @@ project:
   content_type: software
 ai_usage:
   used: true
-  summary: GitHub Copilot and local LLMs were used a lot, but always reviewed by human
+  summary:
+    GitHub Copilot and local LLMs were used a lot, but always reviewed by human
   level: significant
   scope:
     code_completion: true
