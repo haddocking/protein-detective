@@ -8,23 +8,61 @@
 
 Python package to detect proteins in EM density maps.
 
+Have you ever had an coarse Electron Microscopy (EM) density map and was unable to identify part of it? This package can help you to identify the protein in the density map by searching for protein structures in Uniprot, PDBe and AlphaFold DB and fitting them into the density map.
+
 It uses
 
 - [protein-quest](https://github.com/haddocking/protein-quest) to search, retrieve and filter protein structures from Uniprot, PDBe and AlphaFold DB.
 - [powerfit](https://pypi.org/project/powerfit-em/) to fit protein structure in a Electron Microscopy (EM) density map.
 
-An example workflow:
+Diagram how protein-detective calls protein-quest and powerfit:
 
 ```mermaid
-graph LR;
-    search[Search UniprotKB] --> |uniprot_accessions|retrieve[Retrieve PDBe & AlphaFold structures]
-    retrieve -->|mmcif_files| filter[Filter structures]
-    filter -->|mmcif_files| powerfit
-    powerfit -->|*/solutions.out| solutions[Best scoring solutions]
-    solutions -->|dataframe| fitmodels[Fit models]
+flowchart TB
+    subgraph search [protein-detective search]
+        direction TB
+        S2[protein-quest search uniprot]
+        S3[protein-quest search alphafold]
+        S4[protein-quest search pdbe]
+        S5[protein-quest search pdbe-quality]
+        S6[protein-quest search complexes]
+        S2 --> S3 & S4 
+        S4 --> S5
+        S2 -.-> S6
+        S6 -.-> S4
+    end
+    search -- "UniProt accessions & PDB ids" --> retrieve
+
+    subgraph retrieve [protein-detective retrieve]
+        direction TB
+        R2[protein-quest retrieve pdbe]
+        R3[protein-quest retrieve alphafold]
+    end
+    retrieve -- "mmcif_files" --> filter
+
+    subgraph filter [protein-detective filter]
+        direction TB
+        F2[protein-quest convert structures --uniprots]
+        F3[protein-quest filter chain]
+        F4[protein-quest filter combined]
+        F5[protein-quest filter secondary-structure]
+        F2 --> F3 --> F4 -.-> F5
+    end
+    filter -- "fewer mmcif_files" --> P1[protein-detective powerfit run]
+
+    I1[protein-detective import-structures]
+    I1 -. "mmcif files" .-> P1
+
+    E1[protein-detective powerfit report]
+    M1[protein-detective powerfit fit-models]
+    P1 -- "**/solutions.out" --> E1 & M1
+
+    classDef dashedBorder stroke-dasharray: 5 5;
+    S6:::dashedBorder
+    F5:::dashedBorder
+    I1:::dashedBorder
 ```
-
-
+(Dashed nodes are optional)
 
 ## Install
 
