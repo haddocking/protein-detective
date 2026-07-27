@@ -80,8 +80,8 @@ flowchart TB
     I1:::dashedBorder
 ```
 
-(Dashed nodes are optional)
-(The Mermaid figure might not be rendered, see https://www.bonvinlab.org/protein-detective/ for rendered version)
+(Dashed nodes are optional) (The Mermaid figure might not be rendered, see
+<https://www.bonvinlab.org/protein-detective/> for rendered version)
 
 ## Install
 
