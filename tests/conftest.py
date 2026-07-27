@@ -3,6 +3,7 @@ from pathlib import Path
 import pooch
 import pytest
 
+# Make asserts in test.helpers render with pytest verbosity
 pytest.register_assert_rewrite("tests.helpers")
 
 
