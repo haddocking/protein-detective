@@ -5,6 +5,7 @@
 [![Research Software Directory Badge](https://img.shields.io/badge/rsd-00a3e3.svg)](https://www.research-software.nl/software/protein-detective)
 [![PyPI](https://img.shields.io/pypi/v/protein-detective)](https://pypi.org/project/protein-detective/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15632658.svg)](https://doi.org/10.5281/zenodo.15632658)
+![AI Declaration Format](https://img.shields.io/badge/AI_Declaration_Format-validated-blue)
 
 Python package to detect proteins in EM density maps.
 
