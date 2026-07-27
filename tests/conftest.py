@@ -26,6 +26,14 @@ def ribosome_map() -> Path:
     )
 
 
+@pytest.fixture(scope="session")
+def ksga_pdb() -> Path:
+    return _fetch_tutorial_fixture(
+        filename="KsgA.pdb",
+        sha256="6bc1eb01fffc56a855b9d65378810e0fe2da678fadf2a1f1021f9fc8499fd710",
+    )
+
+
 def fetch_cif(filename: str, sha256: str) -> Path:
     base_url = "https://www.ebi.ac.uk/pdbe/entry-files/download/"
     path = pooch.retrieve(
