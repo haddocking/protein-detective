@@ -108,7 +108,7 @@ protein-detective search \
 ```
 ([GO:0005634](https://www.ebi.ac.uk/QuickGO/term/GO:0005634) is "Nucleus" and [GO:0003677](https://www.ebi.ac.uk/QuickGO/term/GO:0003677) is  "DNA binding")
 
-In `./mysession` directory, you will find session.db file, which is a [DuckDB](https://duckdb.org/) database with search results.
+In `./mysession` directory, you will find the search results.
 
 <details>
 <summary>You can also include interaction partners in the search</summary>
