@@ -3,10 +3,10 @@ name: CI
 on:
   push:
     branches:
-    - main
+      - main
   pull_request:
     branches:
-    - main
+      - main
 
 jobs:
   test:
@@ -20,8 +20,13 @@ jobs:
           sudo apt-get install -y ocl-icd-opencl-dev ocl-icd-libopencl1
       - name: Install uv
         uses: astral-sh/setup-uv@v8.1.0
+      - name: Cache downloaded test data
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/protein-detective-test-fixtures
+          key: cached-protein-detective-test-fixtures
       - name: Install the project
-      # Using -no-sources otherwise uv tries to install ../protein-quest
+        # Using -no-sources otherwise uv tries to install ../protein-quest
         run: uv sync --dev --no-sources
       - name: Install pocl
         run: uv pip install pocl-binary-distribution==3.0
