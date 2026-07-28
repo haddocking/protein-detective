@@ -30,7 +30,7 @@ It uses
   [rocrate-action-recorder](https://rocrate-action-recorder.readthedocs.io/) to
   keep track of commands and their input/output files/directories.
 - [duckdb](https://duckdb.org/) to query CSV files like
-  powerfit/_/_/solutions.out files.
+  powerfit/\*/\*/solutions.out files.
 
 Diagram how protein-detective calls protein-quest and powerfit:
 
@@ -140,14 +140,15 @@ protein-detective search --verbose \
     --subcellular-location-go GO:0005634 \
     --molecular-function-go GO:0003677 \
     --interaction.seed A8MT69 \
-    --interaction.exclude B1APH4 \
+    --interaction.exclude Q9BTP7 \
     --limit-uniprot 100 \
     --pdbe.limit 100 \
     ./mysession2
 ```
 
-Which will add `Q96H22` which is an interaction partner of `A8MT69` in a
-macromolecular complex.
+Which will add [Q96H22](https://www.uniprot.org/uniprot/Q96H22) which is an
+interaction partner of [A8MT69](https://www.uniprot.org/uniprot/A8MT69) in a
+macromolecular [complex](https://www.ebi.ac.uk/complexportal/complex/CPX-6266).
 
 </details>
 
@@ -171,7 +172,8 @@ Filter structures based on
     (below threshold) removed
 - Number of residues in secondary structure (helices and sheets)
 
-Also uncompresses _.cif.gz files to_.cif files for compatibility with powerfit.
+Also uncompresses \*.cif.gz files to \*.cif files for compatibility with
+powerfit.
 
 ```shell
 protein-detective filter \
