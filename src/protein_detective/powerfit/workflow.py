@@ -294,7 +294,7 @@ def create_fittable_structures_csv(session_dir: Path, fittable_structures_csv: P
 def powerfit_report(
     session_dir: Path,
     powerfit_run_id: str | None = None,
-):
+) -> DataFrame:
     """Return a DataFrame containing the PowerFit solutions.
 
     Args:
