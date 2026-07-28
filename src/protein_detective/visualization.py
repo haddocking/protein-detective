@@ -1,6 +1,6 @@
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 import duckdb
 from molviewspec import (
@@ -16,21 +16,24 @@ from molviewspec import (
 from molviewspec.builder import Representation, Root, Snapshot, VolumeRepresentation
 from pandas import DataFrame
 
-Renderer = Literal["html", "notebook", "streamlit"]
+Renderer = Literal["html", "notebook", "streamlit", "raw"]
 """Which molstar renderer to use for visualization."""
+available_renderers: tuple[Renderer, ...] = get_args(Renderer)
 
 
 def _render_state(
     state: MVSJ | State, data: dict[str, bytes], renderer: Renderer, ui: Literal["viewer", "stories"] = "viewer"
 ):
     if renderer == "notebook":
-        return molstar_notebook(state=state, data=data, ui=ui, width=1500, height=900)
+        return molstar_notebook(state=state, data=data, ui=ui, width=1500, height=900)  # returns None
     if renderer == "html":
-        return molstar_html(state=state, data=data, ui=ui)
+        return molstar_html(state=state, data=data, ui=ui)  # returns html string
     if renderer == "streamlit":
-        return molstar_streamlit(state=state, data=data, ui=ui)
+        return molstar_streamlit(state=state, data=data, ui=ui)  # returns streamlit.delta_generator.DeltaGenerator
+    if renderer == "raw":
+        return (state, data)  # returns tuple[MVSJ | State, dict[str, bytes]]
 
-    msg = f"Renderer '{renderer}' is not implemented. Supported: 'notebook'."
+    msg = f"Renderer '{renderer}' is not implemented. Supported: {', '.join(available_renderers)}."
     raise NotImplementedError(msg)
 
 
@@ -58,19 +61,18 @@ def _add_density_to_builder(builder: Root, density: Path) -> VolumeRepresentatio
 
 def _create_snapshot_description(fitted_model: dict[str, Any]) -> str:
     source = ""
-    if fitted_model["pdb_id"] is not None:
-        source = dedent(f"""\
-            - Source: PDBe
-            - PDB ID: [{fitted_model["pdb_id"]}](https://www.ebi.ac.uk/pdbe/entry/pdb/{fitted_model["pdb_id"]})
-        """)
-    elif fitted_model["af_id"] is not None:
+    is_alphafold = fitted_model["is_alphafold"]
+    structure_id = fitted_model["structure_id"]
+    if is_alphafold:
         source = dedent(f"""\
             - Source: AlphaFold
-            - AlphfoldDB ID: {fitted_model["af_id"]}
+            - AlphaFoldDB ID: [{structure_id}](https://www.alphafold.ebi.ac.uk/entry/{structure_id})
         """)
     else:
-        msg = "Fitted model must have either a PDB ID or an AlphaFold ID."
-        raise ValueError(msg)
+        source = dedent(f"""\
+            - Source: PDBe
+            - PDB ID: [{structure_id}](https://www.ebi.ac.uk/pdbe/entry/pdb/{structure_id})
+        """)
     translation = fitted_model["translation"].round(3)
     rotation = fitted_model["rotation"].round(3)
     linked_uniprot_accessions = ", ".join(
@@ -124,6 +126,24 @@ def load_fitted_models(*, fitted_models_csv: Path, report_csv: Path, runs_csv: P
 
     Returns:
         DataFrame containing fitted models with additional information from the report and runs.
+            The returned columns are:
+
+            - powerfit_run_id: ID of the PowerFit run
+            - structure: Name of the structure file
+            - rank: Rank of the solution
+            - cc: Cross-correlation coefficient of the solution
+            - fishz: FishZ score of the solution
+            - relz: Relative Z-score of the solution
+            - translation: Translation vector of the solution as a list of floats
+            - rotation: Rotation matrix of the solution as a list of floats
+            - fitted_model_file: Path to the fitted model file
+            - unfitted_model_file: Path to the unfitted model file
+            - density_map: Path to the density map used for fitting
+            - run_dir: Path to the PowerFit run directory
+            - options: Stringified PowerFit options for the run
+            - uniprot_accessions: List of UniProt accessions for the template structure
+            - structure_id: Structure ID of the template structure (UniProt or PDB)
+            - is_alphafold: Boolean indicating if the template structure is from AlphaFoldDB
     """
 
     query = """
@@ -147,8 +167,11 @@ def show_fitted_models_and_density(fitted_models: DataFrame, renderer: Renderer 
     """Visualizes fitted models and their associated density map with molstar.
 
     Args:
-        fitted_models: The fitted models retrieved with
+        fitted_models: The fitted models returned by
             [load_fitted_models][protein_detective.visualization.load_fitted_models].
+            Expected columns: powerfit_run_id, structure, rank, cc, fishz, relz, translation, rotation,
+            fitted_model_file, unfitted_model_file, density_map, run_dir, options, uniprot_accessions,
+            structure_id, is_alphafold.
         renderer: Renderer to use for visualization.
     """
     snapshots = []
@@ -169,7 +192,7 @@ def show_fitted_models_and_density(fitted_models: DataFrame, renderer: Renderer 
         )
     )
 
-    _render_state(state, data, renderer, "stories")
+    return _render_state(state, data, renderer, "stories")
 
 
 def show_structure_and_density(structure: Path | str, density: Path, renderer: Renderer = "notebook"):
@@ -191,4 +214,4 @@ def show_structure_and_density(structure: Path | str, density: Path, renderer: R
     data = {}
     data[str(density)] = density.read_bytes()
     data[str(structure)] = structure.read_bytes()
-    _render_state(state, data, renderer)
+    return _render_state(state, data, renderer)
