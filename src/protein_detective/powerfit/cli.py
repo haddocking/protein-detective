@@ -91,7 +91,6 @@ def run(
         session_dir: Session directory for input and output
         options: Powerfit specific options.
         powerfit_run_id: ID of the PowerFit run to use. If not provided, will autoincrement based on existing runs.
-        output: Output file path. If not specified, defaults to standard output.
         scheduler_address: Address of the Dask scheduler to use.
             Use `sequential` to run PowerFit sequentially without Dask cluster.
             If not provided, will create a local Dask cluster.

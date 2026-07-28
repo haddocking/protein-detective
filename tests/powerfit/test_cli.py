@@ -99,7 +99,16 @@ def fake_solutions(session_dir: Path, powerfit_run_id: str) -> list[Path]:
 
 def assert_solutions(output: str, expected: list[dict[str, str]]) -> None:
     solutions = list(csv.DictReader(output.splitlines()))
-    trimmed_keys = {"powerfit_run_id", "structure", "rank", "cc", "uniprot_accessions", "pdb_id", "template_file"}
+    trimmed_keys = {
+        "powerfit_run_id",
+        "structure",
+        "rank",
+        "cc",
+        "uniprot_accessions",
+        "structure_id",
+        "is_alphafold",
+        "template_file",
+    }
     trimmed_solutions = [{k: v for k, v in s.items() if k in trimmed_keys} for s in solutions]
     assert trimmed_solutions == expected
 
@@ -126,7 +135,8 @@ class TestHandlerPowerfitReport:
                 "cc": "0.499",
                 "template_file": str(session_dir / "combined_output" / "3abc.cif.gz"),
                 "uniprot_accessions": "P12345",
-                "pdb_id": "3abc",
+                "structure_id": "3abc",
+                "is_alphafold": "False",
             },
             {
                 "powerfit_run_id": "run_001",
@@ -135,7 +145,8 @@ class TestHandlerPowerfitReport:
                 "cc": "0.442",
                 "template_file": str(session_dir / "combined_output" / "2abc.cif.gz"),
                 "uniprot_accessions": "P42424",
-                "pdb_id": "2abc",
+                "structure_id": "2abc",
+                "is_alphafold": "False",
             },
             {
                 "powerfit_run_id": "run_001",
@@ -144,7 +155,8 @@ class TestHandlerPowerfitReport:
                 "cc": "0.399",
                 "template_file": str(session_dir / "combined_output" / "1abc.cif.gz"),
                 "uniprot_accessions": "P67890",
-                "pdb_id": "1abc",
+                "structure_id": "1abc",
+                "is_alphafold": "False",
             },
         ]
         assert_solutions(stdout, expected)
@@ -167,7 +179,8 @@ class TestHandlerPowerfitReport:
         expected = [
             {
                 "cc": "0.499",
-                "pdb_id": "3abc",
+                "structure_id": "3abc",
+                "is_alphafold": "False",
                 "powerfit_run_id": "run_001",
                 "rank": "1",
                 "structure": "3abc.cif.gz",
@@ -176,7 +189,8 @@ class TestHandlerPowerfitReport:
             },
             {
                 "cc": "0.487",
-                "pdb_id": "3abc",
+                "structure_id": "3abc",
+                "is_alphafold": "False",
                 "powerfit_run_id": "run_001",
                 "rank": "2",
                 "structure": "3abc.cif.gz",
@@ -185,7 +199,8 @@ class TestHandlerPowerfitReport:
             },
             {
                 "cc": "0.442",
-                "pdb_id": "2abc",
+                "structure_id": "2abc",
+                "is_alphafold": "False",
                 "powerfit_run_id": "run_001",
                 "rank": "1",
                 "structure": "2abc.cif.gz",
@@ -194,7 +209,8 @@ class TestHandlerPowerfitReport:
             },
             {
                 "cc": "0.442",
-                "pdb_id": "2abc",
+                "structure_id": "2abc",
+                "is_alphafold": "False",
                 "powerfit_run_id": "run_001",
                 "rank": "2",
                 "structure": "2abc.cif.gz",
@@ -203,7 +219,8 @@ class TestHandlerPowerfitReport:
             },
             {
                 "cc": "0.399",
-                "pdb_id": "1abc",
+                "structure_id": "1abc",
+                "is_alphafold": "False",
                 "powerfit_run_id": "run_001",
                 "rank": "1",
                 "structure": "1abc.cif.gz",
@@ -212,7 +229,8 @@ class TestHandlerPowerfitReport:
             },
             {
                 "cc": "0.398",
-                "pdb_id": "1abc",
+                "structure_id": "1abc",
+                "is_alphafold": "False",
                 "powerfit_run_id": "run_001",
                 "rank": "2",
                 "structure": "1abc.cif.gz",
@@ -241,7 +259,8 @@ class TestHandlerPowerfitReport:
         expected = [
             {
                 "cc": "0.499",
-                "pdb_id": "3abc",
+                "structure_id": "3abc",
+                "is_alphafold": "False",
                 "powerfit_run_id": "run_001",
                 "rank": "1",
                 "structure": "3abc.cif.gz",
@@ -250,7 +269,8 @@ class TestHandlerPowerfitReport:
             },
             {
                 "cc": "0.487",
-                "pdb_id": "3abc",
+                "structure_id": "3abc",
+                "is_alphafold": "False",
                 "powerfit_run_id": "run_001",
                 "rank": "2",
                 "structure": "3abc.cif.gz",
@@ -348,9 +368,10 @@ def test_run(tmp_path: Path, ribosome_map: Path, cif_2y29: Path, capsys: pytest.
 
     assert read_csv(fittable_csv) == [
         {
-            "pdb_id": "2Y29",
+            "structure_id": "2Y29",
             "structure": "2y29_updated.cif.gz",
             "structure_file": "imported_structures/2y29_updated.cif.gz",
+            "is_alphafold": "False",
             "uniprot_accessions": "P05067",
         },
     ]
