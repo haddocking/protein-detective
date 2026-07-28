@@ -321,9 +321,9 @@ protein-detective powerfit report mysession
 Outputs something like:
 
 ```csv
-powerfit_run_id,structure,rank,cc,fishz,relz,translation,rotation,template_file,uniprot_accessions,pdb_id
-myrun1,3i8z_updated_A2A.cif.gz,1,0.598,0.69,12.959,239.46:187.27:211.83,-0.238:0.322:0.916:0.916:-0.238:0.322:0.322:0.916:-0.238,mysession/combined_output/3i8z_updated_A2A.cif.gz,O00257,3I8Z
-myrun1,6mzc_updated_E2A.cif.gz,1,0.547,0.614,14.671,199.55:214.9:165.78,1.0:0.0:0.0:0.0:-1.0:0.0:0.0:0.0:-1.0,mysession/combined_output/6mzc_updated_E2A.cif.gz,O00268,6MZC
+powerfit_run_id,structure,rank,cc,fishz,relz,translation,rotation,template_file,uniprot_accessions,structure_id,is_alphafold
+myrun1,3i8z_updated_A2A.cif.gz,1,0.598,0.69,12.959,239.46:187.27:211.83,-0.238:0.322:0.916:0.916:-0.238:0.322:0.322:0.916:-0.238,mysession/combined_output/3i8z_updated_A2A.cif.gz,O00257,3I8Z,False
+myrun1,6mzc_updated_E2A.cif.gz,1,0.547,0.614,14.671,199.55:214.9:165.78,1.0:0.0:0.0:0.0:-1.0:0.0:0.0:0.0:-1.0,mysession/combined_output/6mzc_updated_E2A.cif.gz,O00268,6MZC,False
 ...
 ```
 

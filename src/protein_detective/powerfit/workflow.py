@@ -12,6 +12,7 @@ from distributed.deploy.cluster import Cluster
 from duckdb import connect
 from pandas import DataFrame
 from protein_quest.structure.formats import read_structure
+from protein_quest.structure.metadata import structure_metadata
 from protein_quest.structure.uniprot import structure2uniprot_accessions
 from rocrate.rocrate import ROCrate
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
@@ -260,7 +261,8 @@ def powerfit_runs(
 class FittableStructure(TypedDict):
     structure_file: str
     structure: str
-    pdb_id: str
+    structure_id: str
+    is_alphafold: bool
     uniprot_accessions: str
 
 
@@ -270,13 +272,15 @@ def make_fittable_structures_df(session_dir: Path) -> list[FittableStructure]:
     for structure_file in structure_files:
         name = structure_file.name
         structure = read_structure(structure_file)
-        pdb_id = structure.name
+        metadata = structure_metadata(structure)
+        is_alphafold = metadata.is_alphafold
         uniprot_accessions = ":".join(structure2uniprot_accessions(structure))
         data.append(
             {
                 "structure_file": str(structure_file.relative_to(session_dir, walk_up=True)),
                 "structure": name,
-                "pdb_id": pdb_id,
+                "structure_id": metadata.id,
+                "is_alphafold": is_alphafold,
                 "uniprot_accessions": uniprot_accessions,
             }
         )
@@ -306,19 +310,20 @@ def powerfit_report(
 
     Returns:
         A DataFrame containing the PowerFit solutions.
-        With following columns:
+            With following columns:
 
-        1, powerfit_run_id: ID of the PowerFit run
-        2, structure: Name of the structure file
-        3, rank: Rank of the solution
-        4, cc: Cross-correlation coefficient of the solution
-        5, fishz: FishZ score of the solution
-        6, relz: Relative Z-score of the solution
-        7, translation: Translation vector of the solution
-        8, rotation: Rotation matrix of the solution
-        9, template_file: Path to the template structure file, relative to the session directory
-        10, uniprot_accessions: Comma-separated list of UniProt accessions
-        11, pdb_id: PDB ID of the template structure
+            - powerfit_run_id: ID of the PowerFit run
+            - structure: Name of the structure file
+            - rank: Rank of the solution
+            - cc: Cross-correlation coefficient of the solution
+            - fishz: FishZ score of the solution
+            - relz: Relative Z-score of the solution
+            - translation: Translation vector of the solution
+            - rotation: Rotation matrix of the solution
+            - template_file: Path to the template structure file, relative to the session directory
+            - uniprot_accessions: Comma-separated list of UniProt accessions
+            - structure_id: Structure ID of the template structure
+            - is_alphafold: Whether the template structure comes from AlphaFoldDB
     """
     fittable_structures_csv = session_dir / "powerfit" / "fittable_structures.csv"
     if not fittable_structures_csv.exists():
@@ -340,7 +345,8 @@ def powerfit_report(
             rotation,
             structure_file AS template_file,
             uniprot_accessions,
-            pdb_id
+            structure_id,
+            is_alphafold
         FROM (
             SELECT
                 parse_path(filename)[-3] AS powerfit_run_id,
