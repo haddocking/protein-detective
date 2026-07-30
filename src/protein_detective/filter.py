@@ -1,3 +1,5 @@
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -5,10 +7,12 @@ from typing import Annotated
 
 from cyclopts import Group, Parameter, validators
 from cyclopts.types import StdioPath
+from protein_quest.cli.common import CacheParameter
 from protein_quest.cli.convert import structures
 from protein_quest.cli.filter import chain, combined, secondary_structure
 from protein_quest.filters.combined import CombinedFilterQuery
 from protein_quest.filters.ss import SecondaryStructureFilterQuery
+from protein_quest.parallel import configure_dask_scheduler
 from protein_quest.utils import copyfile
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 
@@ -163,11 +167,18 @@ def _make_stats_relative_to_session_dir(stats_file: Path, session_dir: Path):
     stats_file.write_text(content)
 
 
+@contextmanager
+def _sequential_context() -> Generator[str]:
+    yield "sequential"
+
+
 def run_filter(
     session_dir: Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=True, exists=True))],
     /,
     *,
     options: FilterOptions | None = None,
+    cache: CacheParameter | None = None,
+    scheduler_address: str | None = None,
     _: Common | None = None,
 ):
     """Filter structure files based on specified parameters.
@@ -187,11 +198,21 @@ def run_filter(
     Args:
         session_dir: Directory where the structure files are located.
         options: The filtering options.
+        cache: Cache options including no_cache, cache_dir, and copy_method.
+        scheduler_address: Address of the Dask scheduler to connect to.
+            If not provided, will create a local cluster.
+            If set to `sequential` will run tasks sequentially.
+        _: Common CLI options.
     """
     if options is None:
         options = FilterOptions()
 
     start_time = datetime.now(tz=UTC)
+    if scheduler_address == "sequential":
+        context = _sequential_context()
+    else:
+        scheduler_name = "protein_detective_filter"
+        context = configure_dask_scheduler(scheduler_address, name=scheduler_name)
 
     downloaded_pdbe_dir = session_dir / "downloads" / "pdbe"
     downloaded_af_dir = session_dir / "downloads" / "alphafold"
@@ -200,40 +221,60 @@ def run_filter(
 
     uniprots_verified = session_dir / "uniprots_verified"
     uniprots_verified_stats = StdioPath(session_dir / "uniprots_verified_stats.csv")
-    structures(
-        downloaded_pdbe_dir,
-        output_dir=uniprots_verified,
-        uniprots=pdbe_csv,
-        write_stats=uniprots_verified_stats,
-    )
-    _make_stats_relative_to_session_dir(uniprots_verified_stats, session_dir)
+    with context as cluster:
+        real_scheduler_address = cluster if isinstance(cluster, str) else cluster.scheduler_address
+        structures(
+            downloaded_pdbe_dir,
+            output_dir=uniprots_verified,
+            uniprots=pdbe_csv,
+            write_stats=uniprots_verified_stats,
+            cache=cache,
+            scheduler_address=real_scheduler_address,
+        )
+        _make_stats_relative_to_session_dir(uniprots_verified_stats, session_dir)
 
-    single_chain_dir = session_dir / "single_chain"
-    single_chain_stats = StdioPath(session_dir / "single_chain_stats.csv")
-    chain(pdbe_csv, uniprots_verified, single_chain_dir, write_stats=single_chain_stats)
+        single_chain_dir = session_dir / "single_chain"
+        single_chain_stats = StdioPath(session_dir / "single_chain_stats.csv")
+        chain(
+            pdbe_csv,
+            uniprots_verified,
+            single_chain_dir,
+            write_stats=single_chain_stats,
+            cache=cache,
+            scheduler_address=real_scheduler_address,
+        )
 
-    # Combined filter works best if all structure files are in one directory
-    combined_input_dir = session_dir / "combined_input"
-    _merge_structure_files(downloaded_af_dir, single_chain_dir, combined_input_dir)
+        # Combined filter works best if all structure files are in one directory
+        combined_input_dir = session_dir / "combined_input"
+        _merge_structure_files(downloaded_af_dir, single_chain_dir, combined_input_dir)
 
-    combined_output_dir = session_dir / "combined_output"
-    combined_stats_file = StdioPath(session_dir / "combined_stats.csv")
-    combined(
-        combined_input_dir,
-        pdbe_quality_json,
-        combined_output_dir,
-        filters=options.combined,
-        write_stats=combined_stats_file,
-    )
-    _make_stats_relative_to_session_dir(combined_stats_file, session_dir)
+        combined_output_dir = session_dir / "combined_output"
+        combined_stats_file = StdioPath(session_dir / "combined_stats.csv")
+        combined(
+            combined_input_dir,
+            pdbe_quality_json,
+            combined_output_dir,
+            filters=options.combined,
+            write_stats=combined_stats_file,
+            cache=cache,
+            scheduler_address=real_scheduler_address,
+        )
+        _make_stats_relative_to_session_dir(combined_stats_file, session_dir)
 
-    ss_output_dir = None
-    ss_stats_file = None
-    if options.ss.is_actionable():
-        ss_output_dir = session_dir / "secondary_structure"
-        ss_stats_file = StdioPath(session_dir / "secondary_structure_stats.csv")
-        secondary_structure(combined_output_dir, ss_output_dir, filters=options.ss, write_stats=ss_stats_file)
-        _make_stats_relative_to_session_dir(ss_stats_file, session_dir)
+        ss_output_dir = None
+        ss_stats_file = None
+        if options.ss.is_actionable():
+            ss_output_dir = session_dir / "secondary_structure"
+            ss_stats_file = StdioPath(session_dir / "secondary_structure_stats.csv")
+            secondary_structure(
+                combined_output_dir,
+                ss_output_dir,
+                filters=options.ss,
+                write_stats=ss_stats_file,
+                cache=cache,
+                scheduler_address=real_scheduler_address,
+            )
+            _make_stats_relative_to_session_dir(ss_stats_file, session_dir)
 
     _write_ro_crate(
         session_dir,

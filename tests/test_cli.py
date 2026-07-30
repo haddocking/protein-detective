@@ -245,6 +245,8 @@ def test_filter_defaults(tmp_path: Path):
     argv = [
         "filter",
         str(session_dir),
+        "--scheduler-address",
+        "sequential",
     ]
     cli(argv)
 
@@ -314,7 +316,7 @@ def test_filter_defaults(tmp_path: Path):
 
     assert_crate(
         session_dir,
-        action_id=f"protein-detective filter {session_dir}",
+        action_id=f"protein-detective filter {session_dir} --scheduler-address sequential",
         input_ids={
             "pdbe.csv",
             "downloads/pdbe/",
@@ -341,7 +343,14 @@ def test_filter_with_secondary_structure(tmp_path: Path):
     pdbe_quality_json = session_dir / "pdbe-quality.json"
     pdbe_quality_json.write_text("{}")
 
-    argv = ["filter", str(session_dir), "--secondary.abs-min-helix-residues", "5"]
+    argv = [
+        "filter",
+        str(session_dir),
+        "--secondary.abs-min-helix-residues",
+        "5",
+        "--scheduler-address",
+        "sequential",
+    ]
     cli(argv)
 
     assert read_csv(session_dir / "secondary_structure_stats.csv") == [
@@ -398,7 +407,7 @@ def test_filter_with_secondary_structure(tmp_path: Path):
 
     assert_crate(
         session_dir,
-        action_id=f"protein-detective filter {session_dir} --secondary.abs-min-helix-residues 5",
+        action_id=f"protein-detective filter {session_dir} --secondary.abs-min-helix-residues 5 --scheduler-address sequential",
         input_ids={
             "pdbe.csv",
             "downloads/pdbe/",

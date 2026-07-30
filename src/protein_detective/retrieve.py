@@ -4,6 +4,7 @@ from typing import Annotated
 
 from cyclopts import Parameter, validators
 from cyclopts._path_type import StdioPath
+from protein_quest.cli.common import CacheParameter
 from protein_quest.cli.retrieve import (
     alphafold,
     pdbe,
@@ -63,6 +64,7 @@ def retrieve(
     /,
     *,
     alphafold_db_version: str = "6",
+    cache: CacheParameter | None = None,
     _: Common | None = None,
 ) -> None:
     """Retrieve structure files from AlphaFold and PDBe.
@@ -72,6 +74,7 @@ def retrieve(
     Args:
         session_dir: The directory containing the search results.
         alphafold_db_version: The version of the AlphaFold database to use.
+        cache: Cache options including no_cache, cache_dir, and copy_method.
     """
     start_time = datetime.now(tz=UTC)
 
@@ -83,6 +86,7 @@ def retrieve(
     pdbe(
         pdbe_csv,
         pdbe_download_dir,
+        cache=cache,
     )
 
     af_download_dir = download_dir / "alphafold"
@@ -94,6 +98,7 @@ def retrieve(
         af_download_dir,
         db_version=alphafold_db_version,
         gzip_files=True,
+        cache=cache,
     )
 
     _write_ro_crate(
