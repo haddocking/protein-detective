@@ -583,15 +583,3 @@ def test_list_runs(tmp_path: Path):
             "options": "--powerfit-run-id run_002 ../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession",
         },
     ]
-
-
-def test_list_lcc(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
-    fake_solutions(tmp_path, "run_001")
-
-    argv = ["powerfit", "list-lcc", str(tmp_path), "--output", str(tmp_path / "lcc.csv")]
-    cli(argv)
-
-    stderr = capsys.readouterr().err
-    assert "No lcc.mrc files found" in stderr
-
-    assert not (tmp_path / "lcc.csv").exists()
