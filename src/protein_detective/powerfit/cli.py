@@ -10,7 +10,6 @@ from cyclopts.types import PositiveFloat, StdioPath
 from protein_detective.common_cli import Common, rprint
 from protein_detective.powerfit.options import PowerfitOptions, process_group
 from protein_detective.powerfit.workflow import (
-    list_lcc_files,
     powerfit_commands,
     powerfit_filtered_report,
     powerfit_fit_models,
