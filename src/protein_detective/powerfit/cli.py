@@ -223,31 +223,3 @@ def list_runs(
             run["run_dir"] = session_dir / run["run_dir"]
             run["density_map"] = session_dir / run["density_map"]
             writer.writerow(run)
-
-
-@powerfit_app.command
-def list_lcc(
-    session_dir: Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=True, exists=True))],
-    /,
-    *,
-    output: StdioPath | None = None,
-):
-    """List Local Cross Validation (lcc.mrc) files for all PowerFit runs.
-
-    Args:
-        session_dir: Directory containing the session data.
-        output: Comma separated output file for listing lcc files. If set to '-' (default) will print to stdout.
-    """
-    if output is None:
-        output = StdioPath("-")
-
-    lcc_files = list(list_lcc_files(session_dir))
-
-    if not lcc_files:
-        rprint("[yellow]No lcc.mrc files found. Please run at least one powerfit.[/yellow]")
-        return
-
-    with output.open("wt") as fh:
-        print("run_id,structure,lcc_file", file=fh)
-        for run_id, structure, lcc_file in lcc_files:
-            print(f"{run_id},{structure},{lcc_file}", file=fh)
