@@ -85,6 +85,9 @@ def run(
 
     See `powerfit --help` for more information on the available options.
 
+    Unlike `powerfit` command, no cross-correlation map (lcc.mrc file) is generated.
+    If you need the lcc.mrc file, use `powerfit commands` to generate the commands and run them manually.
+
     Args:
         target: Target density map to fit the model in. Data should either be in CCP4 or MRC format
         resolution: Resolution of map in Angstrom
