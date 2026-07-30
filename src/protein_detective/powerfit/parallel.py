@@ -134,6 +134,9 @@ def detect_available_gpus(gpu_backend: GpuBackend = "opencl", cuda_devices: list
         cuda_devices: Optional list of CUDA device IDs to use instead of detecting.
             If provided, bypasses cuda_available() check. Useful for testing.
 
+    Raises:
+        ValueError: If CUDA backend is requested but CUDA is not available.
+
     Returns:
         List of available GPU IDs. Empty list means no GPU detected.
     """
@@ -141,10 +144,18 @@ def detect_available_gpus(gpu_backend: GpuBackend = "opencl", cuda_devices: list
         if cuda_devices is not None:
             return cuda_devices
         if not cuda_available():
-            return []
+            msg = "CUDA backend requested, but CUDA is not available."
+            raise ValueError(msg)
         return _detect_cuda_devices()
 
     visible_devices = environ.get("CUDA_VISIBLE_DEVICES") or environ.get("ROCR_VISIBLE_DEVICES")
+    # CUDA_VISIBLE_DEVICES can also have GPU UUID strings as values.
+    # see https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/environment-variables.html
+    # As can ROCR_VISIBLE_DEVICES
+    # see https://rocm.docs.amd.com/en/latest/reference/environment-variables/index.html
+    # Slurm uses integers, so low priority to handle GPU UUID strings
+    # as Slurm cluster is most likely place with multiple GPUs.
+    # see https://slurm.schedmd.com/gres.html
     if visible_devices:
         return _parse_visible_gpu_ids(visible_devices)
 

@@ -11,7 +11,7 @@ from powerfit_em.powerfit import (
 )
 from powerfit_em.powerfitter import PowerFitter
 
-from protein_detective.powerfit.options import PowerfitOptions, parse_first_visible_gpu_id
+from protein_detective.powerfit.options import PowerfitOptions
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +49,12 @@ def powerfit_worker(
         gpu: str | None = None
         if options.gpu:
             visible_devices = environ.get("CUDA_VISIBLE_DEVICES", environ.get("ROCR_VISIBLE_DEVICES"))
-            gpu_id = parse_first_visible_gpu_id(visible_devices)
-            gpu = options.format_gpu_device(gpu_id)
+            if visible_devices is not None and "," in visible_devices:
+                logger.warning(
+                    "Multiple visible GPU devices detected in environment variable. "
+                    "Using the first visible GPU device for this worker. "
+                )
+            gpu = options.format_gpu_device(0)
         opencl_queue = None
         cuda_stream = None
 
