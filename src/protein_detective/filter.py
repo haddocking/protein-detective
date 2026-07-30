@@ -5,6 +5,7 @@ from typing import Annotated
 
 from cyclopts import Group, Parameter, validators
 from cyclopts.types import StdioPath
+from protein_quest.cli.common import CacheParameter
 from protein_quest.cli.convert import structures
 from protein_quest.cli.filter import chain, combined, secondary_structure
 from protein_quest.filters.combined import CombinedFilterQuery
@@ -168,6 +169,7 @@ def run_filter(
     /,
     *,
     options: FilterOptions | None = None,
+    cache: CacheParameter | None = None,
     _: Common | None = None,
 ):
     """Filter structure files based on specified parameters.
@@ -187,6 +189,8 @@ def run_filter(
     Args:
         session_dir: Directory where the structure files are located.
         options: The filtering options.
+        cache: Cache options including no_cache, cache_dir, and copy_method.
+        _: Common CLI options.
     """
     if options is None:
         options = FilterOptions()
@@ -205,12 +209,13 @@ def run_filter(
         output_dir=uniprots_verified,
         uniprots=pdbe_csv,
         write_stats=uniprots_verified_stats,
+        cache=cache,
     )
     _make_stats_relative_to_session_dir(uniprots_verified_stats, session_dir)
 
     single_chain_dir = session_dir / "single_chain"
     single_chain_stats = StdioPath(session_dir / "single_chain_stats.csv")
-    chain(pdbe_csv, uniprots_verified, single_chain_dir, write_stats=single_chain_stats)
+    chain(pdbe_csv, uniprots_verified, single_chain_dir, write_stats=single_chain_stats, cache=cache)
 
     # Combined filter works best if all structure files are in one directory
     combined_input_dir = session_dir / "combined_input"
@@ -224,6 +229,7 @@ def run_filter(
         combined_output_dir,
         filters=options.combined,
         write_stats=combined_stats_file,
+        cache=cache,
     )
     _make_stats_relative_to_session_dir(combined_stats_file, session_dir)
 
@@ -232,7 +238,9 @@ def run_filter(
     if options.ss.is_actionable():
         ss_output_dir = session_dir / "secondary_structure"
         ss_stats_file = StdioPath(session_dir / "secondary_structure_stats.csv")
-        secondary_structure(combined_output_dir, ss_output_dir, filters=options.ss, write_stats=ss_stats_file)
+        secondary_structure(
+            combined_output_dir, ss_output_dir, filters=options.ss, write_stats=ss_stats_file, cache=cache
+        )
         _make_stats_relative_to_session_dir(ss_stats_file, session_dir)
 
     _write_ro_crate(
