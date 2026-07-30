@@ -12,22 +12,6 @@ type GpuBackend = Literal["opencl", "cuda"]
 gpu_backends: tuple[GpuBackend, ...] = get_args(GpuBackend.__value__)
 
 
-def parse_first_visible_gpu_id(visible_devices: str | None) -> int:
-    """Parse first GPU id from visible-devices env var value.
-
-    Falls back to GPU 0 when the value is missing, empty, or invalid.
-    """
-    if not visible_devices:
-        return 0
-    first_visible_device = visible_devices.split(",")[0].strip()
-    if not first_visible_device:
-        return 0
-    try:
-        return int(first_visible_device)
-    except ValueError:
-        return 0
-
-
 powerfit_group = Group.create_ordered("PowerFit specific parameters")
 process_group = Group.create_ordered("Process parameters")
 
