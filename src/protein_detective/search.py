@@ -7,7 +7,7 @@ from typing import Annotated
 from cyclopts import Group, Parameter, validators
 from cyclopts._path_type import StdioPath
 from cyclopts.types import NonNegativeInt, PositiveInt
-from protein_quest.cli.search import alphafold, complexes, pdbe, pdbe_quality, uniprot
+from protein_quest.cli.search import _write_pdbe_csv, alphafold, complexes, pdbe, pdbe_quality, uniprot
 from protein_quest.uniprot import Query
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 
@@ -127,9 +127,9 @@ def _write_ro_crate(
     /,
     *,
     uniprot_path: StdioPath,
-    alphafold_file: StdioPath | None,
-    pdbe_path: StdioPath | None,
-    pdbe_quality_file: StdioPath | None,
+    alphafold_file: StdioPath,
+    pdbe_path: StdioPath,
+    pdbe_quality_file: StdioPath,
     seeds_path: StdioPath | None,
     complexes_path: StdioPath | None,
     uniprot_with_interaction_partners_path: StdioPath,
@@ -141,31 +141,23 @@ def _write_ro_crate(
                 path=uniprot_path,
                 help="UniProt accessions",
             ),
-        ]
-    )
-    if alphafold_file:
-        ioargs.output_files.append(
             IOArgumentPath(
                 name="alphafold",
                 path=alphafold_file,
                 help="AlphaFold identifiers",
             ),
-        )
-    if pdbe_path and pdbe_quality_file:
-        ioargs.output_files.extend(
-            [
-                IOArgumentPath(
-                    name="pdbe",
-                    path=pdbe_path,
-                    help="PDBe identifiers",
-                ),
-                IOArgumentPath(
-                    name="pdbe_quality",
-                    path=pdbe_quality_file,
-                    help="PDBe validation quality reports",
-                ),
-            ]
-        )
+            IOArgumentPath(
+                name="pdbe",
+                path=pdbe_path,
+                help="PDBe identifiers",
+            ),
+            IOArgumentPath(
+                name="pdbe_quality",
+                path=pdbe_quality_file,
+                help="PDBe validation quality reports",
+            ),
+        ]
+    )
     if seeds_path and complexes_path:
         ioargs.output_files.append(
             IOArgumentPath(
@@ -257,18 +249,19 @@ def search(
         )
         final_uniprot_path = uniprot_with_interaction_partners_path
 
+    alphafold_file = StdioPath(session_dir / "alphafold.csv")
     if options.alphafold.limit > 0:
-        alphafold_file = StdioPath(session_dir / "alphafold.csv")
         alphafold(
             final_uniprot_path,
             alphafold_file,
             limit=options.alphafold.limit,
         )
     else:
-        alphafold_file = None
+        alphafold_file.write_text("uniprot_accession,af_id\n")
 
+    pdbe_path = StdioPath(session_dir / "pdbe.csv")
+    pdbe_quality_file = StdioPath(session_dir / "pdbe-quality.json")
     if options.pdbe.limit > 0:
-        pdbe_path = StdioPath(session_dir / "pdbe.csv")
         pdbe(
             final_uniprot_path,
             pdbe_path,
@@ -278,14 +271,13 @@ def search(
             top_resolution_per_uniprot_accession=options.pdbe.top_resolution_per_uniprot_accession,
         )
 
-        pdbe_quality_file = StdioPath(session_dir / "pdbe-quality.json")
         pdbe_quality(
             pdbe_path,
             pdbe_quality_file,
         )
     else:
-        pdbe_path = None
-        pdbe_quality_file = None
+        _write_pdbe_csv(pdbe_path, {})
+        pdbe_quality_file.write_text("{}\n")
 
     _write_ro_crate(
         session_dir,
