@@ -212,7 +212,7 @@ def test_search_just_uniprot(tmp_path: Path):
         "9606",
         "--reviewed",
         "--limit-uniprot",
-        "1",
+        "50",
         "--pdbe.limit",
         "0",
         "--alphafold.limit",
@@ -223,17 +223,20 @@ def test_search_just_uniprot(tmp_path: Path):
     uniprot_file = session_dir / "uniprot.txt"
     assert uniprot_file.exists()
     alphafold_file = session_dir / "alphafold.csv"
-    assert not alphafold_file.exists()
+    assert_lines(alphafold_file, {"uniprot_accession,af_id"})
     pdbe_file = session_dir / "pdbe.csv"
-    assert not pdbe_file.exists()
+    assert_lines(pdbe_file, {"uniprot_accession,pdb_id,method,resolution,uniprot_chains,chain,chain_length"})
     pdbe_quality_file = session_dir / "pdbe-quality.json"
-    assert not pdbe_quality_file.exists()
+    assert pdbe_quality_file.read_text().strip() == "{}"
 
     assert_crate(
         session_dir,
-        action_id=f"protein-detective search {session_dir} --taxon-id 9606 --reviewed --limit-uniprot 1 --pdbe.limit 0 --alphafold.limit 0",
+        action_id=f"protein-detective search {session_dir} --taxon-id 9606 --reviewed --limit-uniprot 50 --pdbe.limit 0 --alphafold.limit 0",
         output_ids={
             "uniprot.txt",
+            "alphafold.csv",
+            "pdbe.csv",
+            "pdbe-quality.json",
         },
     )
 
@@ -262,6 +265,16 @@ def test_retrieve(tmp_path: Path):
             "downloads/pdbe/",
         },
     )
+
+
+@pytest.mark.vcr
+@pytest.mark.default_cassette("test_retrieve.yaml")
+def test_retrieve_without_search(tmp_path: Path):
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    argv = ["retrieve", str(session_dir)]
+    with pytest.raises(FileNotFoundError):
+        cli(argv)
 
 
 def test_filter_help(capsys: pytest.CaptureFixture[str]):
