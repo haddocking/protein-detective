@@ -2,7 +2,6 @@
 
 
 TODO remove block below
-Fit crudly
 ```shell
 protein-detective powerfit run --gpu-backend cuda --powerfit-run-id myrun1 \
 --angle 20 --scheduler-address sequential \
@@ -89,4 +88,5 @@ def stats_csv_as_duckdb_ddl(session_dir: Path) -> tuple[str, dict[str,str]]:
 
     return ("\n".join(ddl), parameters,)
 
-def 
+def structure_files_as_duckdb_ddl(session_dir: Path) -> tuple[str, dict[str,str]]:
+  # TODO return all structures files in session dir using glob()
