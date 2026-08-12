@@ -203,6 +203,42 @@ def test_search_with_interaction_partners(tmp_path: Path):
 
 
 @pytest.mark.vcr
+def test_search_just_uniprot(tmp_path: Path):
+    session_dir = tmp_path / "session"
+    argv = [
+        "search",
+        str(session_dir),
+        "--taxon-id",
+        "9606",
+        "--reviewed",
+        "--limit-uniprot",
+        "1",
+        "--pdbe.limit",
+        "0",
+        "--alphafold.limit",
+        "0",
+    ]
+    cli(argv)
+
+    uniprot_file = session_dir / "uniprot.txt"
+    assert uniprot_file.exists()
+    alphafold_file = session_dir / "alphafold.csv"
+    assert not alphafold_file.exists()
+    pdbe_file = session_dir / "pdbe.csv"
+    assert not pdbe_file.exists()
+    pdbe_quality_file = session_dir / "pdbe-quality.json"
+    assert not pdbe_quality_file.exists()
+
+    assert_crate(
+        session_dir,
+        action_id=f"protein-detective search {session_dir} --taxon-id 9606 --reviewed --limit-uniprot 1 --pdbe.limit 0 --alphafold.limit 0",
+        output_ids={
+            "uniprot.txt",
+        },
+    )
+
+
+@pytest.mark.vcr
 def test_retrieve(tmp_path: Path):
     session_dir, argv = fake_setup_retrieve(tmp_path)
     cli(argv)
