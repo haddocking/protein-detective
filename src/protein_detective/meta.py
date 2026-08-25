@@ -1,17 +1,5 @@
-"""
-
-
-TODO remove block below
-```shell
-protein-detective powerfit run --gpu-backend cuda --powerfit-run-id myrun1 \
---angle 20 --scheduler-address sequential \
-../powerfit-tutorial/ribosome-KsgA.map 13 ./mysession
-```
-
-TODO add foreign constraints so ER diagram can be generated with it
-TODO add example queries to meta.ipynb
-TODO find better name for meta module, like "trace", "history".
-"""
+"""Create a DuckDB database from the session directory, including all CSV files and the RO-Crate metadata."""
+# TODO find better name for meta module, like "trace", "history".
 
 from pathlib import Path
 from textwrap import dedent
@@ -174,7 +162,7 @@ def _alphafold_stats_csv_as_duckdb_ddl(alphafold_csv: Path, has_uniprot: bool) -
             (
                 dedent("""\
                 CREATE TABLE alphafold (
-                    uniprot_accession VARCHAR,
+                    uniprot_accession VARCHAR PRIMARY KEY,
                     af_id VARCHAR,
                     FOREIGN KEY (uniprot_accession) REFERENCES uniprot(uniprot_accession)
                 );
@@ -210,7 +198,7 @@ def _pdbe_stats_csv_as_duckdb_ddl(pdbe_csv: Path, has_uniprot: bool) -> list[DDL
                 dedent("""\
                 CREATE TABLE pdbe (
                     uniprot_accession VARCHAR,
-                    pdb_id VARCHAR,
+                    pdb_id VARCHAR PRIMARY KEY,
                     method VARCHAR,
                     resolution DOUBLE,
                     uniprot_chains VARCHAR,
@@ -276,6 +264,34 @@ def _uniprots_verified_stats_csv_as_duckdb_ddl(
             FROM read_csv($uniprots_verified_stats_csv);
             """),
             {"uniprots_verified_stats_csv": str(uniprots_verified_stats_csv)},
+        ),
+    ]
+
+
+def _merge_structure_files_csv_as_duckdb_ddl(
+    merge_structure_files_csv: Path,
+) -> list[DDLStatement]:
+    return [
+        (
+            dedent("""\
+            CREATE TABLE merge_structure_files (
+                source VARCHAR PRIMARY KEY,
+                target VARCHAR,
+                FOREIGN KEY (source) REFERENCES structure_files(file),
+                FOREIGN KEY (target) REFERENCES structure_files(file)
+            );
+            """),
+            {},
+        ),
+        (
+            dedent("""\
+            INSERT INTO merge_structure_files
+            SELECT
+                source::VARCHAR,
+                target::VARCHAR
+            FROM read_csv($merge_structure_files_csv);
+            """),
+            {"merge_structure_files_csv": str(merge_structure_files_csv)},
         ),
     ]
 
@@ -383,9 +399,78 @@ def _fittable_structures_csv_as_duckdb_ddl(fittable_structures_csv: Path) -> lis
     ]
 
 
-def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
-    statements: list[DDLStatement] = []
+def _pdbe_retrieve_stats_csv_as_duckdb_ddl(pdbe_retrieve_stats_csv: Path) -> list[DDLStatement]:
+    return [
+        (
+            dedent("""\
+            CREATE TABLE pdbe_retrieve_stats (
+                pdb_id VARCHAR,
+                output_file VARCHAR,
+                FOREIGN KEY (pdb_id) REFERENCES pdbe(pdb_id)
+            );
+            """),
+            {},
+        ),
+        (
+            dedent("""\
+            INSERT INTO pdbe_retrieve_stats
+            SELECT
+                pdb_id::VARCHAR,
+                output_file::VARCHAR
+            FROM read_csv($pdbe_retrieve_stats_csv);
+            """),
+            {"pdbe_retrieve_stats_csv": str(pdbe_retrieve_stats_csv)},
+        ),
+    ]
 
+
+def _alphafold_retrieve_stats_csv_as_duckdb_ddl(
+    alphafold_retrieve_stats_csv: Path,
+) -> list[DDLStatement]:
+    return [
+        (
+            dedent("""\
+            CREATE TABLE alphafold_retrieve_stats (
+                uniprot_accession VARCHAR,
+                summary_file VARCHAR,
+                bcif_file VARCHAR,
+                cif_file VARCHAR,
+                pdb_file VARCHAR,
+                pae_doc_file VARCHAR,
+                am_annotations_file VARCHAR,
+                am_annotations_hg19_file VARCHAR,
+                am_annotations_hg38_file VARCHAR,
+                msa_file VARCHAR,
+                plddt_doc_file VARCHAR,
+                FOREIGN KEY (uniprot_accession) REFERENCES alphafold(uniprot_accession)
+            );
+            """),
+            {},
+        ),
+        (
+            dedent("""\
+            INSERT INTO alphafold_retrieve_stats
+            SELECT
+                uniprot_accession::VARCHAR,
+                summary_file::VARCHAR,
+                bcif_file::VARCHAR,
+                cif_file::VARCHAR,
+                pdb_file::VARCHAR,
+                pae_doc_file::VARCHAR,
+                am_annotations_file::VARCHAR,
+                am_annotations_hg19_file::VARCHAR,
+                am_annotations_hg38_file::VARCHAR,
+                msa_file::VARCHAR,
+                plddt_doc_file::VARCHAR
+            FROM read_csv($alphafold_retrieve_stats_csv);
+            """),
+            {"alphafold_retrieve_stats_csv": str(alphafold_retrieve_stats_csv)},
+        ),
+    ]
+
+
+def _search_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    statements: list[DDLStatement] = []
     uniprot_txt = session_dir / "uniprot.txt"
     has_uniprot = uniprot_txt.exists()
     if has_uniprot:
@@ -399,6 +484,26 @@ def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     if pdbe_csv.exists():
         statements.extend(_pdbe_stats_csv_as_duckdb_ddl(pdbe_csv, has_uniprot))
 
+    return statements
+
+
+def _retrieve_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    statements: list[DDLStatement] = []
+
+    pdbe_retrieve_stats_csv = session_dir / "pdbe_stats.csv"
+    if pdbe_retrieve_stats_csv.exists():
+        statements.extend(_pdbe_retrieve_stats_csv_as_duckdb_ddl(pdbe_retrieve_stats_csv))
+
+    alphafold_retrieve_stats_csv = session_dir / "alphafold_stats.csv"
+    if alphafold_retrieve_stats_csv.exists():
+        statements.extend(_alphafold_retrieve_stats_csv_as_duckdb_ddl(alphafold_retrieve_stats_csv))
+
+    return statements
+
+
+def _filter_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    statements: list[DDLStatement] = []
+
     uniprots_verified_stats_csv = session_dir / "uniprots_verified_stats.csv"
     if uniprots_verified_stats_csv.exists():
         statements.extend(_uniprots_verified_stats_csv_as_duckdb_ddl(uniprots_verified_stats_csv))
@@ -410,6 +515,20 @@ def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     secondary_structure_stats_csv = session_dir / "secondary_structure_stats.csv"
     if secondary_structure_stats_csv.exists():
         statements.extend(_secondary_structure_stats_csv_as_duckdb_ddl(secondary_structure_stats_csv))
+
+    return statements
+
+
+def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    statements: list[DDLStatement] = []
+    statements.extend(_search_csv_as_duckdb_ddl(session_dir))
+
+    merge_structure_files_csv = session_dir / "merge_structure_files.csv"
+    if merge_structure_files_csv.exists():
+        statements.extend(_merge_structure_files_csv_as_duckdb_ddl(merge_structure_files_csv))
+
+    statements.extend(_retrieve_csv_as_duckdb_ddl(session_dir))
+    statements.extend(_filter_csv_as_duckdb_ddl(session_dir))
 
     fittable_structures_csv = session_dir / "powerfit" / "fittable_structures.csv"
     if fittable_structures_csv.exists():

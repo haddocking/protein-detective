@@ -253,6 +253,28 @@ def test_retrieve(tmp_path: Path):
         downloads_dir / "pdbe" / "2y29_updated.cif.gz",
     ]
 
+    assert read_csv(session_dir / "pdbe_stats.csv") == [
+        {
+            "pdb_id": "2Y29",
+            "output_file": "downloads/pdbe/2y29_updated.cif.gz",
+        }
+    ]
+    assert read_csv(session_dir / "alphafold_stats.csv") == [
+        {
+            "uniprot_accession": "A0A0C5B5G6",
+            "summary_file": "",
+            "bcif_file": "",
+            "cif_file": "downloads/alphafold/AF-A0A0C5B5G6-F1-model_v6.cif.gz",
+            "pdb_file": "",
+            "pae_doc_file": "",
+            "am_annotations_file": "",
+            "am_annotations_hg19_file": "",
+            "am_annotations_hg38_file": "",
+            "msa_file": "",
+            "plddt_doc_file": "",
+        }
+    ]
+
     assert_crate(
         session_dir,
         action_id=f"protein-detective retrieve {session_dir} --alphafold-db-version 6",
@@ -263,6 +285,8 @@ def test_retrieve(tmp_path: Path):
         output_ids={
             "downloads/alphafold/",
             "downloads/pdbe/",
+            "pdbe_stats.csv",
+            "alphafold_stats.csv",
         },
     )
 
@@ -363,6 +387,20 @@ def test_filter_defaults(tmp_path: Path):
         },
     ]
 
+    merge_csv = session_dir / "merge_structure_files.csv"
+    assert merge_csv.exists()
+    merge_rows = read_csv(merge_csv)
+    assert {(row["source"], row["target"]) for row in merge_rows} == {
+        (
+            "downloads/alphafold/AF-A0A0C5B5G6-F1-model_v6.cif.gz",
+            "combined_input/AF-A0A0C5B5G6-F1-model_v6.cif.gz",
+        ),
+        (
+            "single_chain/2y29_updated_A2A.cif.gz",
+            "combined_input/2y29_updated_A2A.cif.gz",
+        ),
+    }
+
     assert_crate(
         session_dir,
         action_id=f"protein-detective filter {session_dir} --scheduler-address sequential",
@@ -380,6 +418,7 @@ def test_filter_defaults(tmp_path: Path):
             "combined_stats.csv",
             "uniprots_verified_stats.csv",
             "single_chain_stats.csv",
+            "merge_structure_files.csv",
         },
         nr_actions=2,
     )
@@ -471,6 +510,7 @@ def test_filter_with_secondary_structure(tmp_path: Path):
             "combined_stats.csv",
             "uniprots_verified_stats.csv",
             "single_chain_stats.csv",
+            "merge_structure_files.csv",
             "secondary_structure_stats.csv",
             "secondary_structure/",
         },

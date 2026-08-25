@@ -37,6 +37,18 @@ class Common:
         setup_logging(verbose=self.verbose, quiet=self.quiet)
 
 
+def make_stats_relative_to_session_dir(stats_file: Path, session_dir: Path) -> None:
+    """Replaces occurrences of `session_dir/` with `/` in given stats text file.
+
+    Args:
+        stats_file: Path to the stats text file to be modified.
+        session_dir: The session directory path to be replaced in the stats file.
+    """
+    content = stats_file.read_text()
+    content = content.replace(f"{session_dir}/", "")
+    stats_file.write_text(content)
+
+
 def write_ro_crate(
     session_dir: Path,
     start_time: datetime,
