@@ -293,6 +293,69 @@ def create_fittable_structures_csv(session_dir: Path, fittable_structures_csv: P
         writer.writerows(structures_data)
 
 
+def powerfit_solutions_query(join: str) -> str:
+    """Generate SQL query that reads PowerFit solutions files and joins them with fittable structures.
+
+    Args:
+        join: JOIN clause that combines the solutions subquery with the fittable structures,
+            for example ``JOIN read_csv($fittable_structures_csv) AS fittable_structures USING (structure)``
+            or ``JOIN fittable_structures USING (structure)`` when the table already exists.
+
+    Returns:
+        SQL query string with named parameter ``$solutions_pattern``
+        and any parameters referenced by ``join``.
+    """
+    # join is a developer-supplied constant, not user input
+    return dedent(f"""\
+    SELECT
+        powerfit_run_id,
+        structure,
+        rank,
+        cc,
+        fishz,
+        relz,
+        translation,
+        rotation,
+        structure_file AS template_file,
+        uniprot_accessions,
+        structure_id,
+        is_alphafold
+    FROM (
+        SELECT
+            parse_path(filename)[-3] AS powerfit_run_id,
+            parse_path(filename)[-2] AS structure,
+            rank, cc, fishz, relz,
+            [x,y,z]::FLOAT[3] AS translation,
+            [a11, a12, a13, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation
+        FROM
+            read_csv(
+                $solutions_pattern,
+                filename=True, normalize_names=True,
+                columns={{
+                    'rank': 'INTEGER',
+                    'cc': 'FLOAT',
+                    'fishz': 'FLOAT',
+                    'relz': 'FLOAT',
+                    'x': 'FLOAT',
+                    'y': 'FLOAT',
+                    'z': 'FLOAT',
+                    'a11': 'FLOAT',
+                    'a12': 'FLOAT',
+                    'a13': 'FLOAT',
+                    'a21': 'FLOAT',
+                    'a22': 'FLOAT',
+                    'a23': 'FLOAT',
+                    'a31': 'FLOAT',
+                    'a32': 'FLOAT',
+                    'a33': 'FLOAT',
+                }}
+            )
+        ) AS solutions
+        {join}
+    ORDER BY cc DESC, rank ASC
+    """)  # noqa: S608
+
+
 def powerfit_report(
     session_dir: Path,
     powerfit_run_id: str | None = None,
@@ -331,55 +394,16 @@ def powerfit_report(
     if powerfit_run_id:
         solutions = session_dir / "powerfit" / powerfit_run_id / "*" / "solutions.out"
     with connect() as con:
-        query = dedent("""\
-        SELECT
-            powerfit_run_id,
-            structure,
-            rank,
-            cc,
-            fishz,
-            relz,
-            translation,
-            rotation,
-            structure_file AS template_file,
-            uniprot_accessions,
-            structure_id,
-            is_alphafold
-        FROM (
-            SELECT
-                parse_path(filename)[-3] AS powerfit_run_id,
-                parse_path(filename)[-2] AS structure,
-                rank, cc, fishz, relz,
-                [x,y,z]::FLOAT[3] AS translation,
-                [a11, a12, a13, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation
-            FROM
-                read_csv(
-                    ?,
-                    filename=True, normalize_names=True,
-                    columns={
-                        'rank': 'INTEGER',
-                        'cc': 'FLOAT',
-                        'fishz': 'FLOAT',
-                        'relz': 'FLOAT',
-                        'x': 'FLOAT',
-                        'y': 'FLOAT',
-                        'z': 'FLOAT',
-                        'a11': 'FLOAT',
-                        'a12': 'FLOAT',
-                        'a13': 'FLOAT',
-                        'a21': 'FLOAT',
-                        'a22': 'FLOAT',
-                        'a23': 'FLOAT',
-                        'a31': 'FLOAT',
-                        'a32': 'FLOAT',
-                        'a33': 'FLOAT',
-                    }
-                )
-            ) AS solutions
-            JOIN read_csv(?) AS fittable_structures USING (structure)
-        ORDER BY cc DESC, rank ASC
-        """)
-        con.execute(query, (str(solutions), str(fittable_structures_csv)))
+        query = powerfit_solutions_query(
+            "JOIN read_csv($fittable_structures_csv) AS fittable_structures USING (structure)"
+        )
+        con.execute(
+            query,
+            {
+                "solutions_pattern": str(solutions),
+                "fittable_structures_csv": str(fittable_structures_csv),
+            },
+        )
         return con.df()
 
 

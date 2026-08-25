@@ -19,6 +19,8 @@ from textwrap import dedent
 import duckdb
 from rocrate.metadata import BASENAME
 
+from protein_detective.powerfit.workflow import powerfit_solutions_query
+
 DDLStatement = tuple[str, dict[str, str]]
 """SQL DDL statement and named parameters (use $ prefix in SQL) to be passed to DuckDB connection.execute()"""
 
@@ -450,7 +452,6 @@ def structure_files_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
 
 
 def solutions_as_duckdb_ddl(session_dir: Path, powerfit_run_id: str | None = None) -> list[DDLStatement]:
-    # TODO call this in workflow module
     solutions_pattern = session_dir / "powerfit" / "*" / "*" / "solutions.out"
     if powerfit_run_id:
         solutions_pattern = session_dir / "powerfit" / powerfit_run_id / "*" / "solutions.out"
@@ -476,55 +477,7 @@ def solutions_as_duckdb_ddl(session_dir: Path, powerfit_run_id: str | None = Non
             {},
         ),
         (
-            dedent("""\
-            INSERT INTO solutions
-            SELECT
-                powerfit_run_id,
-                structure,
-                rank,
-                cc,
-                fishz,
-                relz,
-                translation,
-                rotation,
-                structure_file AS template_file,
-                uniprot_accessions,
-                structure_id,
-                is_alphafold
-            FROM (
-                SELECT
-                    parse_path(filename)[-3] AS powerfit_run_id,
-                    parse_path(filename)[-2] AS structure,
-                    rank, cc, fishz, relz,
-                    [x,y,z]::FLOAT[3] AS translation,
-                    [a11, a12, a13, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation
-                FROM
-                    read_csv(
-                        $solutions_pattern,
-                        filename=True, normalize_names=True,
-                        columns={
-                            'rank': 'INTEGER',
-                            'cc': 'FLOAT',
-                            'fishz': 'FLOAT',
-                            'relz': 'FLOAT',
-                            'x': 'FLOAT',
-                            'y': 'FLOAT',
-                            'z': 'FLOAT',
-                            'a11': 'FLOAT',
-                            'a12': 'FLOAT',
-                            'a13': 'FLOAT',
-                            'a21': 'FLOAT',
-                            'a22': 'FLOAT',
-                            'a23': 'FLOAT',
-                            'a31': 'FLOAT',
-                            'a32': 'FLOAT',
-                            'a33': 'FLOAT',
-                        }
-                    )
-                ) AS solutions
-                JOIN fittable_structures USING (structure)
-            ORDER BY cc DESC, rank ASC;
-            """),
+            "INSERT INTO solutions\n" + powerfit_solutions_query("JOIN fittable_structures USING (structure)") + ";",
             {"solutions_pattern": str(solutions_pattern)},
         ),
     ]
