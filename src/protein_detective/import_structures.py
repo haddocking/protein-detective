@@ -7,7 +7,7 @@ from protein_quest.structure.chains import chains_in_structure
 from protein_quest.structure.convert import convert_to_cif_file
 from protein_quest.structure.files import glob_structure_files
 from protein_quest.structure.formats import read_structure
-from protein_quest.structure.uniprot import structure2uniprot_accessions
+from protein_quest.structure.uniprot_extraction import structure2uniprot_accessions
 from protein_quest.utils import CopyMethod
 from rich.progress import track
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
@@ -78,7 +78,7 @@ def import_structures(
             console.print(f"Warning: {msg} Skipping file.", style="yellow")
             output_file.unlink()
             continue
-        uniprot_accessions = structure2uniprot_accessions(structure)
+        uniprot_accessions = structure2uniprot_accessions(output_file)
         if len(uniprot_accessions) != 1:
             msg = f"Structure file {structure_file} contains {uniprot_accessions} UniProt accessions, expected 1."
             msg += " Use `protein-quest convert structures --uniprots ...` to fix the UniProt accessions."

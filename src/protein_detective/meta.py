@@ -282,7 +282,7 @@ def _combined_stats_csv_as_duckdb_ddl(combined_stats_csv: Path, has_uniprot: boo
     foreign_key = (
         """
                 -- TODO renable once https://github.com/haddocking/protein-quest/issues/155 is fixed
-                -- ,FOREIGN KEY (uniprot_accession) REFERENCES uniprot(uniprot_accession)
+                ,FOREIGN KEY (uniprot_accession) REFERENCES uniprot(uniprot_accession)
         """
         if has_uniprot
         else ""

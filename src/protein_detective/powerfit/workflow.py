@@ -11,9 +11,8 @@ from dask.distributed import Client, progress
 from distributed.deploy.cluster import Cluster
 from duckdb import connect
 from pandas import DataFrame
-from protein_quest.structure.formats import read_structure
 from protein_quest.structure.metadata import structure_metadata
-from protein_quest.structure.uniprot import structure2uniprot_accessions
+from protein_quest.structure.uniprot_extraction import structure2uniprot_accessions
 from rocrate.rocrate import ROCrate
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 from tqdm.auto import tqdm
@@ -271,10 +270,9 @@ def make_fittable_structures_df(session_dir: Path) -> list[FittableStructure]:
     data: list[FittableStructure] = []
     for structure_file in structure_files:
         name = structure_file.name
-        structure = read_structure(structure_file)
-        metadata = structure_metadata(structure)
+        metadata = structure_metadata(structure_file)
         is_alphafold = metadata.is_alphafold
-        uniprot_accessions = ":".join(structure2uniprot_accessions(structure))
+        uniprot_accessions = ":".join(structure2uniprot_accessions(structure_file))
         data.append(
             {
                 "structure_file": str(structure_file.relative_to(session_dir, walk_up=True)),
