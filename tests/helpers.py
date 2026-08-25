@@ -1,13 +1,12 @@
 """Helper functions for testing."""
 
 import csv
-import gzip
 import sys
 from pathlib import Path
 from typing import Any
 
 import gemmi
-from protein_quest.structure.uniprot import add_uniprot_accessions2structure
+from protein_quest.structure.formats import write_structure
 from protein_quest.uniprot_chains import UniprotChainMapping, UniprotChainRange
 from rocrate.metadata import BASENAME
 from rocrate.rocrate import ROCrate
@@ -113,29 +112,23 @@ def fake_structure_file(pdb_id: str, output: Path, uniprot_accession: str | None
     residue.seqid = gemmi.SeqId(1, " ")
     residue.add_atom(atom)
     residue.entity_type = gemmi.EntityType.Polymer
+    # Set subchain explicitly so assign_subchains() does not invent a "<chain_id>xp" label_asym_id.
+    residue.subchain = chain_id
     chain = gemmi.Chain(chain_id)
     chain.add_residue(residue)
     model = gemmi.Model(1)
     model.add_chain(chain)
     structure.add_model(model)
     structure.setup_entities()
-    structure.assign_subchains()
+    uniprot_chain_mappings = None
     if uniprot_accession:
-        structure, _injected, _uniprot_chains = add_uniprot_accessions2structure(
-            structure,
-            {
-                pdb_id: {
-                    UniprotChainMapping(
-                        uniprot_accession=uniprot_accession,
-                        chain_ranges=(UniprotChainRange(chain_ids=(chain_id,), start=1, end=100),),
-                    )
-                }
-            },
-        )
-        structure.setup_entities()
-    doc = structure.make_mmcif_document(gemmi.MmcifOutputGroups(True, chem_comp=False))
-
-    output.write_bytes(gzip.compress(doc.as_string().encode("utf-8")))
+        uniprot_chain_mappings = {
+            UniprotChainMapping(
+                uniprot_accession=uniprot_accession,
+                chain_ranges=(UniprotChainRange(chain_ids=(chain_id,), start=1, end=100),),
+            )
+        }
+    write_structure(structure, output, uniprot_chain_mappings)
 
 
 def assert_lines(file: Path, expected_lines: set[str]):

@@ -243,6 +243,7 @@ def run_filter(
             cache=cache,
             scheduler_address=real_scheduler_address,
         )
+        _make_stats_relative_to_session_dir(single_chain_stats, session_dir)
 
         # Combined filter works best if all structure files are in one directory
         combined_input_dir = session_dir / "combined_input"
