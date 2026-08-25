@@ -278,15 +278,7 @@ def _uniprots_verified_stats_csv_as_duckdb_ddl(
     ]
 
 
-def _combined_stats_csv_as_duckdb_ddl(combined_stats_csv: Path, has_uniprot: bool) -> list[DDLStatement]:
-    foreign_key = (
-        """
-                -- TODO renable once https://github.com/haddocking/protein-quest/issues/155 is fixed
-                ,FOREIGN KEY (uniprot_accession) REFERENCES uniprot(uniprot_accession)
-        """
-        if has_uniprot
-        else ""
-    )
+def _combined_stats_csv_as_duckdb_ddl(combined_stats_csv: Path) -> list[DDLStatement]:
     return [
         (
             (
@@ -309,10 +301,9 @@ def _combined_stats_csv_as_duckdb_ddl(combined_stats_csv: Path, has_uniprot: boo
                     output_file VARCHAR,
                     reason VARCHAR,
                     FOREIGN KEY (input_file) REFERENCES structure_files(file),
+                    -- disabled foreign key as uniprot.txt and best uniprot in structure files may differ
+                    -- FOREIGN KEY (uniprot_accession) REFERENCES uniprot(uniprot_accession)
                     FOREIGN KEY (output_file) REFERENCES structure_files(file)
-                """)
-                + foreign_key
-                + dedent("""\
                 );
                 """)
             ),
@@ -412,7 +403,7 @@ def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
 
     combined_stats_csv = session_dir / "combined_stats.csv"
     if combined_stats_csv.exists():
-        statements.extend(_combined_stats_csv_as_duckdb_ddl(combined_stats_csv, has_uniprot))
+        statements.extend(_combined_stats_csv_as_duckdb_ddl(combined_stats_csv))
 
     secondary_structure_stats_csv = session_dir / "secondary_structure_stats.csv"
     if secondary_structure_stats_csv.exists():
