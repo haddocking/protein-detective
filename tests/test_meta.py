@@ -1,8 +1,6 @@
 import json
 from pathlib import Path
 
-import pytest
-
 from protein_detective.meta import in_memory_duckdb_connection
 
 
@@ -72,7 +70,7 @@ def test_rocrate_columns_are_normalized(tmp_path: Path):
     assert result_rows == [("run", "structure")]
 
 
-def test_solutions_template_file_has_foreign_key_constraint(tmp_path: Path):
+def test_solutions_is_created_as_select(tmp_path: Path):
     session_dir = tmp_path / "session"
     session_dir.mkdir()
 
@@ -124,12 +122,12 @@ def test_solutions_template_file_has_foreign_key_constraint(tmp_path: Path):
     )
 
     con = in_memory_duckdb_connection(session_dir)
+    rows = con.execute("SELECT structure, template_file, rank, cc FROM solutions").fetchall()
 
-    with pytest.raises(Exception, match="Violates foreign key constraint"):
-        con.execute("INSERT INTO solutions (template_file) VALUES ('missing.pdb')")
+    assert rows == [("structure", "structure.pdb", 1, 0.5)]
 
 
-def test_merge_structure_files_sql_with_foreign_key_is_valid(tmp_path: Path):
+def test_merge_structure_files_is_loaded_with_ctas(tmp_path: Path):
     session_dir = tmp_path / "session"
     session_dir.mkdir()
 
@@ -202,11 +200,8 @@ def test_merge_structure_files_sql_with_foreign_key_is_valid(tmp_path: Path):
         ("single_chain/structure.pdb", "combined_input/structure.pdb"),
     ]
 
-    with pytest.raises(Exception, match="Violates foreign key constraint"):
-        con.execute("INSERT INTO merge_structure_files (source, target) VALUES ('missing.cif.gz', 'other.cif.gz')")
 
-
-def test_combined_stats_sql_with_uniprot_foreign_key_is_valid(tmp_path: Path):
+def test_combined_stats_is_loaded_with_ctas(tmp_path: Path):
     session_dir = tmp_path / "session"
     session_dir.mkdir()
 
