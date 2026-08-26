@@ -17,7 +17,7 @@ from rocrate.rocrate import ROCrate
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 from tqdm.auto import tqdm
 
-from protein_detective.common_cli import write_ro_crate
+from protein_detective.common_cli import make_stats_relative_to_session_dir, write_ro_crate
 from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.powerfit.parallel import build_gpu_cycler, configure_dask_scheduler, detect_available_gpus
 from protein_detective.powerfit.run import clear_worker_cache, powerfit_worker
@@ -439,6 +439,7 @@ def _write_ro_crate4fit_models(
     /,
     *,
     fitted_df: DataFrame,
+    fitted_models_csv: Path,
 ):
     ioargs = IOArgumentPaths(
         input_files=[
@@ -456,6 +457,12 @@ def _write_ro_crate4fit_models(
                 help="Fitted model file.",
             )
             for row in fitted_df["fitted_model_file"]
+        ] + [
+            IOArgumentPath(
+                name="fitted_models_csv",
+                path=fitted_models_csv,
+                help="CSV file containing the relationship between unfitted and fitted models.",
+            ),
         ],
     )
     write_ro_crate(
@@ -485,8 +492,15 @@ def powerfit_fit_models(
         FileNotFoundError: If no structure files are found in the session directory.
 
     Returns:
-        A DataFrame containing the fitted models. See protein_detective.db.save_fitted_models function
-            for details.
+        A DataFrame containing following columns:
+
+            * powerfit_run_id: ID of the PowerFit run
+            * structure: Name of the structure file
+            * rank: Rank of the solution
+            * fitted_model_file: Path to the fitted model file
+            * unfitted_model_file: Path to the unfitted model file
+
+            Dataframe is written to `<session_dir>/powerfit/fitted_models.csv` with paths relative to session dir.
     """
     start_time = datetime.now(tz=UTC)
     solutions = powerfit_filtered_report(
@@ -496,11 +510,15 @@ def powerfit_fit_models(
         group_by_structure=group_by_structure,
     )
     fitted_df = fit_models(solutions, session_dir)
+    fitted_models_csv = session_dir / "powerfit" / "fitted_models.csv"
+    fitted_df.to_csv(fitted_models_csv, index=False, mode="a")
+    make_stats_relative_to_session_dir(fitted_models_csv, session_dir)
 
     _write_ro_crate4fit_models(
         session_dir,
         start_time,
         fitted_df=fitted_df,
+        fitted_models_csv=fitted_models_csv,
     )
     return fitted_df
 

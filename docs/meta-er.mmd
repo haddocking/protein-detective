@@ -143,6 +143,17 @@ erDiagram
     }
     "fittable_structures" ||--o{ "solutions" : "structure = structure"
     "structure_files" ||--o{ "solutions" : "file = template_file"
+    "fitted_models" {
+      VARCHAR powerfit_run_id FK
+      VARCHAR structure FK
+      INTEGER rank FK
+      VARCHAR fitted_model_file FK
+      VARCHAR unfitted_model_file FK
+    }
+    "solutions" ||--o{ "fitted_models" : "powerfit_run_id, structure, rank"
+    "fittable_structures" ||--o{ "fitted_models" : "structure = structure"
+    "structure_files" ||--o{ "fitted_models" : "file = fitted_model_file"
+    "structure_files" ||--o{ "fitted_models" : "file = unfitted_model_file"
     "structure_files" {
       VARCHAR file PK
       VARCHAR parent_dir

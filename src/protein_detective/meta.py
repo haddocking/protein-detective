@@ -181,6 +181,19 @@ def _fittable_structures_csv_as_duckdb_ddl(fittable_structures_csv: Path) -> lis
     ]
 
 
+def _fitted_models_csv_as_duckdb_ddl(fitted_models_csv: Path) -> list[DDLStatement]:
+    return [
+        (
+            """\
+            CREATE TABLE fitted_models AS
+            SELECT *
+            FROM read_csv($fitted_models_csv);
+            """,
+            {"fitted_models_csv": str(fitted_models_csv)},
+        ),
+    ]
+
+
 def _pdbe_retrieve_stats_csv_as_duckdb_ddl(pdbe_retrieve_stats_csv: Path) -> list[DDLStatement]:
     return [
         (
@@ -273,6 +286,10 @@ def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     fittable_structures_csv = session_dir / "powerfit" / "fittable_structures.csv"
     if fittable_structures_csv.exists():
         statements.extend(_fittable_structures_csv_as_duckdb_ddl(fittable_structures_csv))
+
+    fitted_models_csv = session_dir / "powerfit" / "fitted_models.csv"
+    if fitted_models_csv.exists():
+        statements.extend(_fitted_models_csv_as_duckdb_ddl(fitted_models_csv))
 
     return statements
 

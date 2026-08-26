@@ -259,3 +259,129 @@ def test_combined_stats_is_loaded_with_ctas(tmp_path: Path):
     rows = con.execute("SELECT uniprot_accession FROM combined_stats").fetchall()
 
     assert rows == [("P12345",)]
+
+
+def test_fitted_models_is_loaded_with_ctas(tmp_path: Path):
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
+    powerfit_dir = session_dir / "powerfit" / "run_001" / "structure"
+    powerfit_dir.mkdir(parents=True)
+    (powerfit_dir / "solutions.out").write_text(
+        "rank,cc,fishz,relz,x,y,z,a11,a12,a13,a21,a22,a23,a31,a32,a33\n"
+        "1,0.5,0.6,0.7,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0\n"
+    )
+    (powerfit_dir / "fit_1.pdb").write_text("MODEL\nENDMDL\n")
+    (session_dir / "powerfit" / "fittable_structures.csv").write_text(
+        "structure,structure_file,structure_id,uniprot_accessions,is_alphafold\n"
+        "structure,structure.pdb,struct_1,UP00000001,true\n"
+    )
+    (session_dir / "powerfit" / "fitted_models.csv").write_text(
+        "powerfit_run_id,structure,rank,fitted_model_file,unfitted_model_file\n"
+        "run_001,structure,1,powerfit/run_001/structure/fit_1.pdb,structure.pdb\n"
+    )
+    (session_dir / "structure.pdb").write_text("MODEL\nENDMDL\n")
+    (session_dir / "ro-crate-metadata.json").write_text(
+        json.dumps(
+            {
+                "@context": ["https://w3id.org/ro/crate/1.1/context"],
+                "@graph": [
+                    {
+                        "@id": "./",
+                        "@type": "Dataset",
+                        "description": "An RO-Crate session directory.",
+                        "name": "session",
+                    },
+                    {
+                        "@id": "structure",
+                        "@type": "File",
+                        "description": "Input structure file.",
+                        "name": "structure",
+                    },
+                    {
+                        "@id": "run",
+                        "@type": "CreateAction",
+                        "name": "run",
+                        "agent": {"@id": "verhoes"},
+                        "description": "Run the analysis.",
+                        "endTime": "2026-08-17T09:09:00.000000+00:00",
+                        "instrument": {"@id": "protein-detective@0.8.6"},
+                        "object": [{"@id": "structure"}],
+                        "result": [{"@id": "structure"}],
+                        "startTime": "2026-08-17T09:08:00.000000+00:00",
+                    },
+                ],
+            }
+        )
+    )
+
+    con = in_memory_duckdb_connection(session_dir)
+    rows = con.execute(
+        "SELECT powerfit_run_id, structure, rank, fitted_model_file, unfitted_model_file FROM fitted_models"
+    ).fetchall()
+
+    assert rows == [
+        (
+            "run_001",
+            "structure",
+            1,
+            "powerfit/run_001/structure/fit_1.pdb",
+            "structure.pdb",
+        )
+    ]
+
+    joined = con.execute(
+        "SELECT fm.fitted_model_file FROM fitted_models fm "
+        "JOIN solutions s ON fm.powerfit_run_id = s.powerfit_run_id "
+        "AND fm.structure = s.structure AND fm.rank = s.rank"
+    ).fetchall()
+    assert joined == [("powerfit/run_001/structure/fit_1.pdb",)]
+
+
+def test_fitted_models_table_is_absent_without_csv(tmp_path: Path):
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
+    powerfit_dir = session_dir / "powerfit" / "run_001" / "structure"
+    powerfit_dir.mkdir(parents=True)
+    (powerfit_dir / "solutions.out").write_text(
+        "rank,cc,fishz,relz,x,y,z,a11,a12,a13,a21,a22,a23,a31,a32,a33\n"
+        "1,0.5,0.6,0.7,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0\n"
+    )
+    (session_dir / "powerfit" / "fittable_structures.csv").write_text(
+        "structure,structure_file,structure_id,uniprot_accessions,is_alphafold\n"
+        "structure,structure.pdb,struct_1,UP00000001,true\n"
+    )
+    (session_dir / "structure.pdb").write_text("MODEL\nENDMDL\n")
+    (session_dir / "ro-crate-metadata.json").write_text(
+        json.dumps(
+            {
+                "@context": ["https://w3id.org/ro/crate/1.1/context"],
+                "@graph": [
+                    {
+                        "@id": "./",
+                        "@type": "Dataset",
+                        "description": "An RO-Crate session directory.",
+                        "name": "session",
+                    },
+                    {
+                        "@id": "run",
+                        "@type": "CreateAction",
+                        "name": "run",
+                        "agent": {"@id": "verhoes"},
+                        "description": "Run the analysis.",
+                        "endTime": "2026-08-17T09:09:00.000000+00:00",
+                        "instrument": {"@id": "protein-detective@0.8.6"},
+                        "object": [{"@id": "structure"}],
+                        "result": [{"@id": "structure"}],
+                        "startTime": "2026-08-17T09:08:00.000000+00:00",
+                    },
+                ],
+            }
+        )
+    )
+
+    con = in_memory_duckdb_connection(session_dir)
+    tables = [row[0] for row in con.execute("SHOW TABLES").fetchall()]
+
+    assert "fitted_models" not in tables
