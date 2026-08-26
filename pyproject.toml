@@ -48,6 +48,7 @@ dependencies = [
     "rocrate-action-recorder>=0.5.3",
     "tqdm>=4.67.1",
     "rocrate>=0.15.0",
+    "haddock3>=2026.8.0",
 ]
 
 [project.urls]
