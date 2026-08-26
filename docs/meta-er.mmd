@@ -1,0 +1,163 @@
+erDiagram
+
+  "alphafold" {
+      VARCHAR uniprot_accession PK,FK
+      VARCHAR af_id
+    }
+    "uniprot" ||--o{ "alphafold" : has
+    "alphafold_retrieve_stats" {
+      VARCHAR uniprot_accession FK
+      VARCHAR summary_file
+      VARCHAR bcif_file
+      VARCHAR cif_file FK
+      VARCHAR pdb_file
+      VARCHAR pae_doc_file
+      VARCHAR am_annotations_file
+      VARCHAR am_annotations_hg19_file
+      VARCHAR am_annotations_hg38_file
+      VARCHAR msa_file
+      VARCHAR plddt_doc_file
+    }
+    "alphafold" ||--o{ "alphafold_retrieve_stats" : has
+    "structure_files" ||--o{ "alphafold_retrieve_stats" : "file = cif_file"
+    "alphafold_retrieve_stats" ||--o{ "merge_structure_files" : "cif_file = source"
+    "combined_stats" {
+      VARCHAR input_file FK
+      VARCHAR structure_id
+      VARCHAR uniprot_accession FK
+      DOUBLE resolution
+      INTEGER high_confidence_residues_count
+      INTEGER total_residue_count
+      VARCHAR method
+      BOOLEAN is_alphafold
+      INTEGER uniprot_start
+      INTEGER uniprot_end
+      DOUBLE sequence_identity
+      INTEGER chain_length
+      DOUBLE geometry_quality
+      BOOLEAN passed
+      VARCHAR output_file FK
+      VARCHAR reason
+    }
+    "structure_files" ||--o{ "combined_stats" : "file = input_file"
+    "structure_files" ||--o{ "combined_stats" : "file = output_file"
+    "uniprot" ||--o{ "combined_stats" : has
+    "fittable_structures" {
+      VARCHAR structure_file FK
+      VARCHAR structure PK
+      VARCHAR structure_id
+      BOOLEAN is_alphafold
+      VARCHAR uniprot_accessions
+    }
+    "structure_files" ||--o{ "fittable_structures" : "file = structure_file"
+    "merge_structure_files" {
+      VARCHAR source PK,FK
+      VARCHAR target FK
+    }
+    "structure_files" ||--o{ "merge_structure_files" : "file = source"
+    "structure_files" ||--o{ "merge_structure_files" : "file = target"
+    "pdbe" {
+      VARCHAR uniprot_accession FK
+      VARCHAR pdb_id PK
+      VARCHAR method
+      DOUBLE resolution
+      VARCHAR uniprot_chains
+      VARCHAR chain
+      INTEGER chain_length
+    }
+    "uniprot" ||--o{ "pdbe" : has
+    "pdbe_retrieve_stats" {
+      VARCHAR pdb_id FK
+      VARCHAR output_file FK
+    }
+    "pdbe" ||--o{ "pdbe_retrieve_stats" : has
+    "structure_files" ||--o{ "pdbe_retrieve_stats" : "file = output_file"
+    "pdbe_retrieve_stats" ||--o{ "merge_structure_files" : "pdb_id-derived source"
+    "rocrate_create_actions" {
+      VARCHAR id FK,PK
+      VARCHAR type
+      VARCHAR name
+      STRUCT agent
+      VARCHAR endTime
+      STRUCT instrument
+      STRUCT object
+      STRUCT result
+      VARCHAR startTime
+      VARCHAR command
+    }
+    "rocrate_nodes" ||--o{ "rocrate_create_actions" : has
+    "rocrate_inodes" {
+      VARCHAR id PK,FK
+      VARCHAR type
+      VARCHAR description
+      VARCHAR name
+    }
+    "rocrate_nodes" ||--o{ "rocrate_inodes" : has
+    "rocrate_inodes" |o--o| "structure_files" : "id = file"
+    "rocrate_nodes" {
+      VARCHAR id PK
+      VARCHAR type
+      STRUCT conformsTo
+      VARCHAR datePublished
+      VARCHAR description
+      STRUCT hasPart
+      VARCHAR license
+      VARCHAR name
+      STRUCT about
+      BIGINT contentSize
+      VARCHAR encodingFormat
+      VARCHAR version
+      STRUCT agent
+      VARCHAR endTime
+      STRUCT instrument
+      STRUCT result
+      VARCHAR startTime
+      STRUCT object
+    }
+
+    "rocrate_objects" {
+      VARCHAR action_id FK
+      VARCHAR object_id FK
+    }
+    "rocrate_create_actions" ||--o{ "rocrate_objects" : has
+    "rocrate_inodes" ||--o{ "rocrate_objects" : has
+    "rocrate_results" {
+      VARCHAR action_id FK
+      VARCHAR result_id FK
+    }
+    "rocrate_create_actions" ||--o{ "rocrate_results" : has
+    "rocrate_inodes" ||--o{ "rocrate_results" : has
+    "solutions" {
+      VARCHAR powerfit_run_id
+      VARCHAR structure FK
+      INTEGER rank
+      FLOAT cc
+      FLOAT fishz
+      FLOAT relz
+      FLOAT[3] translation
+      FLOAT[9] rotation
+      VARCHAR template_file FK
+      VARCHAR uniprot_accessions
+      VARCHAR structure_id
+      BOOLEAN is_alphafold
+    }
+    "fittable_structures" ||--o{ "solutions" : "structure = structure"
+    "structure_files" ||--o{ "solutions" : "file = template_file"
+    "structure_files" {
+      VARCHAR file PK
+      VARCHAR parent_dir
+      VARCHAR filename
+    }
+
+    "uniprot" {
+      VARCHAR uniprot_accession PK
+    }
+
+    "uniprots_verified_stats" {
+      VARCHAR input_file FK
+      VARCHAR output_file FK
+      BOOLEAN injected
+      VARCHAR uniprot_chain_mappings
+    }
+    "structure_files" ||--o{ "uniprots_verified_stats" : has
+    "structure_files" ||--o{ "uniprots_verified_stats" : has

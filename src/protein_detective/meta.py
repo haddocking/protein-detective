@@ -1,7 +1,6 @@
 """Create a DuckDB database from the session directory, including all CSV files and the RO-Crate metadata."""
 # Whenever changes occur in this file,
 # the mermaid er diagram in docs/meta.ipynb should be updated to reflect the changes.
-# TODO find better name for meta module, like "trace", "history".
 
 from pathlib import Path
 
