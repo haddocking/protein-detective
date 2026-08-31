@@ -1,7 +1,27 @@
 import json
 from pathlib import Path
 
-from protein_detective.meta import in_memory_duckdb_connection
+from protein_detective.meta import in_memory_duckdb_connection, solutions_as_duckdb_ddl
+
+
+def test_solutions_ddl_requires_fittable_structures_and_solutions(tmp_path: Path):
+    session_dir = tmp_path / "session"
+    powerfit_dir = session_dir / "powerfit"
+    solutions_dir = powerfit_dir / "run_001" / "structure"
+    solutions_dir.mkdir(parents=True)
+
+    assert solutions_as_duckdb_ddl(session_dir) == []
+
+    fittable_structures_csv = powerfit_dir / "fittable_structures.csv"
+    fittable_structures_csv.write_text("structure,structure_file\n")
+    assert solutions_as_duckdb_ddl(session_dir) == []
+
+    solutions_out = solutions_dir / "solutions.out"
+    solutions_out.write_text("rank,cc\n")
+    assert len(solutions_as_duckdb_ddl(session_dir)) == 1
+
+    fittable_structures_csv.unlink()
+    assert solutions_as_duckdb_ddl(session_dir) == []
 
 
 def test_rocrate_columns_are_normalized(tmp_path: Path):

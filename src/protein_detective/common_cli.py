@@ -38,7 +38,7 @@ class Common:
 
 
 def make_stats_relative_to_session_dir(stats_file: Path, session_dir: Path) -> None:
-    """Replaces occurrences of `session_dir/` with `/` in given stats text file.
+    """Remove occurrences of the `session_dir/` prefix from a stats text file.
 
     Args:
         stats_file: Path to the stats text file to be modified.

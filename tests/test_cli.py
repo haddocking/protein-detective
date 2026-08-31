@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from protein_detective.filter import _merge_structure_files
 from tests.helpers import (
     assert_crate,
     assert_lines,
@@ -12,6 +13,24 @@ from tests.helpers import (
     fake_structure_file,
     read_csv,
 )
+
+
+def test_merge_structure_files_recreates_combined_input(tmp_path: Path):
+    session_dir = tmp_path / "session"
+    downloaded_af_dir = session_dir / "downloads" / "alphafold"
+    with_uniprots = session_dir / "single_chain"
+    downloaded_af_dir.mkdir(parents=True)
+    with_uniprots.mkdir()
+    (downloaded_af_dir / "alphafold.cif.gz").write_text("alphafold")
+    (with_uniprots / "pdbe.cif.gz").write_text("pdbe")
+
+    combined_input_dir, _ = _merge_structure_files(downloaded_af_dir, with_uniprots, session_dir)
+    (combined_input_dir / "stale.cif.gz").write_text("stale")
+
+    rerun_input_dir, _ = _merge_structure_files(downloaded_af_dir, with_uniprots, session_dir)
+
+    assert rerun_input_dir == combined_input_dir
+    assert {path.name for path in rerun_input_dir.iterdir()} == {"alphafold.cif.gz", "pdbe.cif.gz"}
 
 
 def test_app_help(capsys: pytest.CaptureFixture[str]):

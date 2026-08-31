@@ -1,4 +1,6 @@
 import csv
+import logging
+import shutil
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -18,6 +20,8 @@ from protein_quest.utils import copyfile
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 
 from protein_detective.common_cli import Common, make_stats_relative_to_session_dir, write_ro_crate
+
+logger = logging.getLogger(__name__)
 
 ss_group = Group.create_ordered("Secondary structure sub-filter")
 
@@ -165,6 +169,9 @@ def _merge_structure_files(
     session_dir: Path,
 ) -> tuple[Path, Path]:
     combined_input_dir = session_dir / "combined_input"
+    if combined_input_dir.exists():
+        logger.info("Removing existing combined input directory: %s", combined_input_dir)
+        shutil.rmtree(combined_input_dir)
     combined_input_dir.mkdir()
     merge_structure_files = session_dir / "merge_structure_files.csv"
     with merge_structure_files.open("w", newline="") as f:

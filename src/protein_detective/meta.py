@@ -318,9 +318,13 @@ def structure_files_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
 
 
 def solutions_as_duckdb_ddl(session_dir: Path, powerfit_run_id: str | None = None) -> list[DDLStatement]:
+    fittable_structures_csv = session_dir / "powerfit" / "fittable_structures.csv"
     solutions_pattern = session_dir / "powerfit" / "*" / "*" / "solutions.out"
     if powerfit_run_id:
         solutions_pattern = session_dir / "powerfit" / powerfit_run_id / "*" / "solutions.out"
+    has_solutions = any(session_dir.glob(str(solutions_pattern.relative_to(session_dir))))
+    if not fittable_structures_csv.exists() or not has_solutions:
+        return []
     return [
         (
             "CREATE TABLE solutions AS\n"
