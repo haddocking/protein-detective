@@ -11,14 +11,13 @@ from dask.distributed import Client, progress
 from distributed.deploy.cluster import Cluster
 from duckdb import connect
 from pandas import DataFrame
-from protein_quest.structure.formats import read_structure
 from protein_quest.structure.metadata import structure_metadata
-from protein_quest.structure.uniprot import structure2uniprot_accessions
+from protein_quest.structure.uniprot_extraction import structure2uniprot_accessions
 from rocrate.rocrate import ROCrate
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 from tqdm.auto import tqdm
 
-from protein_detective.common_cli import write_ro_crate
+from protein_detective.common_cli import make_stats_relative_to_session_dir, write_ro_crate
 from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.powerfit.parallel import build_gpu_cycler, configure_dask_scheduler, detect_available_gpus
 from protein_detective.powerfit.run import clear_worker_cache, powerfit_worker
@@ -271,10 +270,9 @@ def make_fittable_structures_df(session_dir: Path) -> list[FittableStructure]:
     data: list[FittableStructure] = []
     for structure_file in structure_files:
         name = structure_file.name
-        structure = read_structure(structure_file)
-        metadata = structure_metadata(structure)
+        metadata = structure_metadata(structure_file)
         is_alphafold = metadata.is_alphafold
-        uniprot_accessions = ":".join(structure2uniprot_accessions(structure))
+        uniprot_accessions = ":".join(structure2uniprot_accessions(structure_file))
         data.append(
             {
                 "structure_file": str(structure_file.relative_to(session_dir, walk_up=True)),
@@ -293,6 +291,69 @@ def create_fittable_structures_csv(session_dir: Path, fittable_structures_csv: P
         writer = csv.DictWriter(fh, fieldnames=structures_data[0].keys())
         writer.writeheader()
         writer.writerows(structures_data)
+
+
+def powerfit_solutions_query(join: str) -> str:
+    """Generate SQL query that reads PowerFit solutions files and joins them with fittable structures.
+
+    Args:
+        join: JOIN clause that combines the solutions subquery with the fittable structures,
+            for example ``JOIN read_csv($fittable_structures_csv) AS fittable_structures USING (structure)``
+            or ``JOIN fittable_structures USING (structure)`` when the table already exists.
+
+    Returns:
+        SQL query string with named parameter ``$solutions_pattern``
+        and any parameters referenced by ``join``.
+    """
+    # join is a developer-supplied constant, not user input
+    return dedent(f"""\
+    SELECT
+        powerfit_run_id,
+        structure,
+        rank,
+        cc,
+        fishz,
+        relz,
+        translation,
+        rotation,
+        structure_file AS template_file,
+        uniprot_accessions,
+        structure_id,
+        is_alphafold
+    FROM (
+        SELECT
+            parse_path(filename)[-3] AS powerfit_run_id,
+            parse_path(filename)[-2] AS structure,
+            rank, cc, fishz, relz,
+            [x,y,z]::FLOAT[3] AS translation,
+            [a11, a12, a13, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation
+        FROM
+            read_csv(
+                $solutions_pattern,
+                filename=True, normalize_names=True,
+                columns={{
+                    'rank': 'INTEGER',
+                    'cc': 'FLOAT',
+                    'fishz': 'FLOAT',
+                    'relz': 'FLOAT',
+                    'x': 'FLOAT',
+                    'y': 'FLOAT',
+                    'z': 'FLOAT',
+                    'a11': 'FLOAT',
+                    'a12': 'FLOAT',
+                    'a13': 'FLOAT',
+                    'a21': 'FLOAT',
+                    'a22': 'FLOAT',
+                    'a23': 'FLOAT',
+                    'a31': 'FLOAT',
+                    'a32': 'FLOAT',
+                    'a33': 'FLOAT',
+                }}
+            )
+        ) AS solutions
+        {join}
+    ORDER BY cc DESC, rank ASC
+    """)  # noqa: S608
 
 
 def powerfit_report(
@@ -333,55 +394,16 @@ def powerfit_report(
     if powerfit_run_id:
         solutions = session_dir / "powerfit" / powerfit_run_id / "*" / "solutions.out"
     with connect() as con:
-        query = dedent("""\
-        SELECT
-            powerfit_run_id,
-            structure,
-            rank,
-            cc,
-            fishz,
-            relz,
-            translation,
-            rotation,
-            structure_file AS template_file,
-            uniprot_accessions,
-            structure_id,
-            is_alphafold
-        FROM (
-            SELECT
-                parse_path(filename)[-3] AS powerfit_run_id,
-                parse_path(filename)[-2] AS structure,
-                rank, cc, fishz, relz,
-                [x,y,z]::FLOAT[3] AS translation,
-                [a11, a12, a13, a21, a22, a23, a31, a32, a33]::FLOAT[9] AS rotation
-            FROM
-                read_csv(
-                    ?,
-                    filename=True, normalize_names=True,
-                    columns={
-                        'rank': 'INTEGER',
-                        'cc': 'FLOAT',
-                        'fishz': 'FLOAT',
-                        'relz': 'FLOAT',
-                        'x': 'FLOAT',
-                        'y': 'FLOAT',
-                        'z': 'FLOAT',
-                        'a11': 'FLOAT',
-                        'a12': 'FLOAT',
-                        'a13': 'FLOAT',
-                        'a21': 'FLOAT',
-                        'a22': 'FLOAT',
-                        'a23': 'FLOAT',
-                        'a31': 'FLOAT',
-                        'a32': 'FLOAT',
-                        'a33': 'FLOAT',
-                    }
-                )
-            ) AS solutions
-            JOIN read_csv(?) AS fittable_structures USING (structure)
-        ORDER BY cc DESC, rank ASC
-        """)
-        con.execute(query, (str(solutions), str(fittable_structures_csv)))
+        query = powerfit_solutions_query(
+            "JOIN read_csv($fittable_structures_csv) AS fittable_structures USING (structure)"
+        )
+        con.execute(
+            query,
+            {
+                "solutions_pattern": str(solutions),
+                "fittable_structures_csv": str(fittable_structures_csv),
+            },
+        )
         return con.df()
 
 
@@ -417,6 +439,7 @@ def _write_ro_crate4fit_models(
     /,
     *,
     fitted_df: DataFrame,
+    fitted_models_csv: Path,
 ):
     ioargs = IOArgumentPaths(
         input_files=[
@@ -434,6 +457,13 @@ def _write_ro_crate4fit_models(
                 help="Fitted model file.",
             )
             for row in fitted_df["fitted_model_file"]
+        ]
+        + [
+            IOArgumentPath(
+                name="fitted_models_csv",
+                path=fitted_models_csv,
+                help="CSV file containing the relationship between unfitted and fitted models.",
+            ),
         ],
     )
     write_ro_crate(
@@ -463,8 +493,15 @@ def powerfit_fit_models(
         FileNotFoundError: If no structure files are found in the session directory.
 
     Returns:
-        A DataFrame containing the fitted models. See protein_detective.db.save_fitted_models function
-            for details.
+        A DataFrame containing following columns:
+
+            * powerfit_run_id: ID of the PowerFit run
+            * structure: Name of the structure file
+            * rank: Rank of the solution
+            * fitted_model_file: Path to the fitted model file
+            * unfitted_model_file: Path to the unfitted model file
+
+            Dataframe is written to `<session_dir>/powerfit/fitted_models.csv` with paths relative to session dir.
     """
     start_time = datetime.now(tz=UTC)
     solutions = powerfit_filtered_report(
@@ -474,11 +511,15 @@ def powerfit_fit_models(
         group_by_structure=group_by_structure,
     )
     fitted_df = fit_models(solutions, session_dir)
+    fitted_models_csv = session_dir / "powerfit" / "fitted_models.csv"
+    fitted_df.to_csv(fitted_models_csv, index=False, mode="a")
+    make_stats_relative_to_session_dir(fitted_models_csv, session_dir)
 
     _write_ro_crate4fit_models(
         session_dir,
         start_time,
         fitted_df=fitted_df,
+        fitted_models_csv=fitted_models_csv,
     )
     return fitted_df
 

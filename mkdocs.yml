@@ -78,4 +78,5 @@ nav:
       - Prepare EM map: em_prepare.ipynb
       - Determine the fraction of Secondary Structure Elements (SSE): SSE_elements.ipynb
       - Visualization: visualization.ipynb
+      - Meta-analysis: meta.ipynb
   - Contributing guidelines: CONTRIBUTING.md

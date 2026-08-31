@@ -1,3 +1,6 @@
+import csv
+import logging
+import shutil
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -16,7 +19,9 @@ from protein_quest.parallel import configure_dask_scheduler
 from protein_quest.utils import copyfile
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 
-from protein_detective.common_cli import Common, write_ro_crate
+from protein_detective.common_cli import Common, make_stats_relative_to_session_dir, write_ro_crate
+
+logger = logging.getLogger(__name__)
 
 ss_group = Group.create_ordered("Secondary structure sub-filter")
 
@@ -46,6 +51,7 @@ def _write_ro_crate(
     combined_input_dir: Path,
     combined_output_dir: Path,
     combined_stats_file: StdioPath,
+    merge_structure_files: Path,
     ss_output_dir: Path | None = None,
     ss_stats_file: StdioPath | None = None,
 ) -> None:
@@ -122,6 +128,11 @@ def _write_ro_crate(
                 path=combined_stats_file,
                 help="CSV file containing statistics for the combined filtering step.",
             ),
+            IOArgumentPath(
+                name="merge_structure_files",
+                path=merge_structure_files,
+                help="CSV file containing the source and target paths of merged structure files.",
+            ),
         ],
     )
     if ss_output_dir:
@@ -152,19 +163,39 @@ def _write_ro_crate(
     )
 
 
-def _merge_structure_files(downloaded_af_dir: Path, with_uniprots: Path, combined_input_dir: Path):
+def _merge_structure_files(
+    downloaded_af_dir: Path,
+    with_uniprots: Path,
+    session_dir: Path,
+) -> tuple[Path, Path]:
+    combined_input_dir = session_dir / "combined_input"
+    if combined_input_dir.exists():
+        logger.info("Removing existing combined input directory: %s", combined_input_dir)
+        shutil.rmtree(combined_input_dir)
     combined_input_dir.mkdir()
-    for file in downloaded_af_dir.glob("*"):
-        copyfile(file, combined_input_dir / file.name, copy_method="symlink")
-    for file in with_uniprots.glob("*"):
-        copyfile(file, combined_input_dir / file.name, copy_method="symlink")
-
-
-def _make_stats_relative_to_session_dir(stats_file: Path, session_dir: Path):
-    """Replaces occurrences of `session_dir/` with `/` in given stats text file."""
-    content = stats_file.read_text()
-    content = content.replace(f"{session_dir}/", "")
-    stats_file.write_text(content)
+    merge_structure_files = session_dir / "merge_structure_files.csv"
+    with merge_structure_files.open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["source", "target"])
+        for file in downloaded_af_dir.glob("*"):
+            target = combined_input_dir / file.name
+            copyfile(file, target, copy_method="symlink")
+            writer.writerow(
+                [
+                    str(file.relative_to(session_dir, walk_up=True)),
+                    str(target.relative_to(session_dir, walk_up=True)),
+                ]
+            )
+        for file in with_uniprots.glob("*"):
+            target = combined_input_dir / file.name
+            copyfile(file, target, copy_method="symlink")
+            writer.writerow(
+                [
+                    str(file.relative_to(session_dir, walk_up=True)),
+                    str(target.relative_to(session_dir, walk_up=True)),
+                ]
+            )
+    return combined_input_dir, merge_structure_files
 
 
 @contextmanager
@@ -231,7 +262,7 @@ def run_filter(
             cache=cache,
             scheduler_address=real_scheduler_address,
         )
-        _make_stats_relative_to_session_dir(uniprots_verified_stats, session_dir)
+        make_stats_relative_to_session_dir(uniprots_verified_stats, session_dir)
 
         single_chain_dir = session_dir / "single_chain"
         single_chain_stats = StdioPath(session_dir / "single_chain_stats.csv")
@@ -243,10 +274,12 @@ def run_filter(
             cache=cache,
             scheduler_address=real_scheduler_address,
         )
+        make_stats_relative_to_session_dir(single_chain_stats, session_dir)
 
         # Combined filter works best if all structure files are in one directory
-        combined_input_dir = session_dir / "combined_input"
-        _merge_structure_files(downloaded_af_dir, single_chain_dir, combined_input_dir)
+        combined_input_dir, merge_structure_files = _merge_structure_files(
+            downloaded_af_dir, single_chain_dir, session_dir
+        )
 
         combined_output_dir = session_dir / "combined_output"
         combined_stats_file = StdioPath(session_dir / "combined_stats.csv")
@@ -259,7 +292,7 @@ def run_filter(
             cache=cache,
             scheduler_address=real_scheduler_address,
         )
-        _make_stats_relative_to_session_dir(combined_stats_file, session_dir)
+        make_stats_relative_to_session_dir(combined_stats_file, session_dir)
 
         ss_output_dir = None
         ss_stats_file = None
@@ -274,7 +307,7 @@ def run_filter(
                 cache=cache,
                 scheduler_address=real_scheduler_address,
             )
-            _make_stats_relative_to_session_dir(ss_stats_file, session_dir)
+            make_stats_relative_to_session_dir(ss_stats_file, session_dir)
 
     _write_ro_crate(
         session_dir,
@@ -292,6 +325,7 @@ def run_filter(
         combined_input_dir=combined_input_dir,
         combined_output_dir=combined_output_dir,
         combined_stats_file=combined_stats_file,
+        merge_structure_files=merge_structure_files,
         ss_output_dir=ss_output_dir,
         ss_stats_file=ss_stats_file,
     )

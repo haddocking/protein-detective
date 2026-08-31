@@ -11,7 +11,7 @@ from protein_quest.cli.retrieve import (
 )
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 
-from protein_detective.common_cli import Common, write_ro_crate
+from protein_detective.common_cli import Common, make_stats_relative_to_session_dir, write_ro_crate
 
 
 def _write_ro_crate(
@@ -23,6 +23,8 @@ def _write_ro_crate(
     pdbe_path: StdioPath,
     pdbe_download_dir: Path,
     af_download_dir: Path,
+    pdbe_stats_file: StdioPath,
+    alphafold_stats_file: StdioPath,
 ) -> None:
     ioargs = IOArgumentPaths(
         input_files=[
@@ -47,6 +49,18 @@ def _write_ro_crate(
                 name="alphafold_download_dir",
                 path=af_download_dir,
                 help="Directory where the AlphaFold files were downloaded.",
+            ),
+        ],
+        output_files=[
+            IOArgumentPath(
+                name="pdbe_stats_file",
+                path=pdbe_stats_file,
+                help="CSV file containing statistics for the PDBe retrieval step.",
+            ),
+            IOArgumentPath(
+                name="alphafold_stats_file",
+                path=alphafold_stats_file,
+                help="CSV file containing statistics for the AlphaFold retrieval step.",
             ),
         ],
     )
@@ -83,23 +97,29 @@ def retrieve(
     pdbe_download_dir.mkdir(parents=True, exist_ok=True)
 
     pdbe_csv = StdioPath(session_dir / "pdbe.csv")
+    pdbe_stats_file = StdioPath(session_dir / "pdbe_stats.csv")
     pdbe(
         pdbe_csv,
         pdbe_download_dir,
         cache=cache,
+        write_stats=pdbe_stats_file,
     )
+    make_stats_relative_to_session_dir(pdbe_stats_file, session_dir)
 
     af_download_dir = download_dir / "alphafold"
     af_download_dir.mkdir(parents=True, exist_ok=True)
 
     alphafold_csv = StdioPath(session_dir / "alphafold.csv")
+    alphafold_stats_file = StdioPath(session_dir / "alphafold_stats.csv")
     alphafold(
         alphafold_csv,
         af_download_dir,
         db_version=alphafold_db_version,
         gzip_files=True,
         cache=cache,
+        write_stats=alphafold_stats_file,
     )
+    make_stats_relative_to_session_dir(alphafold_stats_file, session_dir)
 
     _write_ro_crate(
         session_dir,
@@ -108,4 +128,6 @@ def retrieve(
         pdbe_path=pdbe_csv,
         pdbe_download_dir=pdbe_download_dir,
         af_download_dir=af_download_dir,
+        pdbe_stats_file=pdbe_stats_file,
+        alphafold_stats_file=alphafold_stats_file,
     )
