@@ -27,7 +27,6 @@ app = App(
 app.register_install_completion_command(group=utilities_group, sort_key=2)
 install_rich_traceback(console=console, suppress=[cyclopts])
 
-# TODO Move non-powerfit commands under `protein-detective candidates` subcommand?
 app.command(search, group=workflow_group, sort_key=0)
 app.command(retrieve, group=workflow_group, sort_key=1)
 app.command(run_filter, name="filter", group=workflow_group, sort_key=2)
