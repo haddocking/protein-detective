@@ -433,7 +433,10 @@ def test_fit_models(tmp_path: Path):
     ]
     assert read_csv(fitted_csv) == expected
     expected_relative_to_session_dir = [
-        {k: (v.replace(str(session_dir) + "/", "") if k in {"fitted_model_file", "unfitted_model_file"} else v) for k, v in e.items()}
+        {
+            k: (v.replace(str(session_dir) + "/", "") if k in {"fitted_model_file", "unfitted_model_file"} else v)
+            for k, v in e.items()
+        }
         for e in expected
     ]
     assert read_csv(session_dir / "powerfit" / "fitted_models.csv") == expected_relative_to_session_dir

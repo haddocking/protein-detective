@@ -457,7 +457,8 @@ def _write_ro_crate4fit_models(
                 help="Fitted model file.",
             )
             for row in fitted_df["fitted_model_file"]
-        ] + [
+        ]
+        + [
             IOArgumentPath(
                 name="fitted_models_csv",
                 path=fitted_models_csv,
