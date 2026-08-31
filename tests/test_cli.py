@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
 
+import duckdb
 import pytest
 
+from protein_detective.filter import _merge_structure_files
 from tests.helpers import (
     assert_crate,
     assert_lines,
@@ -14,12 +16,36 @@ from tests.helpers import (
 )
 
 
+def test_merge_structure_files_recreates_combined_input(tmp_path: Path):
+    session_dir = tmp_path / "session"
+    downloaded_af_dir = session_dir / "downloads" / "alphafold"
+    with_uniprots = session_dir / "single_chain"
+    downloaded_af_dir.mkdir(parents=True)
+    with_uniprots.mkdir()
+    (downloaded_af_dir / "alphafold.cif.gz").write_text("alphafold")
+    (with_uniprots / "pdbe.cif.gz").write_text("pdbe")
+
+    combined_input_dir, _ = _merge_structure_files(downloaded_af_dir, with_uniprots, session_dir)
+    (combined_input_dir / "stale.cif.gz").write_text("stale")
+
+    rerun_input_dir, _ = _merge_structure_files(downloaded_af_dir, with_uniprots, session_dir)
+
+    assert rerun_input_dir == combined_input_dir
+    assert {path.name for path in rerun_input_dir.iterdir()} == {"alphafold.cif.gz", "pdbe.cif.gz"}
+
+
 def test_app_help(capsys: pytest.CaptureFixture[str]):
     # Smoke test to ensure the CLI can be invoked and shows help message
     cli(["--help"])
 
     captured = capsys.readouterr()
     assert "Protein Detective CLI" in captured.out
+    assert captured.out.count("╭─ ") == 2
+    assert "Workflow" in captured.out
+    assert "Utilities" in captured.out
+    commands = ["search", "retrieve", "filter", "powerfit", "meta", "import-structures"]
+    positions = [captured.out.index(command) for command in commands]
+    assert positions == sorted(positions)
 
 
 def test_search_help(capsys: pytest.CaptureFixture[str]):
@@ -253,6 +279,28 @@ def test_retrieve(tmp_path: Path):
         downloads_dir / "pdbe" / "2y29_updated.cif.gz",
     ]
 
+    assert read_csv(session_dir / "pdbe_stats.csv") == [
+        {
+            "pdb_id": "2Y29",
+            "output_file": "downloads/pdbe/2y29_updated.cif.gz",
+        }
+    ]
+    assert read_csv(session_dir / "alphafold_stats.csv") == [
+        {
+            "uniprot_accession": "A0A0C5B5G6",
+            "summary_file": "",
+            "bcif_file": "",
+            "cif_file": "downloads/alphafold/AF-A0A0C5B5G6-F1-model_v6.cif.gz",
+            "pdb_file": "",
+            "pae_doc_file": "",
+            "am_annotations_file": "",
+            "am_annotations_hg19_file": "",
+            "am_annotations_hg38_file": "",
+            "msa_file": "",
+            "plddt_doc_file": "",
+        }
+    ]
+
     assert_crate(
         session_dir,
         action_id=f"protein-detective retrieve {session_dir} --alphafold-db-version 6",
@@ -263,6 +311,8 @@ def test_retrieve(tmp_path: Path):
         output_ids={
             "downloads/alphafold/",
             "downloads/pdbe/",
+            "pdbe_stats.csv",
+            "alphafold_stats.csv",
         },
     )
 
@@ -309,7 +359,7 @@ def test_filter_defaults(tmp_path: Path):
             "method": "Predicted",
             "output_file": "combined_output/AF-A0A0C5B5G6-F1-model_v6.cif.gz",
             "passed": "True",
-            "pdb_id": "AF-A0A0C5B5G6-F1",
+            "structure_id": "AF-A0A0C5B5G6-F1",
             "reason": "",
             "resolution": "0.0",
             "sequence_identity": "1.0",
@@ -327,7 +377,7 @@ def test_filter_defaults(tmp_path: Path):
             "method": "X-ray",
             "output_file": "combined_output/2y29_updated_A2A.cif.gz",
             "passed": "True",
-            "pdb_id": "2Y29",
+            "structure_id": "2Y29",
             "reason": "",
             "resolution": "2.3",
             "sequence_identity": "1.0",
@@ -347,9 +397,9 @@ def test_filter_defaults(tmp_path: Path):
         {
             "chain2keep": "A",
             "discard_reason": "",
-            "input_file": "2y29_updated.cif.gz",
+            "input_file": "uniprots_verified/2y29_updated.cif.gz",
             "output_chain": "A",
-            "output_file": "2y29_updated_A2A.cif.gz",
+            "output_file": "single_chain/2y29_updated_A2A.cif.gz",
             "passed": "True",
         },
     ]
@@ -362,6 +412,20 @@ def test_filter_defaults(tmp_path: Path):
             "uniprot_chain_mappings": "",
         },
     ]
+
+    merge_csv = session_dir / "merge_structure_files.csv"
+    assert merge_csv.exists()
+    merge_rows = read_csv(merge_csv)
+    assert {(row["source"], row["target"]) for row in merge_rows} == {
+        (
+            "downloads/alphafold/AF-A0A0C5B5G6-F1-model_v6.cif.gz",
+            "combined_input/AF-A0A0C5B5G6-F1-model_v6.cif.gz",
+        ),
+        (
+            "single_chain/2y29_updated_A2A.cif.gz",
+            "combined_input/2y29_updated_A2A.cif.gz",
+        ),
+    }
 
     assert_crate(
         session_dir,
@@ -380,6 +444,7 @@ def test_filter_defaults(tmp_path: Path):
             "combined_stats.csv",
             "uniprots_verified_stats.csv",
             "single_chain_stats.csv",
+            "merge_structure_files.csv",
         },
         nr_actions=2,
     )
@@ -471,6 +536,7 @@ def test_filter_with_secondary_structure(tmp_path: Path):
             "combined_stats.csv",
             "uniprots_verified_stats.csv",
             "single_chain_stats.csv",
+            "merge_structure_files.csv",
             "secondary_structure_stats.csv",
             "secondary_structure/",
         },
@@ -544,3 +610,45 @@ class TestImportStructures:
         ]
         with pytest.raises(ValueError, match="UniProt accessions, expected 1"):
             cli(argv)
+
+
+def test_meta_creates_duckdb_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    (session_dir / "ro-crate-metadata.json").write_text(
+        json.dumps(
+            {
+                "@graph": [
+                    {
+                        "@id": "create-action",
+                        "@type": "CreateAction",
+                        "name": "protein-detective search",
+                        "agent": {"@id": "user"},
+                        "endTime": "2026-08-17T09:09:00+00:00",
+                        "instrument": {"@id": "protein-detective"},
+                        "object": [],
+                        "result": [],
+                        "startTime": "2026-08-17T09:08:00+00:00",
+                    },
+                    {
+                        "@id": "./",
+                        "@type": "Dataset",
+                        "description": "Protein Detective session",
+                        "name": "session",
+                    },
+                ]
+            }
+        )
+    )
+
+    cli(["meta", str(session_dir)])
+
+    duckdb_file = session_dir / "meta.duckdb"
+    assert duckdb_file.exists()
+    with duckdb.connect(str(duckdb_file), read_only=True) as con:
+        assert con.execute("SELECT command FROM rocrate_create_actions").fetchone() == ("protein-detective search",)
+
+    stderr = capsys.readouterr().err
+    assert f"{duckdb_file} has been generated." in stderr
+    assert "https://www.bonvinlab.org/protein-detective/meta.html" in stderr
+    assert f"duckdb --readonly {duckdb_file}" in stderr

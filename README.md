@@ -350,6 +350,15 @@ The results can also be visualized see
 [visualization.ipynb](https://bonvinlab.org/protein-detective/docs/visualization.html)
 for an example.
 
+### Metadata database
+
+Generate a DuckDB database containing the metadata and results from a protein
+detective session:
+
+```shell
+protein-detective meta mysession/
+```
+
 ## Contributing
 
 For development information and contribution guidelines, please see

@@ -408,7 +408,7 @@ def test_fit_models(tmp_path: Path):
         session_dir / "combined_output" / "1abc.cif.gz",
     ]
 
-    assert read_csv(fitted_csv) == [
+    expected = [
         {
             "fitted_model_file": str(fitted_model1),
             "powerfit_run_id": "run_001",
@@ -431,6 +431,15 @@ def test_fit_models(tmp_path: Path):
             "unfitted_model_file": str(unfitted_models[2]),
         },
     ]
+    assert read_csv(fitted_csv) == expected
+    expected_relative_to_session_dir = [
+        {
+            k: (v.replace(str(session_dir) + "/", "") if k in {"fitted_model_file", "unfitted_model_file"} else v)
+            for k, v in e.items()
+        }
+        for e in expected
+    ]
+    assert read_csv(session_dir / "powerfit" / "fitted_models.csv") == expected_relative_to_session_dir
 
     assert_crate(
         session_dir,
@@ -440,6 +449,7 @@ def test_fit_models(tmp_path: Path):
             "powerfit/run_001/1abc.cif.gz/fit_1.pdb",
             "powerfit/run_001/2abc.cif.gz/fit_1.pdb",
             "powerfit/run_001/3abc.cif.gz/fit_1.pdb",
+            "powerfit/fitted_models.csv",
         },
     )
 
