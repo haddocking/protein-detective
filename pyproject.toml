@@ -49,6 +49,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "rocrate>=0.15.0",
     "haddock3>=2026.8.0",
+    "gemmi>=0.7.5",
 ]
 
 [project.urls]
