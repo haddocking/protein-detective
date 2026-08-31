@@ -3,10 +3,13 @@
 # the mermaid er diagram in docs/meta.ipynb should be updated to reflect the changes.
 
 from pathlib import Path
+from typing import Annotated
 
 import duckdb
+from cyclopts import Parameter, validators
 from rocrate.metadata import BASENAME
 
+from protein_detective.common_cli import rprint
 from protein_detective.powerfit.workflow import powerfit_solutions_query
 
 DDLStatement = tuple[str, dict[str, str]]
@@ -363,3 +366,25 @@ def create_meta_duckdb_file(session_dir: Path, duckdb_file: Path | None = None, 
     con = duckdb.connect(database=str(duckdb_file))
     _execute_ddl_statements(con, statements)
     con.close()
+
+
+def create_meta_duckdb(
+    session_dir: Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=True, exists=True))],
+    /,
+    *,
+    powerfit_run_id: str | None = None,
+) -> None:
+    """Generate a DuckDB metadata database for a Protein Detective session.
+
+    Args:
+        session_dir: Session directory containing the files to include.
+        powerfit_run_id: Optional PowerFit run ID used to restrict solutions.
+    """
+    create_meta_duckdb_file(session_dir, powerfit_run_id=powerfit_run_id)
+    duckdb_file = session_dir / "meta.duckdb"
+    rprint(
+        f"[green]{duckdb_file} has been generated.[/green]\n"
+        "See https://www.bonvinlab.org/protein-detective/meta.html for example queries.\n"
+        f"Use `duckdb --readonly {duckdb_file}` to query it.",
+        soft_wrap=True,
+    )

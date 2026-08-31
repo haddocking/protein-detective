@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import duckdb
 import pytest
 
 from protein_detective.filter import _merge_structure_files
@@ -39,6 +40,12 @@ def test_app_help(capsys: pytest.CaptureFixture[str]):
 
     captured = capsys.readouterr()
     assert "Protein Detective CLI" in captured.out
+    assert captured.out.count("╭─ ") == 2
+    assert "Workflow" in captured.out
+    assert "Utilities" in captured.out
+    commands = ["search", "retrieve", "filter", "powerfit", "meta", "import-structures"]
+    positions = [captured.out.index(command) for command in commands]
+    assert positions == sorted(positions)
 
 
 def test_search_help(capsys: pytest.CaptureFixture[str]):
@@ -603,3 +610,45 @@ class TestImportStructures:
         ]
         with pytest.raises(ValueError, match="UniProt accessions, expected 1"):
             cli(argv)
+
+
+def test_meta_creates_duckdb_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    (session_dir / "ro-crate-metadata.json").write_text(
+        json.dumps(
+            {
+                "@graph": [
+                    {
+                        "@id": "create-action",
+                        "@type": "CreateAction",
+                        "name": "protein-detective search",
+                        "agent": {"@id": "user"},
+                        "endTime": "2026-08-17T09:09:00+00:00",
+                        "instrument": {"@id": "protein-detective"},
+                        "object": [],
+                        "result": [],
+                        "startTime": "2026-08-17T09:08:00+00:00",
+                    },
+                    {
+                        "@id": "./",
+                        "@type": "Dataset",
+                        "description": "Protein Detective session",
+                        "name": "session",
+                    },
+                ]
+            }
+        )
+    )
+
+    cli(["meta", str(session_dir)])
+
+    duckdb_file = session_dir / "meta.duckdb"
+    assert duckdb_file.exists()
+    with duckdb.connect(str(duckdb_file), read_only=True) as con:
+        assert con.execute("SELECT command FROM rocrate_create_actions").fetchone() == ("protein-detective search",)
+
+    stderr = capsys.readouterr().err
+    assert f"{duckdb_file} has been generated." in stderr
+    assert "https://www.bonvinlab.org/protein-detective/meta.html" in stderr
+    assert f"duckdb --readonly {duckdb_file}" in stderr
