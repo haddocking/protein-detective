@@ -48,6 +48,8 @@ dependencies = [
     "rocrate-action-recorder>=0.5.3",
     "tqdm>=4.67.1",
     "rocrate>=0.15.0",
+    "haddock3>=2026.8.0",
+    "gemmi>=0.7.5",
 ]
 
 [project.urls]
@@ -216,7 +218,10 @@ enable-fallback-search-path = true
 
 [tool.pytest]
 minversion = "9.0"
-addopts = ["--import-mode=importlib"]
+addopts = ["--import-mode=importlib", "-m", "not manual"]
+markers = [
+    "manual: tests that only run when explicitly selected with '-m manual'",
+]
 
 [tool.coverage.run]
 source = ["src/protein_detective"]
