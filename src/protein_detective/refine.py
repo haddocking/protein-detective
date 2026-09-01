@@ -1,18 +1,21 @@
-import sys
+import csv
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from subprocess import run
 from textwrap import dedent
 from typing import Annotated
 
 import pandas as pd
 from cyclopts import Parameter, validators
 from cyclopts.types import PositiveInt
+from haddock.core.defaults import RUNDIR
+from haddock.gear.prepare_run import setup_run
+from haddock.libs.libio import working_directory
+from haddock.libs.libworkflow import WorkflowManager
 from protein_quest.cli.common import Common
 from protein_quest.parallel import configure_dask_scheduler, map_with_progress
+from protein_quest.structure.chains import chains_in_structure
 from protein_quest.structure.formats import read_structure, write_structure
-from pytz import UTC
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 
 from protein_detective.common_cli import write_ro_crate
@@ -35,16 +38,17 @@ class RefineOptions:
     top_clusters: PositiveInt = 10
     top_models: PositiveInt = 2
     water_refinement_sampling: PositiveInt = 5
-    ncores: PositiveInt = 1  # TODO do not overload system as dask cluster and haddock3 ncores are independent
-
-
-def _haddock3_executable() -> Path:
-    # TODO do this once, no need to find each loop iteration
-    return Path(sys.executable).with_name("haddock3").resolve(strict=True)
+    # TODO do not overload system as dask cluster and haddock3 ncores are independent
+    # we expect there are more models to refined then there are CPU cores available
+    ncores: PositiveInt = 1
 
 
 def _write_ro_crate(
-    session_dir: Path, start_time: datetime, session_fixed_structure: Path, refined: list[tuple[Path, Path]]
+    session_dir: Path,
+    start_time: datetime,
+    session_fixed_structure: Path,
+    refined: list[tuple[Path, Path]],
+    io_csv: Path,
 ):
     ioargs = IOArgumentPaths(
         input_files=[
@@ -58,7 +62,7 @@ def _write_ro_crate(
             IOArgumentPath(
                 name=f"refined_{i}",
                 path=fitted_model,
-                help="Fitted structure file.",
+                help="Fitted model file.",
             )
             for i, (fitted_model, _) in enumerate(refined)
         ],
@@ -69,6 +73,13 @@ def _write_ro_crate(
                 help="Refined structure result.",
             )
             for i, (_, refined_path) in enumerate(refined)
+        ],
+        output_files=[
+            IOArgumentPath(
+                name="io_csv",
+                path=io_csv,
+                help="CSV file containing fitted model path and refine run dir.",
+            )
         ],
     )
     write_ro_crate(
@@ -82,9 +93,10 @@ def _write_ro_crate(
 
 def _generate_config_body(run_dir: Path, fitted_model: Path, fixed_structure: Path, options: RefineOptions) -> str:
     return dedent(f"""\
-        run_dir = {run_dir}
-        mode="local"
-        ncores={options.ncores}
+        run_dir = "{run_dir}"
+        mode = "local"
+        ncores = {options.ncores}
+        clean = true
 
         molecules = [
             "{fitted_model}",
@@ -97,6 +109,7 @@ def _generate_config_body(run_dir: Path, fitted_model: Path, fixed_structure: Pa
         separate = false
         mol_fix_origin_2 = true
         sampling = {options.rigidbody_sampling}
+        cmrest = true
 
         [caprieval]
 
@@ -110,41 +123,77 @@ def _generate_config_body(run_dir: Path, fitted_model: Path, fixed_structure: Pa
         top_models = {options.top_models}
 
         [mdref]
-        sampling = {options.water_refinement_sampling}
+        # sampling = {options.water_refinement_sampling}
 
         [caprieval]
         """)
 
 
 def _prepare_fixed_structure(fixed_structure: Path, refine_dir: Path, out_chain: str = "B") -> Path:
-    fixed_structure_dest = refine_dir / "fixed_structure.cif.gz"
+    # Haddock3 does not work with mmcif so convert to pdb
+    # luckily fitted models are already pdb formatted.
+    fixed_structure_dest = refine_dir / "fixed_structure.pdb"
     structure = read_structure(fixed_structure)
-    for model in structure:
-        for chain in model:
-            chain.name = out_chain
+
+    chains = chains_in_structure(structure)
+    # Chain rename logic from include/gemmi/modify.hpp:rename_chain
+    if chains != {out_chain}:
+        for residue in structure.mod_residues:
+            residue.chain_name = out_chain
+        for refinement in structure.meta.refinement:
+            for group in refinement.tls_groups:
+                for selection in group.selections:
+                    selection.chain = out_chain
+        for model in structure:
+            for chain in model:
+                if chain != out_chain:
+                    chain.name = out_chain
+
     write_structure(structure, fixed_structure_dest)
     return fixed_structure_dest
+
+
+def _run_haddock3(config_file: Path) -> None:
+    modules_params, general_params = setup_run(config_file)
+    run_dir = general_params[RUNDIR]
+
+    with working_directory(run_dir):
+        workflow = WorkflowManager(
+            workflow_params=modules_params,
+            start=None,
+            **general_params,
+        )
+        workflow.run()
+
+        if general_params.get("postprocess", True):
+            workflow.postprocess(self_contained=general_params.get("gen_archive", False))
+
+        workflow.clean()
 
 
 def refine_structure_task(
     fitted_model: Path, /, *, root_refine_dir: Path, fixed_structure: Path, options: RefineOptions
 ) -> tuple[Path, Path]:
     # fitted_model=mysession/powerfit/run_001/4pld_updated_A2A.cif.gz/fit_1.pdb
-    # refine_dir=mysession/refine/run_001/4pld_updated_A2A.cif.gz/fit_1.pdb/
-    powerfit_run_dir = fitted_model.parent.parent
-    refine_dir = root_refine_dir / powerfit_run_dir.relative_to(powerfit_run_dir.parents[2])
-    refine_dir.mkdir(parents=True)
+    # refine_run_dir=mysession/refine/run_001/4pld_updated_A2A.cif.gz/fit_1.pdb/
+    powerfit_root_run_dir = fitted_model.parent.parent.parent
+    refine_run_dir = root_refine_dir / fitted_model.relative_to(powerfit_root_run_dir)
+    abs_fitted_model = (root_refine_dir / ".." / fitted_model).resolve().absolute()
 
-    config_file = refine_dir / "workflow.cfg"
-    config_body = _generate_config_body(refine_dir, fitted_model, fixed_structure, options)
+    if refine_run_dir.exists():
+        msg = f"Refine directory already exists: {refine_run_dir}"
+        raise FileExistsError(msg)
+
+    # Keep the workflow config outside the run_dir because HADDOCK3's
+    # setup_run refuses to start in a non-empty directory.
+    refine_run_dir.parent.mkdir(parents=True, exist_ok=True)
+    config_file = refine_run_dir.parent / f"{refine_run_dir.name}.cfg"
+    config_body = _generate_config_body(refine_run_dir, abs_fitted_model, fixed_structure, options)
     config_file.write_text(config_body)
 
-    process_result = run([_haddock3_executable(), config_file], cwd=refine_dir, check=True)  # noqa: S603
-    if process_result.returncode != 0:
-        msg = f"refine structure of {fitted_model} using haddock3 failed with return code {process_result.returncode}"
-        raise RuntimeError(msg)
+    _run_haddock3(config_file)
 
-    return fitted_model, refine_dir
+    return fitted_model, refine_run_dir
 
 
 def refine_structures(
@@ -216,7 +265,7 @@ def refine_with_haddock3(
         scheduler_name = "protein_detective_filter"
         context = configure_dask_scheduler(scheduler_address, name=scheduler_name)
 
-    structures_to_refine: list[Path] = fitted_models_df["fitted_model_file"].to_list()
+    structures_to_refine = [Path(f) for f in fitted_models_df["fitted_model_file"]]
     with context as cluster:
         real_scheduler_address = cluster if isinstance(cluster, str) else cluster.scheduler_address
         refined = refine_structures(
@@ -227,5 +276,11 @@ def refine_with_haddock3(
             scheduler_address=real_scheduler_address,
         )
 
-    _write_ro_crate(session_dir, start_time, session_fixed_structure, refined)
-    # TODO write refined into csv files so you know which refined haddock3 result is for what fitted model
+    io_csv = refine_dir / "io.csv"
+    with io_csv.open("w") as f:
+        writer = csv.writer(f)
+        writer.writerow(["fitted_model", "refine_run_dir"])
+        for fitted_model, refine_run_dir in refined:
+            writer.writerow([fitted_model, refine_run_dir])
+
+    _write_ro_crate(session_dir, start_time, session_fixed_structure, refined, io_csv)
