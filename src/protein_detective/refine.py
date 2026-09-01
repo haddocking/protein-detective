@@ -193,7 +193,7 @@ def refine_structure_task(
 
     _run_haddock3(config_file)
 
-    return fitted_model, refine_run_dir
+    return abs_fitted_model, refine_run_dir
 
 
 def refine_structures(
@@ -281,6 +281,6 @@ def refine_with_haddock3(
         writer = csv.writer(f)
         writer.writerow(["fitted_model", "refine_run_dir"])
         for fitted_model, refine_run_dir in refined:
-            writer.writerow([fitted_model, refine_run_dir])
+            writer.writerow([fitted_model.relative_to(session_dir), refine_run_dir.relative_to])
 
     _write_ro_crate(session_dir, start_time, session_fixed_structure, refined, io_csv)
