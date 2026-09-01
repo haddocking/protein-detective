@@ -20,7 +20,8 @@ It uses
   retrieve and filter protein structures from Uniprot, PDBe and AlphaFold DB.
 - [powerfit](https://pypi.org/project/powerfit-em/) to fit protein structure in
   a Electron Microscopy (EM) density map.
-- [haddock3](https://www.bonvinlab.org/haddock3) to refine fitted protein structures against a fixed structure.
+- [haddock3](https://www.bonvinlab.org/haddock3) to refine fitted protein
+  structures against a fixed structure.
 - [cyclopts](https://cyclopts.readthedocs.io/en/latest/) for command line
   interface
 - [molviewspec](https://molstar.org/mol-view-spec/) to visualize the fitted
