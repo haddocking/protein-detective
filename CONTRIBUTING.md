@@ -139,6 +139,20 @@ uv run mkdocs build
 python3 -m http.server -d site
 ```
 
+## Running tests
+
+To run the test suite, use `pytest`:
+
+```shell
+uv run pytest
+```
+
+Some tests are skipped
+
+- when CUDA or OpenCL is available or not.
+- when they take too long for CI, for example a haddock3 refinement run
+  takes >20 minutes, they can be run with `pytest -m manual`
+
 ## Automated code quality checks on git commit
 
 This step is **optional** but recommended for developers who want to

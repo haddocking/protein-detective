@@ -20,6 +20,8 @@ It uses
   retrieve and filter protein structures from Uniprot, PDBe and AlphaFold DB.
 - [powerfit](https://pypi.org/project/powerfit-em/) to fit protein structure in
   a Electron Microscopy (EM) density map.
+- [haddock3](https://www.bonvinlab.org/haddock3) to refine fitted protein
+  structures against a fixed structure.
 - [cyclopts](https://cyclopts.readthedocs.io/en/latest/) for command line
   interface
 - [molviewspec](https://molstar.org/mol-view-spec/) to visualize the fitted
@@ -73,6 +75,9 @@ flowchart TB
     E1[protein-detective powerfit report]
     M1[protein-detective powerfit fit-models]
     P1 -- "**/solutions.out" --> E1 & M1
+
+    R1[refine against fixed structure with haddock3]
+    M1 -- "**/fit_*.pdb" --> R1
 
     classDef dashedBorder stroke-dasharray: 5 5;
     S6:::dashedBorder
@@ -349,6 +354,14 @@ and `unfitted_model_file` is the original structure file.
 The results can also be visualized see
 [visualization.ipynb](https://bonvinlab.org/protein-detective/docs/visualization.html)
 for an example.
+
+## Refine
+
+The models fitted with powerfit can be further refined using the refine command.
+
+```shell
+protein-detective refine mysession fixed_structure.pdb
+```
 
 ### Metadata database
 

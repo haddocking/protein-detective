@@ -73,4 +73,4 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "24"
-      - uses: j178/prek-action@v1
+      - uses: j178/prek-action@4e14d07f9231acabce116ccfca13b13dd9755ece # v3.0.0
