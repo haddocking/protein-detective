@@ -91,7 +91,20 @@ def _write_ro_crate(
     )
 
 
-def _generate_config_body(run_dir: Path, fitted_model: Path, fixed_structure: Path, options: RefineOptions) -> str:
+def generate_haddock3_config_body(
+    run_dir: Path, fitted_model: Path, fixed_structure: Path, options: RefineOptions
+) -> str:
+    """Generate the configuration body for a HADDOCK3 refinement run.
+
+    Args:
+        run_dir: Path of the HADDOCK3 run directory.
+        fitted_model: Path to the fitted model file.
+        fixed_structure: Path to the fixed structure file.
+        options: RefineOptions object containing refinement parameters.
+
+    Returns:
+        A string representing the HADDOCK3 configuration body for the refinement run.
+    """
     return dedent(f"""\
         run_dir = "{run_dir}"
         mode = "local"
@@ -129,9 +142,19 @@ def _generate_config_body(run_dir: Path, fitted_model: Path, fixed_structure: Pa
         """)
 
 
-def _prepare_fixed_structure(fixed_structure: Path, refine_dir: Path, out_chain: str = "B") -> Path:
-    # Haddock3 does not work with mmcif so convert to pdb
-    # luckily fitted models are already pdb formatted.
+def prepare_fixed_structure(fixed_structure: Path, refine_dir: Path, out_chain: str = "B") -> Path:
+    """Prepare the fixed structure for refinement.
+
+    By converting it to PDB format and renaming chains if necessary.
+
+    Args:
+        fixed_structure: Path to the fixed structure file.
+        refine_dir: Directory where the refined structure will be saved.
+        out_chain: The chain identifier to rename to if necessary.
+
+    Returns:
+        Path to the prepared fixed structure in PDB format.
+    """
     fixed_structure_dest = refine_dir / "fixed_structure.pdb"
     structure = read_structure(fixed_structure)
 
@@ -188,7 +211,7 @@ def refine_structure_task(
     # setup_run refuses to start in a non-empty directory.
     refine_run_dir.parent.mkdir(parents=True, exist_ok=True)
     config_file = refine_run_dir.parent / f"{refine_run_dir.name}.cfg"
-    config_body = _generate_config_body(refine_run_dir, abs_fitted_model, fixed_structure, options)
+    config_body = generate_haddock3_config_body(refine_run_dir, abs_fitted_model, fixed_structure, options)
     config_file.write_text(config_body)
 
     _run_haddock3(config_file)
@@ -215,6 +238,16 @@ def refine_structures(
             "tqdm_unit": "file",
         },
     )
+
+
+def _write_io_csv(*, session_dir: Path, refine_dir: Path, refined: list[tuple[Path, Path]]) -> Path:
+    io_csv = refine_dir / "io.csv"
+    with io_csv.open("w") as f:
+        writer = csv.writer(f)
+        writer.writerow(["fitted_model", "refine_run_dir"])
+        for fitted_model, refine_run_dir in refined:
+            writer.writerow([fitted_model.relative_to(session_dir), refine_run_dir.relative_to])
+    return io_csv
 
 
 def refine_with_haddock3(
@@ -257,7 +290,7 @@ def refine_with_haddock3(
 
     refine_dir = session_dir / "refine"
     refine_dir.mkdir()
-    session_fixed_structure = _prepare_fixed_structure(fixed_structure, refine_dir)
+    session_fixed_structure = prepare_fixed_structure(fixed_structure, refine_dir)
 
     if scheduler_address == "sequential":
         context = _sequential_context()
@@ -276,11 +309,5 @@ def refine_with_haddock3(
             scheduler_address=real_scheduler_address,
         )
 
-    io_csv = refine_dir / "io.csv"
-    with io_csv.open("w") as f:
-        writer = csv.writer(f)
-        writer.writerow(["fitted_model", "refine_run_dir"])
-        for fitted_model, refine_run_dir in refined:
-            writer.writerow([fitted_model.relative_to(session_dir), refine_run_dir.relative_to])
-
+    io_csv = _write_io_csv(session_dir=session_dir, refine_dir=refine_dir, refined=refined)
     _write_ro_crate(session_dir, start_time, session_fixed_structure, refined, io_csv)
