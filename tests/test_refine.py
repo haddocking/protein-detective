@@ -49,7 +49,7 @@ class TestGenerateHaddock3ConfigBody:
             rigidbody_sampling=42,
             top_clusters=3,
             top_models=4,
-            water_refinement_sampling=7,
+            water_refinement_sampling_factor=7,
             ncores=8,
         )
 
@@ -86,7 +86,7 @@ class TestGenerateHaddock3ConfigBody:
             top_models = 4
 
             [mdref]
-            # sampling = 7
+            sampling_factor = 7
 
             [caprieval]
         """)
@@ -131,7 +131,7 @@ class TestGenerateHaddock3ConfigBody:
             top_models = 2
 
             [mdref]
-            # sampling = 5
+            sampling_factor = 1
 
             [caprieval]
         """)

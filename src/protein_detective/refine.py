@@ -30,14 +30,14 @@ class RefineOptions:
         rigidbody_sampling: Number of rigidbody samples.
         top_clusters: Number of top clusters to keep.
         top_models: Number of top models to keep.
-        water_refinement_sampling: Number of water refinement samples.
+        water_refinement_sampling_factor: Factor for determining the number of water refinement samples.
         ncores: Number of CPU cores to use.
     """
 
     rigidbody_sampling: PositiveInt = 1000
     top_clusters: PositiveInt = 10
     top_models: PositiveInt = 2
-    water_refinement_sampling: PositiveInt = 5
+    water_refinement_sampling_factor: PositiveInt = 1
     # TODO do not overload system as dask cluster and haddock3 ncores are independent
     # we expect there are more models to refined then there are CPU cores available
     ncores: PositiveInt = 1
@@ -136,7 +136,7 @@ def generate_haddock3_config_body(
         top_models = {options.top_models}
 
         [mdref]
-        # sampling = {options.water_refinement_sampling}
+        sampling_factor = {options.water_refinement_sampling_factor}
 
         [caprieval]
         """)
