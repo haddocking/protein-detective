@@ -32,7 +32,7 @@ class RefineOptions:
         top_models: Number of top models to keep.
         water_refinement_sampling_factor: Factor for determining the number of water refinement samples.
         water_refinement_solvent: Solvent used for water refinement. Can be "water", "dmso", or "none".
-        ncores: Number of CPU cores to use.
+        ncores: Number of CPU cores to use for a single fitted structure.
     """
 
     rigidbody_sampling: PositiveInt = 1000
@@ -40,8 +40,6 @@ class RefineOptions:
     top_models: PositiveInt = 2
     water_refinement_sampling_factor: PositiveInt = 1
     water_refinement_solvent: Literal["water", "dmso", "none"] = "none"
-    # TODO do not overload system as dask cluster and haddock3 ncores are independent
-    # we expect there are more models to refined then there are CPU cores available
     ncores: PositiveInt = 1
 
 
@@ -299,7 +297,7 @@ def refine_with_haddock3(
         context = _sequential_context()
     else:
         scheduler_name = "protein_detective_filter"
-        context = configure_dask_scheduler(scheduler_address, name=scheduler_name)
+        context = configure_dask_scheduler(scheduler_address, name=scheduler_name, nproc=options.ncores)
 
     structures_to_refine = [Path(f) for f in fitted_models_df["fitted_model_file"]]
     with context as cluster:
