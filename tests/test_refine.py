@@ -50,6 +50,7 @@ class TestGenerateHaddock3ConfigBody:
             top_clusters=3,
             top_models=4,
             water_refinement_sampling_factor=7,
+            water_refinement_solvent="dmso",
             ncores=8,
         )
 
@@ -87,6 +88,7 @@ class TestGenerateHaddock3ConfigBody:
 
             [mdref]
             sampling_factor = 7
+            solvent = "dmso"
 
             [caprieval]
         """)
@@ -132,6 +134,7 @@ class TestGenerateHaddock3ConfigBody:
 
             [mdref]
             sampling_factor = 1
+            solvent = "none"
 
             [caprieval]
         """)

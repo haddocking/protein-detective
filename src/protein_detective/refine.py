@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from textwrap import dedent
-from typing import Annotated
+from typing import Annotated, Literal
 
 import pandas as pd
 from cyclopts import Parameter, validators
@@ -31,6 +31,7 @@ class RefineOptions:
         top_clusters: Number of top clusters to keep.
         top_models: Number of top models to keep.
         water_refinement_sampling_factor: Factor for determining the number of water refinement samples.
+        water_refinement_solvent: Solvent used for water refinement. Can be "water", "dmso", or "none".
         ncores: Number of CPU cores to use.
     """
 
@@ -38,6 +39,7 @@ class RefineOptions:
     top_clusters: PositiveInt = 10
     top_models: PositiveInt = 2
     water_refinement_sampling_factor: PositiveInt = 1
+    water_refinement_solvent: Literal["water", "dmso", "none"] = "none"
     # TODO do not overload system as dask cluster and haddock3 ncores are independent
     # we expect there are more models to refined then there are CPU cores available
     ncores: PositiveInt = 1
@@ -137,6 +139,7 @@ def generate_haddock3_config_body(
 
         [mdref]
         sampling_factor = {options.water_refinement_sampling_factor}
+        solvent = "{options.water_refinement_solvent}"
 
         [caprieval]
         """)
