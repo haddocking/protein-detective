@@ -37,7 +37,7 @@ It uses
   format for haddock3, which requires PDB formatted input. It is also used by
   protein-quest.
 
-Diagram how protein-detective calls protein-quest and powerfit:
+Diagram how protein-detective calls protein-quest, powerfit and haddock3's refine:
 
 ```mermaid
 flowchart TB
@@ -79,7 +79,7 @@ flowchart TB
     M1[protein-detective powerfit fit-models]
     P1 -- "**/solutions.out" --> E1 & M1
 
-    R1[refine against fixed structure with haddock3]
+    R1[protein-detective refine]
     M1 -- "**/fit_*.pdb" --> R1
 
     classDef dashedBorder stroke-dasharray: 5 5;
