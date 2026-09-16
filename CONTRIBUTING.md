@@ -150,8 +150,8 @@ uv run pytest
 Some tests are skipped
 
 - when CUDA or OpenCL is available or not.
-- when they take too long for CI, for example a haddock3 refinement run
-  takes >20 minutes, they can be run with `pytest -m manual`
+- when they take too long for CI, for example a haddock3 refinement run takes >2
+  minutes, they can be run with `uv run pytest -m manual`
 
 ## Automated code quality checks on git commit
 
