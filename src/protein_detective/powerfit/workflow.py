@@ -38,12 +38,15 @@ def _find_structure_files(session_dir: Path) -> list[Path]:
     if not structure_files_dir.exists():
         msg = (
             f"Structure files directory '{structure_files_dir}' does not exist. "
-            "Please run `protein-detective filter` command."
+            "Please run `protein-detective candidates filter` command."
         )
         raise FileNotFoundError(msg)
     files = sorted(structure_files_dir.glob("*"))
     if not files:
-        msg = f"No structure files found in '{structure_files_dir}'. Please run `protein-detective filter` command."
+        msg = (
+            f"No structure files found in '{structure_files_dir}'. "
+            "Please run `protein-detective candidates filter` command."
+        )
         raise FileNotFoundError(msg)
     return files
 

@@ -41,7 +41,7 @@ Diagram how protein-detective calls protein-quest and powerfit:
 
 ```mermaid
 flowchart TB
-    subgraph search [protein-detective search]
+    subgraph search [protein-detective candidates search]
         direction TB
         S2[protein-quest search uniprot]
         S3[protein-quest search alphafold]
@@ -55,14 +55,14 @@ flowchart TB
     end
     search -- "UniProt accessions & PDB ids" --> retrieve
 
-    subgraph retrieve [protein-detective retrieve]
+    subgraph retrieve [protein-detective candidates retrieve]
         direction TB
         R2[protein-quest retrieve pdbe]
         R3[protein-quest retrieve alphafold]
     end
     retrieve -- "mmcif_files" --> filter
 
-    subgraph filter [protein-detective filter]
+    subgraph filter [protein-detective candidates filter]
         direction TB
         F2[protein-quest convert structures --uniprots]
         F3[protein-quest filter chain]
@@ -121,7 +121,7 @@ multiple subcommands to perform actions.
 ### Search Uniprot for structures
 
 ```shell
-protein-detective search \
+protein-detective candidates search \
     --taxon-id 9606 \
     --reviewed \
     --subcellular-location-uniprot nucleus \
@@ -141,7 +141,7 @@ In `./mysession` directory, you will find the search results.
 <summary>You can also include interaction partners in the search</summary>
 
 ```shell
-protein-detective search --verbose \
+protein-detective candidates search --verbose \
     --taxon-id 9606 \
     --reviewed \
     --subcellular-location-uniprot nucleus \
@@ -163,7 +163,7 @@ macromolecular [complex](https://www.ebi.ac.uk/complexportal/complex/CPX-6266).
 ### To retrieve a bunch of structures
 
 ```shell
-protein-detective retrieve ./mysession
+protein-detective candidates retrieve ./mysession
 ```
 
 In `./mysession` directory, you will find mmCIF files from PDBe and PDB files
@@ -184,14 +184,14 @@ Also uncompresses \*.cif.gz files to \*.cif files for compatibility with
 powerfit.
 
 ```shell
-protein-detective filter \
+protein-detective candidates filter \
     --min-confidence 50 \
     --min-residues 100 \
     --max-residues 1000 \
     ./mysession
 
 # or to filter on secondary structure having some helices
-protein-detective filter mysession --secondary.abs-min-helix-residues 40
+protein-detective candidates filter mysession --secondary.abs-min-helix-residues 40
 ```
 
 ### Import filtered structures
