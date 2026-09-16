@@ -33,6 +33,9 @@ It uses
   keep track of commands and their input/output files/directories.
 - [duckdb](https://duckdb.org/) to query CSV files like
   powerfit/\*/\*/solutions.out files.
+- [gemmi](https://gemmi.readthedocs.io/en/latest/) to convert mmCIF files to PDB
+  format for haddock3, which requires PDB formatted input. It is also used by
+  protein-quest.
 
 Diagram how protein-detective calls protein-quest and powerfit:
 
