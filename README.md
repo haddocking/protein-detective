@@ -20,6 +20,8 @@ It uses
   retrieve and filter protein structures from Uniprot, PDBe and AlphaFold DB.
 - [powerfit](https://pypi.org/project/powerfit-em/) to fit protein structure in
   a Electron Microscopy (EM) density map.
+- [haddock3](https://www.bonvinlab.org/haddock3) to refine fitted protein
+  structures against a fixed structure.
 - [cyclopts](https://cyclopts.readthedocs.io/en/latest/) for command line
   interface
 - [molviewspec](https://molstar.org/mol-view-spec/) to visualize the fitted
@@ -31,8 +33,12 @@ It uses
   keep track of commands and their input/output files/directories.
 - [duckdb](https://duckdb.org/) to query CSV files like
   powerfit/\*/\*/solutions.out files.
+- [gemmi](https://gemmi.readthedocs.io/en/latest/) to convert mmCIF files to PDB
+  format for haddock3, which requires PDB formatted input. It is also used by
+  protein-quest.
 
-Diagram how protein-detective calls protein-quest and powerfit:
+Diagram how protein-detective calls protein-quest, powerfit and haddock3's
+refine:
 
 ```mermaid
 flowchart TB
@@ -73,6 +79,9 @@ flowchart TB
     E1[protein-detective powerfit report]
     M1[protein-detective powerfit fit-models]
     P1 -- "**/solutions.out" --> E1 & M1
+
+    R1[protein-detective refine]
+    M1 -- "**/fit_*.pdb" --> R1
 
     classDef dashedBorder stroke-dasharray: 5 5;
     S6:::dashedBorder
@@ -349,6 +358,14 @@ and `unfitted_model_file` is the original structure file.
 The results can also be visualized see
 [visualization.ipynb](https://bonvinlab.org/protein-detective/docs/visualization.html)
 for an example.
+
+## Refine
+
+The models fitted with powerfit can be further refined using the refine command.
+
+```shell
+protein-detective refine mysession fixed_structure.pdb
+```
 
 ### Metadata database
 
