@@ -11,6 +11,7 @@ from protein_detective.refine import (
     prepare_fixed_structure,
     refine_with_haddock3,
 )
+from tests.helpers import assert_crate, assert_lines
 
 
 class TestPrepareFixedStructure:
@@ -61,6 +62,7 @@ class TestGenerateHaddock3ConfigBody:
             mode = "local"
             ncores = 8
             clean = true
+            postprocess = true
 
             molecules = [
                 "{fitted_model}",
@@ -107,6 +109,7 @@ class TestGenerateHaddock3ConfigBody:
             mode = "local"
             ncores = 1
             clean = true
+            postprocess = true
 
             molecules = [
                 "{fitted_model}",
@@ -161,6 +164,36 @@ def test_refine_with_haddock3(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Pa
         fixed_structure,
         options=RefineOptions(
             rigidbody_sampling=10,
+            ncores=6,
+            # TODO use -1 see https://github.com/haddocking/haddock3/issues/1691
+            # ncores=-1, # as its manual use all cpu cores available  # noqa: ERA001
         ),
         scheduler_address="sequential",
     )
+
+    assert (session_dir / "refine/run_001/fakestructure.cif/fit_1.pdb/6_mdref/mdref_1.pdb.gz").exists()
+    expected_io_csv_lines = {
+        "fitted_model,refine_run_dir",
+        "powerfit/run_001/fakestructure.cif/fit_1.pdb,refine/run_001/fakestructure.cif/fit_1.pdb",
+    }
+    assert_lines(session_dir / "refine/io.csv", expected_io_csv_lines)
+    crate_input_ids = {
+        "refine/fixed_structure.pdb",
+        "powerfit/run_001/fakestructure.cif/fit_1.pdb",
+    }
+    crate_output_ids = {
+        "refine/io.csv",
+        "refine/run_001/fakestructure.cif/fit_1.pdb/",
+    }
+    _, expected_action = assert_crate(
+        Path("manual-refine-test-output/session"),
+        input_ids=crate_input_ids,
+        output_ids=crate_output_ids,
+    )
+    _, actual_action = assert_crate(
+        session_dir,
+        input_ids=crate_input_ids,
+        output_ids=crate_output_ids,
+    )
+    assert {i["@id"] for i in actual_action["object"]} == {i["@id"] for i in expected_action["object"]}
+    assert {o["@id"] for o in actual_action["result"]} == {o["@id"] for o in expected_action["result"]}

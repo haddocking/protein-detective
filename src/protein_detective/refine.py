@@ -22,6 +22,14 @@ from protein_detective.common_cli import write_ro_crate
 from protein_detective.filter import _sequential_context
 
 
+def _validate_ncores(_type: object, value: object) -> None:
+    if not isinstance(value, int):
+        return
+    if value != -1 and value <= 0:
+        msg = "Must be -1 or > 0."
+        raise ValueError(msg)
+
+
 @dataclass
 class RefineOptions:
     """Options for refining a structure with HADDOCK3.
@@ -31,8 +39,9 @@ class RefineOptions:
         top_clusters: Number of top clusters to keep.
         top_models: Number of top models to keep.
         water_refinement_sampling_factor: Factor for determining the number of water refinement samples.
-        water_refinement_solvent: Solvent used for water refinement. Can be "water", "dmso", or "none".
+        water_refinement_solvent: Solvent used for water refinement.
         ncores: Number of CPU cores to use for a single fitted structure.
+            Use -1 for all CPU cores available.
     """
 
     rigidbody_sampling: PositiveInt = 1000
@@ -40,7 +49,7 @@ class RefineOptions:
     top_models: PositiveInt = 2
     water_refinement_sampling_factor: PositiveInt = 1
     water_refinement_solvent: Literal["water", "dmso", "none"] = "none"
-    ncores: PositiveInt = 1
+    ncores: Annotated[int, Parameter(validator=_validate_ncores)] = 1
 
 
 def _write_ro_crate(
@@ -110,6 +119,7 @@ def generate_haddock3_config_body(
         mode = "local"
         ncores = {options.ncores}
         clean = true
+        postprocess = true
 
         molecules = [
             "{fitted_model}",
@@ -247,7 +257,7 @@ def _write_io_csv(*, session_dir: Path, refine_dir: Path, refined: list[tuple[Pa
         writer = csv.writer(f)
         writer.writerow(["fitted_model", "refine_run_dir"])
         for fitted_model, refine_run_dir in refined:
-            writer.writerow([fitted_model.relative_to(session_dir), refine_run_dir.relative_to])
+            writer.writerow([fitted_model.relative_to(session_dir), refine_run_dir.relative_to(session_dir)])
     return io_csv
 
 
