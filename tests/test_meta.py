@@ -1,7 +1,9 @@
 import json
 from pathlib import Path
 
-from protein_detective.meta import in_memory_duckdb_connection, solutions_as_duckdb_ddl
+import duckdb
+
+from protein_detective.meta import ddl, in_memory_duckdb_connection, solutions_as_duckdb_ddl
 
 
 def test_solutions_ddl_requires_fittable_structures_and_solutions(tmp_path: Path):
@@ -405,3 +407,26 @@ def test_fitted_models_table_is_absent_without_csv(tmp_path: Path):
     tables = [row[0] for row in con.execute("SHOW TABLES").fetchall()]
 
     assert "fitted_models" not in tables
+
+
+def test_refine_io_is_loaded_with_ctas(tmp_path: Path):
+    session_dir = tmp_path / "session"
+    refine_dir = session_dir / "refine"
+    refine_dir.mkdir(parents=True)
+    (refine_dir / "io.csv").write_text(
+        "fitted_model,refine_run_dir\npowerfit/run_001/model.pdb,refine/run_001/model.pdb\n"
+    )
+
+    statements = ddl(session_dir)
+    io_statement = next(statement for statement in statements if "CREATE TABLE refinements_io" in statement[0])
+    con = duckdb.connect(database=":memory:")
+    con.execute(*io_statement)
+
+    rows = con.execute("SELECT fitted_model, refine_run_dir FROM refinements_io").fetchall()
+
+    assert rows == [
+        (
+            "powerfit/run_001/model.pdb",
+            "refine/run_001/model.pdb",
+        )
+    ]

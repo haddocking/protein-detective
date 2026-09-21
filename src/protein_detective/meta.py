@@ -225,6 +225,19 @@ def _alphafold_retrieve_stats_csv_as_duckdb_ddl(
     ]
 
 
+def _refinements_io_csv_as_duckdb_ddl(refine_io_csv: Path) -> list[DDLStatement]:
+    return [
+        (
+            """\
+            CREATE TABLE refinements_io AS
+            SELECT *
+            FROM read_csv($refine_io_csv);
+            """,
+            {"refine_io_csv": str(refine_io_csv)},
+        ),
+    ]
+
+
 def _search_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     statements: list[DDLStatement] = []
     uniprot_txt = session_dir / "uniprot.txt"
@@ -293,6 +306,10 @@ def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     fitted_models_csv = session_dir / "powerfit" / "fitted_models.csv"
     if fitted_models_csv.exists():
         statements.extend(_fitted_models_csv_as_duckdb_ddl(fitted_models_csv))
+
+    refine_io_csv = session_dir / "refine" / "io.csv"
+    if refine_io_csv.exists():
+        statements.extend(_refinements_io_csv_as_duckdb_ddl(refine_io_csv))
 
     return statements
 
