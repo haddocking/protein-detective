@@ -87,12 +87,12 @@ docs = [
     "ipywidgets>=8.1.7",
     "jupysql>=0.11.1",
     "matplotlib>=3.10.3",
-    "mkdocs>=1.6.1",
     "mkdocs-autoapi>=0.4.1",
     "mkdocs-jupyter>=0.25.1",
-    "mkdocs-material>=9.6.22",
-    "mkdocstrings[python]>=0.30.1",
+    "mkdocs-materialx>=10.2.0",
+    "mkdocstrings-python>=2.0.2",
     "nbconvert>=7.16.6",
+    "properdocs>=1.6.7",
 ]
 
 [build-system]
