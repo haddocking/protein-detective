@@ -154,6 +154,11 @@ erDiagram
     "fittable_structures" ||--o{ "fitted_models" : "structure = structure"
     "structure_files" ||--o{ "fitted_models" : "file = fitted_model_file"
     "structure_files" ||--o{ "fitted_models" : "file = unfitted_model_file"
+    "refinements_io" {
+      VARCHAR fitted_model FK
+      VARCHAR refine_run_dir
+    }
+    "fitted_models" ||--o{ "refinements_io" : "fitted_model_file = fitted_model"
     "structure_files" {
       VARCHAR file PK
       VARCHAR parent_dir
