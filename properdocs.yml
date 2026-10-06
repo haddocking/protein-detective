@@ -1,23 +1,34 @@
 site_name: Protein Detective
 site_url: https://bonvinlab.org/protein_detective
+site_description: Deduce the protein from an EM density map.
 repo_name: haddocking/protein-detective
 repo_url: https://github.com/haddocking/protein-detective
-watch: [mkdocs.yml, README.md, src/protein_detective]
+edit_uri: edit/main/docs/
+watch: [properdocs.yml, README.md, src/protein_detective]
 use_directory_urls: false
 theme:
-  name: material
+  name: materialx
+  code:
+    fold:
+      enabled: true
   features:
     - navigation.instant
     - navigation.tabs
     - navigation.tabs.sticky
+    - navigation.footer
+    - navigation.sections
     - content.code.copy
+    - content.action.view
+    - content.action.agents
+    - search.highlight
+    - search.share
+    - toc.follow
+  topbar_style: primary
   palette:
-    # Palette toggle for automatic mode
     - media: "(prefers-color-scheme)"
       toggle:
         icon: material/brightness-auto
         name: Switch to light mode
-    # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
       primary: teal
@@ -25,7 +36,6 @@ theme:
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-    # Palette toggle for dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       primary: teal
@@ -33,14 +43,12 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to system preference
+  icon:
+    repo: fontawesome/brands/github
 
 plugins:
   - search
   - autorefs
-  - mkdocs-jupyter:
-      remove_tag_config:
-        remove_input_tags:
-          - hide_code
   - mkdocs-autoapi:
       autoapi_dir: src
   - mkdocstrings:
@@ -57,10 +65,27 @@ plugins:
           options:
             docstring_style: google
             show_source: false
+  - mkdocs-jupyter:
+      remove_tag_config:
+        remove_input_tags:
+          - hide_code
   - cyclopts
 
 markdown_extensions:
-  # Use to render part of README as home
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      toc_depth: 4
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
   - pymdownx.snippets:
       base_path: [!relative $config_dir]
       check_paths: true
@@ -70,6 +95,17 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
 
 nav:
   - Home: index.md
