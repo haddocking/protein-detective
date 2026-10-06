@@ -80,13 +80,19 @@ flowchart TB
     M1[protein-detective powerfit fit-models]
     P1 -- "**/solutions.out" --> E1 & M1
 
-    R1[protein-detective refine]
-    M1 -- "**/fit_*.pdb" --> R1
+    subgraph refine [protein-detective refine]
+        R1[haddock3 refine-fitted2fixed.cfg]
+    end
+    M1 -- "**/fit_*.pdb" --> refine
+
+    META[protein-detective meta]
+    refine -- session/ --> META
 
     classDef dashedBorder stroke-dasharray: 5 5;
     S6:::dashedBorder
     F5:::dashedBorder
     I1:::dashedBorder
+    META:::dashedBorder
 ```
 
 (Dashed nodes are optional) (The Mermaid figure might not be rendered, see
@@ -361,7 +367,8 @@ for an example.
 
 ## Refine
 
-The models fitted with powerfit can be further refined using the refine command.
+The models fitted with powerfit can be further refined using the refine command
+using haddock3.
 
 ```shell
 protein-detective refine mysession fixed_structure.pdb

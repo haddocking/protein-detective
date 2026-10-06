@@ -225,6 +225,19 @@ def _alphafold_retrieve_stats_csv_as_duckdb_ddl(
     ]
 
 
+def _refinements_io_csv_as_duckdb_ddl(refine_io_csv: Path) -> list[DDLStatement]:
+    return [
+        (
+            """\
+            CREATE TABLE refinements_io AS
+            SELECT *
+            FROM read_csv($refine_io_csv);
+            """,
+            {"refine_io_csv": str(refine_io_csv)},
+        ),
+    ]
+
+
 def _search_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     statements: list[DDLStatement] = []
     uniprot_txt = session_dir / "uniprot.txt"
@@ -294,6 +307,10 @@ def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     if fitted_models_csv.exists():
         statements.extend(_fitted_models_csv_as_duckdb_ddl(fitted_models_csv))
 
+    refine_io_csv = session_dir / "refine" / "io.csv"
+    if refine_io_csv.exists():
+        statements.extend(_refinements_io_csv_as_duckdb_ddl(refine_io_csv))
+
     return statements
 
 
@@ -338,12 +355,43 @@ def solutions_as_duckdb_ddl(session_dir: Path, powerfit_run_id: str | None = Non
     ]
 
 
+def capri_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    """Load final CAPRI results with session-relative refinement run keys.
+
+    Read 7_caprieval only, excluding earlier stages and postprocessed copies
+    under analysis/. Like solutions, the keys describe relationships without
+    adding database foreign key constraints.
+    """
+    statements: list[DDLStatement] = []
+    for table in ("capri_ss", "capri_clt"):
+        pattern = Path("refine") / "*" / "*" / "*" / "7_caprieval" / f"{table}.tsv"
+        if not any(session_dir.glob(str(pattern))):
+            continue
+        statements.append(
+            (
+                f"""\
+                CREATE TABLE refinements_{table} AS
+                SELECT
+                    replace(parse_dirpath(parse_dirpath(filename)), $session_dir || '/', '') AS refine_run_dir,
+                    * EXCLUDE (filename)
+                FROM read_csv(
+                    $capri_pattern, delim = '\t', header = true, comment = '#',
+                    nullstr = '-', filename = true, normalize_names = true, union_by_name = true
+                );
+                """,  # noqa: S608 -- table is one of the two hardcoded CAPRI table names.
+                {"capri_pattern": str(session_dir / pattern), "session_dir": str(session_dir)},
+            )
+        )
+    return statements
+
+
 def ddl(session_dir: Path, powerfit_run_id: str | None = None) -> list[DDLStatement]:
     statements: list[DDLStatement] = []
     statements.extend(structure_files_as_duckdb_ddl(session_dir))
     statements.extend(rocrate_as_duckdb_ddl(session_dir))
     statements.extend(stats_csv_as_duckdb_ddl(session_dir))
     statements.extend(solutions_as_duckdb_ddl(session_dir, powerfit_run_id=powerfit_run_id))
+    statements.extend(capri_as_duckdb_ddl(session_dir))
     return statements
 
 
