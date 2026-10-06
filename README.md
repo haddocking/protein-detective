@@ -361,7 +361,7 @@ for an example.
 
 ## Refine
 
-The models fitted with powerfit can be further refined using the refine command.
+The models fitted with powerfit can be further refined using the refine command using haddock3.
 
 ```shell
 protein-detective refine mysession fixed_structure.pdb

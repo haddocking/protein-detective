@@ -2,9 +2,11 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
+from cyclopts import ValidationError
 from protein_quest.structure.chains import chains_in_structure
 from protein_quest.structure.formats import read_structure, write_structure
 
+from protein_detective.cli import app
 from protein_detective.refine import (
     RefineOptions,
     generate_haddock3_config_body,
@@ -12,6 +14,18 @@ from protein_detective.refine import (
     refine_with_haddock3,
 )
 from tests.helpers import assert_crate, assert_lines
+
+
+@pytest.mark.parametrize("ncores", [-2, -1, 0])
+def test_refine_cli_rejects_nonpositive_ncores(tmp_path: Path, ncores: int):
+    fixed_structure = tmp_path / "fixed.pdb"
+    fixed_structure.touch()
+    with pytest.raises(ValidationError, match="Must be > 0"):
+        app.parse_args(
+            ["refine", str(tmp_path), str(fixed_structure), "--ncores", str(ncores)],
+            exit_on_error=False,
+            print_error=False,
+        )
 
 
 class TestPrepareFixedStructure:
@@ -165,8 +179,6 @@ def test_refine_with_haddock3(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Pa
         options=RefineOptions(
             rigidbody_sampling=10,
             ncores=6,
-            # TODO use -1 see https://github.com/haddocking/haddock3/issues/1691
-            # ncores=-1, # as its manual use all cpu cores available  # noqa: ERA001
         ),
         scheduler_address="sequential",
     )

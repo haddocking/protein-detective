@@ -101,3 +101,8 @@ repos:
       - id: markdownlint-cli2
         args: ["--fix"]
         exclude: "docs/(index|CONTRIBUTING).md" # lint does not understand pymdownx extensions
+
+  - repo: https://github.com/i-VRESSE/python-mock-hooks
+    rev: v0.2.0
+    hooks:
+      - id: python-mock-hooks
