@@ -1,15 +1,3 @@
-# TODO subcommand like powerfit make a `refine run` and `refine report` subcommands.
-# TODO like powerfit command make refine run ids
-# so a run with different fixed structure+refine options can be saved in a subdir.
-# TODO the refine and powerfit commands use different naming methods,
-# either use underlying tool name like haddock3/powerfit or
-# what it does refine (known fixed structure)/fit (em density volume).
-# I prefer what it does as tooling can change underneath without affecting the command name.
-# TODO sometimes mid way a running command it stops unexpectedly,
-# would be nice if you could ask protein-detective to remove incomplete runs or resume them.
-# TODO haddock score before refinement, by taking first caprieval_2 haddock3 score
-# instead of looking visually at fitted and refined structures.
-# TODO the `refine report` command should contain an uniprot accessions column, top N capri cluster
 import csv
 from dataclasses import dataclass
 from datetime import UTC, datetime
