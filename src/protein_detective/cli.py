@@ -10,7 +10,7 @@ from protein_detective.filter import run_filter
 from protein_detective.import_structures import import_structures
 from protein_detective.meta import create_meta_duckdb
 from protein_detective.powerfit.cli import powerfit_app
-from protein_detective.refine import refine_with_haddock3
+from protein_detective.refine.cli import refine_app
 from protein_detective.retrieve import retrieve
 from protein_detective.search import search
 
@@ -37,6 +37,8 @@ app.command(candidates_app)
 powerfit_app.group = workflow_group
 powerfit_app.sort_key = 1
 app.command(powerfit_app)
-app.command(refine_with_haddock3, name="refine", group=workflow_group, sort_key=2)
+refine_app.group = workflow_group
+refine_app.sort_key = 2
+app.command(refine_app)
 app.command(import_structures, group=utilities_group, sort_key=1)
 app.command(create_meta_duckdb, name="meta", group=utilities_group, sort_key=0)

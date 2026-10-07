@@ -80,7 +80,7 @@ flowchart TB
     M1[protein-detective powerfit fit-models]
     P1 -- "**/solutions.out" --> E1 & M1
 
-    subgraph refine [protein-detective refine]
+    subgraph refine [protein-detective refine run]
         R1[haddock3 refine-fitted2fixed.cfg]
     end
     M1 -- "**/fit_*.pdb" --> refine
@@ -371,7 +371,8 @@ The models fitted with powerfit can be further refined using the refine command
 using haddock3.
 
 ```shell
-protein-detective refine mysession fixed_structure.pdb
+protein-detective refine run mysession fixed_structure.pdb
+protein-detective refine list-runs mysession
 ```
 
 ### Metadata database

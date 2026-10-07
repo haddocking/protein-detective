@@ -12,13 +12,13 @@ from rocrate.metadata import BASENAME
 from protein_detective.common_cli import rprint
 from protein_detective.powerfit.workflow import powerfit_solutions_query
 
-DDLStatement = tuple[str, dict[str, str]]
+DDLStatement = tuple[str, dict[str, str | list[str]]]
 """SQL DDL statement and named parameters (use $ prefix in SQL) to be passed to DuckDB connection.execute()"""
 
 
 def rocrate_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     rocrate_path = session_dir / BASENAME
-    params = {"rocrate_path": str(rocrate_path)}
+    params: dict[str, str | list[str]] = {"rocrate_path": str(rocrate_path)}
     return [
         (
             """\
@@ -225,15 +225,52 @@ def _alphafold_retrieve_stats_csv_as_duckdb_ddl(
     ]
 
 
-def _refinements_io_csv_as_duckdb_ddl(refine_io_csv: Path) -> list[DDLStatement]:
+def refinement_run_io_paths(session_dir: Path, refine_run_id: str | None = None) -> list[Path]:
+    """Find paths to refinement run IO mapping files.
+
+    Args:
+        session_dir: Session directory containing refinement runs.
+        refine_run_id: Run to select; when omitted, include all runs.
+
+    Returns:
+        Matching per-run IO indexes, ordered by path; empty if no runs exist.
+
+    Raises:
+        ValueError: The requested refinement run has no IO index.
+    """
+    indexes = sorted((session_dir / "refine").glob("*/io.csv"))
+    if refine_run_id is not None:
+        indexes = [p for p in indexes if p.parent.name == refine_run_id]
+        if not indexes:
+            msg = f"Unknown refinement run ID: {refine_run_id}"
+            raise ValueError(msg)
+    return indexes
+
+
+def refinements_io_as_duckdb_ddl(session_dir: Path, refine_run_id: str | None = None) -> list[DDLStatement]:
+    """Build the statements that load refinement input/output mappings.
+
+    Args:
+        session_dir: Session directory containing refinement runs.
+        refine_run_id: Run to select; when omitted, include all runs.
+
+    Returns:
+        SQL statements and bound parameters for creating refinements_io from
+        matching run indexes; empty if no indexes exist.
+
+    Raises:
+        ValueError: The requested refinement run has no IO index.
+    """
+    indexes = refinement_run_io_paths(session_dir=session_dir, refine_run_id=refine_run_id)
+    if not indexes:
+        return []
     return [
         (
             """\
             CREATE TABLE refinements_io AS
-            SELECT *
-            FROM read_csv($refine_io_csv);
+            SELECT * FROM read_csv($indexes, all_varchar = true);
             """,
-            {"refine_io_csv": str(refine_io_csv)},
+            {"indexes": [str(index) for index in indexes]},
         ),
     ]
 
@@ -307,9 +344,7 @@ def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     if fitted_models_csv.exists():
         statements.extend(_fitted_models_csv_as_duckdb_ddl(fitted_models_csv))
 
-    refine_io_csv = session_dir / "refine" / "io.csv"
-    if refine_io_csv.exists():
-        statements.extend(_refinements_io_csv_as_duckdb_ddl(refine_io_csv))
+    statements.extend(refinements_io_as_duckdb_ddl(session_dir))
 
     return statements
 
@@ -364,8 +399,9 @@ def capri_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     """
     statements: list[DDLStatement] = []
     for table in ("capri_ss", "capri_clt"):
-        pattern = Path("refine") / "*" / "*" / "*" / "7_caprieval" / f"{table}.tsv"
-        if not any(session_dir.glob(str(pattern))):
+        pattern = Path("refine") / "*" / "*" / "*" / "*" / "7_caprieval" / f"{table}.tsv"
+        files = sorted(str(path) for path in session_dir.glob(str(pattern)))
+        if not files:
             continue
         statements.append(
             (
@@ -379,7 +415,7 @@ def capri_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
                     nullstr = '-', filename = true, normalize_names = true, union_by_name = true
                 );
                 """,  # noqa: S608 -- table is one of the two hardcoded CAPRI table names.
-                {"capri_pattern": str(session_dir / pattern), "session_dir": str(session_dir)},
+                {"capri_pattern": files, "session_dir": str(session_dir)},
             )
         )
     return statements

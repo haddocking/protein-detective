@@ -5,7 +5,13 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from protein_detective.meta import capri_as_duckdb_ddl, ddl, in_memory_duckdb_connection, solutions_as_duckdb_ddl
+from protein_detective.meta import (
+    capri_as_duckdb_ddl,
+    ddl,
+    in_memory_duckdb_connection,
+    refinements_io_as_duckdb_ddl,
+    solutions_as_duckdb_ddl,
+)
 
 
 def test_solutions_ddl_requires_fittable_structures_and_solutions(tmp_path: Path):
@@ -413,10 +419,11 @@ def test_fitted_models_table_is_absent_without_csv(tmp_path: Path):
 
 def test_refine_io_is_loaded_with_ctas(tmp_path: Path):
     session_dir = tmp_path / "session"
-    refine_dir = session_dir / "refine"
+    refine_dir = session_dir / "refine/refine_run_001"
     refine_dir.mkdir(parents=True)
     (refine_dir / "io.csv").write_text(
-        "fitted_model,refine_run_dir\npowerfit/run_001/model.pdb,refine/run_001/model.pdb\n"
+        "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
+        "refine_run_001,run_001,powerfit/run_001/structure/model.pdb,refine/refine_run_001/run_001/structure/model.pdb\n"
     )
 
     statements = ddl(session_dir)
@@ -428,8 +435,8 @@ def test_refine_io_is_loaded_with_ctas(tmp_path: Path):
 
     assert rows == [
         (
-            "powerfit/run_001/model.pdb",
-            "refine/run_001/model.pdb",
+            "powerfit/run_001/structure/model.pdb",
+            "refine/refine_run_001/run_001/structure/model.pdb",
         )
     ]
 
@@ -439,11 +446,14 @@ def test_capri_tables_join_refinement_runs_and_only_load_final_stage(tmp_path: P
     session_dir = tmp_path / "session with spaces"
     refine_dir = session_dir / "refine"
     refine_dir.mkdir(parents=True)
-    run_dirs = [f"refine/run_00{i}/structure.cif/fit_1.pdb" for i in (1, 2)]
-    (refine_dir / "io.csv").write_text(
-        "fitted_model,refine_run_dir\n"
-        + "".join(f"powerfit/run_00{i}/structure.cif/fit_1.pdb,{run_dir}\n" for i, run_dir in enumerate(run_dirs, 1))
-    )
+    run_dirs = [f"refine/refine_run_00{i}/run_001/structure.cif/fit_1.pdb" for i in (1, 2)]
+    for i, run_dir in enumerate(run_dirs, 1):
+        index = refine_dir / f"refine_run_00{i}" / "io.csv"
+        index.parent.mkdir()
+        index.write_text(
+            "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
+            f"refine_run_00{i},run_001,powerfit/run_001/structure.cif/fit_1.pdb,{run_dir}\n"
+        )
     fixture = Path(__file__).parent / "fixtures" / "refine" / f"{table}.tsv"
     for run_dir in run_dirs:
         for step in ("2_caprieval", "7_caprieval"):
@@ -456,7 +466,7 @@ def test_capri_tables_join_refinement_runs_and_only_load_final_stage(tmp_path: P
         shutil.copyfile(fixture, analysis_dir / f"{table}.tsv")
 
     # Include results from runs not recorded in refinements_io.
-    orphan_dir = refine_dir / "run_003" / "structure.cif" / "fit_1.pdb" / "7_caprieval"
+    orphan_dir = refine_dir / "refine_run_003" / "run_001" / "structure.cif" / "fit_1.pdb" / "7_caprieval"
     orphan_dir.mkdir(parents=True)
     shutil.copyfile(fixture, orphan_dir / f"{table}.tsv")
 
@@ -559,7 +569,7 @@ def test_capri_tables_join_refinement_runs_and_only_load_final_stage(tmp_path: P
 
 def test_capri_ddl_loads_without_refinement_io_and_skips_missing_tables(tmp_path: Path):
     assert capri_as_duckdb_ddl(tmp_path) == []
-    stage_dir = tmp_path / "refine" / "run_001" / "structure" / "fit_1.pdb" / "7_caprieval"
+    stage_dir = tmp_path / "refine" / "refine_run_001" / "run_001" / "structure" / "fit_1.pdb" / "7_caprieval"
     stage_dir.mkdir(parents=True)
     results = stage_dir / "capri_ss.tsv"
     shutil.copyfile(Path(__file__).parent / "fixtures/refine/capri_ss.tsv", results)
@@ -571,3 +581,27 @@ def test_capri_ddl_loads_without_refinement_io_and_skips_missing_tables(tmp_path
         assert con.table("refinements_capri_ss").count("*").fetchone() == (10,)
     results.unlink()
     assert capri_as_duckdb_ddl(tmp_path) == []
+
+
+def test_multiple_refinement_indexes_load_together(tmp_path: Path):
+    for run_id in ("refine_run_001", "refine_run_003"):
+        model_run = f"refine/{run_id}/run_001/same_structure/fit_1.pdb"
+        index = tmp_path / "refine" / run_id / "io.csv"
+        index.parent.mkdir(parents=True)
+        index.write_text(
+            "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
+            f"{run_id},run_001,powerfit/run_001/same_structure/fit_1.pdb,{model_run}\n"
+        )
+        stage = tmp_path / model_run / "7_caprieval"
+        stage.mkdir(parents=True)
+        (stage / "capri_ss.tsv").write_text("model\tscore\tcaprieval_rank\tcluster_id\nx.pdb\t-10\t1\t-\n")
+    with duckdb.connect() as con:
+        for statement, params in refinements_io_as_duckdb_ddl(tmp_path) + capri_as_duckdb_ddl(tmp_path):
+            con.execute(statement, params)
+        assert con.execute(
+            "SELECT count(*) FROM refinements_io JOIN refinements_capri_ss USING (refine_run_dir)"
+        ).fetchone() == (2,)
+        assert con.execute("SELECT DISTINCT refine_run_id FROM refinements_io ORDER BY 1").fetchall() == [
+            ("refine_run_001",),
+            ("refine_run_003",),
+        ]
