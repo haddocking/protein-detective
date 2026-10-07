@@ -1,3 +1,15 @@
+# TODO subcommand like powerfit make a `refine run` and `refine report` subcommands.
+# TODO like powerfit command make refine run ids
+# so a run with different fixed structure+refine options can be saved in a subdir.
+# TODO the refine and powerfit commands use different naming methods,
+# either use underlying tool name like haddock3/powerfit or
+# what it does refine (known fixed structure)/fit (em density volume).
+# I prefer what it does as tooling can change underneath without affecting the command name.
+# TODO sometimes mid way a running command it stops unexpectedly,
+# would be nice if you could ask protein-detective to remove incomplete runs or resume them.
+# TODO haddock score before refinement, by taking first caprieval_2 haddock3 score
+# instead of looking visually at fitted and refined structures.
+# TODO the `refine report` command should contain an uniprot accessions column, top N capri cluster
 import csv
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -6,7 +18,7 @@ from textwrap import dedent
 from typing import Annotated, Literal
 
 import pandas as pd
-from cyclopts import Parameter, validators
+from cyclopts import Group, Parameter, validators
 from cyclopts.types import PositiveInt
 from haddock.core.defaults import RUNDIR
 from haddock.gear.prepare_run import setup_run
@@ -145,15 +157,19 @@ def generate_haddock3_config_body(
         """)
 
 
-def prepare_fixed_structure(fixed_structure: Path, refine_dir: Path, out_chain: str = "B") -> Path:
+def prepare_fixed_structure(
+    fixed_structure: Path, refine_dir: Path, out_chain: str = "B", *, remove_fixed_chains: set[str] | None = None
+) -> Path:
     """Prepare the fixed structure for refinement.
 
-    By converting it to PDB format and renaming chains if necessary.
+    By removing selected chains, converting it to PDB format and renaming chains if necessary.
 
     Args:
         fixed_structure: Path to the fixed structure file.
         refine_dir: Directory where the refined structure will be saved.
         out_chain: The chain identifier to rename to if necessary.
+        remove_fixed_chains: Original chain identifiers to remove from every model before renaming.
+            For mmCIF inputs, use author chain identifiers (auth_asym_id).
 
     Returns:
         Path to the prepared fixed structure in PDB format.
@@ -161,19 +177,23 @@ def prepare_fixed_structure(fixed_structure: Path, refine_dir: Path, out_chain: 
     fixed_structure_dest = refine_dir / "fixed_structure.pdb"
     structure = read_structure(fixed_structure)
 
-    chains = chains_in_structure(structure)
-    # Chain rename logic from include/gemmi/modify.hpp:rename_chain
-    if chains != {out_chain}:
-        for residue in structure.mod_residues:
-            residue.chain_name = out_chain
-        for refinement in structure.meta.refinement:
-            for group in refinement.tls_groups:
-                for selection in group.selections:
-                    selection.chain = out_chain
+    if remove_fixed_chains:
+        chains_to_remove = remove_fixed_chains
+        chain_names = {chain.name for chain in chains_in_structure(structure)}
+        missing_chains = chains_to_remove - chain_names
+        if missing_chains:
+            msg = f"Chains not found in fixed structure: {', '.join(sorted(missing_chains))}"
+            raise ValueError(msg)
+        if not chain_names - chains_to_remove:
+            msg = "Cannot remove all chains from the fixed structure."
+            raise ValueError(msg)
         for model in structure:
-            for chain in model:
-                if chain != out_chain:
-                    chain.name = out_chain
+            for chain_name in chains_to_remove:
+                model.remove_chain(chain_name)
+
+    chain_names = {chain.name for chain in chains_in_structure(structure)}
+    for chain_name in chain_names - {out_chain}:
+        structure.rename_chain(chain_name, out_chain)
 
     write_structure(structure, fixed_structure_dest)
     return fixed_structure_dest
@@ -258,7 +278,9 @@ def refine_with_haddock3(
     fixed_structure: Annotated[Path, Parameter(validator=validators.Path(file_okay=True, dir_okay=False, exists=True))],
     /,
     *,
-    options: Annotated[RefineOptions, Parameter(name="*")] | None = None,
+    refine_options: Annotated[RefineOptions, Parameter(name="*", group=Group("Refine options", sort_key=0))]
+    | None = None,
+    remove_fixed_chains: Annotated[set[str] | None, Parameter(negative="")] = None,
     powerfit_run_id: str | None = None,
     scheduler_address: str | None = None,
     _: Common | None = None,
@@ -274,18 +296,24 @@ def refine_with_haddock3(
             The fixed structure should be in the same coordinate system as the fitted structure.
             The fixed structure should contain the known structures in the volume.
             Can be a PDB or mmCIF file either gzipped or not.
-            If will be copied into session directory and
+            It will be copied into session directory and
             converted into a structure file with all chains renamed to **B**.
             It will not be translated or rotated.
-        options: Refinement options for HADDOCK3.
+        refine_options: Refinement options for HADDOCK3.
+        remove_fixed_chains: Original chain identifiers to remove from the fixed structure before
+            renaming the remaining chains to **B**. For mmCIF inputs, use author chain
+            identifiers (auth_asym_id). Use this to omit the modeled counterpart of the
+            fitted unknown structure.
+            To remove multiple chains, repeat the option:
+            `--remove-fixed-chains A --remove-fixed-chains C`.
         powerfit_run_id: ID of the PowerFit run to refine.
             If not provided, all fitted models of all runs will be refined.
         scheduler_address: Address of the Dask scheduler to connect to.
             If not provided, will create a local cluster.
             If set to `sequential` will run tasks sequentially.
     """
-    if options is None:
-        options = RefineOptions()
+    if refine_options is None:
+        refine_options = RefineOptions()
     start_time = datetime.now(tz=UTC)
 
     fitted_models_csv = session_dir / "powerfit" / "fitted_models.csv"
@@ -295,13 +323,17 @@ def refine_with_haddock3(
 
     refine_dir = session_dir / "refine"
     refine_dir.mkdir()
-    session_fixed_structure = prepare_fixed_structure(fixed_structure, refine_dir)
+    session_fixed_structure = prepare_fixed_structure(
+        fixed_structure, refine_dir, remove_fixed_chains=remove_fixed_chains
+    )
 
     if scheduler_address == "sequential":
         context = _sequential_context()
     else:
         scheduler_name = "protein_detective_filter"
-        context = configure_dask_scheduler(scheduler_address, name=scheduler_name, nproc=min(options.ncores, nr_cpus()))
+        context = configure_dask_scheduler(
+            scheduler_address, name=scheduler_name, nproc=min(refine_options.ncores, nr_cpus())
+        )
 
     structures_to_refine = [Path(f) for f in fitted_models_df["fitted_model_file"]]
     with context as cluster:
@@ -310,7 +342,7 @@ def refine_with_haddock3(
             refine_dir,
             structures_to_refine,
             session_fixed_structure,
-            options=options,
+            options=refine_options,
             scheduler_address=real_scheduler_address,
         )
 

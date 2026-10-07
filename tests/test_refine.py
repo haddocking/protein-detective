@@ -28,7 +28,55 @@ def test_refine_cli_rejects_nonpositive_ncores(tmp_path: Path, ncores: int):
         )
 
 
+@pytest.mark.parametrize("chains", [["A", "C"], ["A", "C", "A"]])
+def test_refine_cli_accepts_fixed_chain_removal(tmp_path: Path, chains: list[str]):
+    fixed_structure = tmp_path / "fixed.pdb"
+    fixed_structure.touch()
+
+    _, bound, _ = app.parse_args(
+        ["refine", str(tmp_path), str(fixed_structure)]
+        + [token for chain in chains for token in ("--remove-fixed-chains", chain)],
+        exit_on_error=False,
+        print_error=False,
+    )
+
+    assert bound.arguments["remove_fixed_chains"] == {"A", "C"}
+
+
 class TestPrepareFixedStructure:
+    @pytest.mark.parametrize("remove_fixed_chains", [{"B"}, {"A", "C"}, set()])
+    def test_removes_original_chains_before_renaming(
+        self, tmp_path: Path, cif_1gru: Path, remove_fixed_chains: set[str]
+    ):
+        original = read_structure(cif_1gru)
+        expected_atom_count = sum(
+            len(residue)
+            for model in original
+            for chain in model
+            if chain.name not in remove_fixed_chains
+            for residue in chain
+        )
+
+        result = read_structure(prepare_fixed_structure(cif_1gru, tmp_path, remove_fixed_chains=remove_fixed_chains))
+
+        assert len(result) == len(original)
+        assert {chain.name for chain in chains_in_structure(result)} == {"B"}
+        assert result[0].count_atom_sites() == expected_atom_count
+
+    def test_rejects_missing_chain(self, tmp_path: Path, cif_1gru: Path):
+        with pytest.raises(ValueError, match=r"Chains not found.*X"):
+            prepare_fixed_structure(cif_1gru, tmp_path, remove_fixed_chains={"X"})
+
+        assert not (tmp_path / "fixed_structure.pdb").exists()
+
+    def test_rejects_removing_all_chains(self, tmp_path: Path, cif_1gru: Path):
+        all_chains = {chain.name for chain in chains_in_structure(read_structure(cif_1gru))}
+
+        with pytest.raises(ValueError, match="Cannot remove all chains"):
+            prepare_fixed_structure(cif_1gru, tmp_path, remove_fixed_chains=all_chains)
+
+        assert not (tmp_path / "fixed_structure.pdb").exists()
+
     def test_renames_all_chains_to_b(self, tmp_path: Path, cif_1gru: Path):
         refine_dir = tmp_path / "refine"
         refine_dir.mkdir()
@@ -176,7 +224,7 @@ def test_refine_with_haddock3(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Pa
     refine_with_haddock3(
         session_dir,
         fixed_structure,
-        options=RefineOptions(
+        refine_options=RefineOptions(
             rigidbody_sampling=10,
             ncores=6,
         ),
