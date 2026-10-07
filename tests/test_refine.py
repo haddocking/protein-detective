@@ -245,15 +245,10 @@ def test_refine_with_haddock3(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Pa
         "refine/io.csv",
         "refine/run_001/fakestructure.cif/fit_1.pdb/",
     }
-    _, expected_action = assert_crate(
-        Path("manual-refine-test-output/session"),
-        input_ids=crate_input_ids,
-        output_ids=crate_output_ids,
-    )
     _, actual_action = assert_crate(
         session_dir,
         input_ids=crate_input_ids,
         output_ids=crate_output_ids,
     )
-    assert {i["@id"] for i in actual_action["object"]} == {i["@id"] for i in expected_action["object"]}
-    assert {o["@id"] for o in actual_action["result"]} == {o["@id"] for o in expected_action["result"]}
+    assert {i["@id"] for i in actual_action["object"]} == crate_input_ids
+    assert {o["@id"] for o in actual_action["result"]} == crate_output_ids

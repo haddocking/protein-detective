@@ -1,16 +1,17 @@
 # Plan for the refinement TODOs
 
-This plan covers refinement subcommands, run IDs, reporting, and score comparison.
-It proposes implementation work; no application code has been changed.
-Resume and cleanup of incomplete runs are out of scope and tracked in
-[issue #98](https://github.com/haddocking/protein-detective/issues/98).
-Renaming `powerfit` to `fit` is also out of scope and tracked in
+This plan covers refinement subcommands, run IDs, reporting, and score
+comparison. It proposes implementation work; no application code has been
+changed. Resume and cleanup of incomplete runs are out of scope and tracked in
+[issue #98](https://github.com/haddocking/protein-detective/issues/98). Renaming
+`powerfit` to `fit` is also out of scope and tracked in
 [issue #99](https://github.com/haddocking/protein-detective/issues/99).
 
 ## Findings from the current code
 
 - `src/protein_detective/cli.py` registers refinement as a single command.
-  PowerFit already has `run`, `report`, `fit-models`, and `list-runs` subcommands.
+  PowerFit already has `run`, `report`, `fit-models`, and `list-runs`
+  subcommands.
 - `refine_with_haddock3()` creates `session/refine` with `mkdir()` and therefore
   cannot perform a second refinement in the same session. Its nested `run_001`
   currently identifies the **source PowerFit run**, not a refinement experiment.
@@ -20,8 +21,8 @@ Renaming `powerfit` to `fit` is also out of scope and tracked in
   collide when refining all runs together. Its input path resolution also relies
   on the current directory when the session path is relative.
 - The generated workflow is `0_topoaa`, `1_rigidbody`, `2_caprieval`,
-  `3_clustfcc`, `4_caprieval`, `5_seletopclusts`, `6_mdref`, `7_caprieval`.
-  Thus `2_caprieval` already evaluates rigid-body-refined models. It is a
+  `3_clustfcc`, `4_caprieval`, `5_seletopclusts`, `6_mdref`, `7_caprieval`. Thus
+  `2_caprieval` already evaluates rigid-body-refined models. It is a
   pre-**mdref** score, not a score of the original fitted placement.
 - `meta.py` already reads final `capri_ss.tsv` and `capri_clt.tsv`, handles TSV
   comments and `-` nulls, and joins through session-relative `refine_run_dir`.
@@ -32,9 +33,12 @@ Renaming `powerfit` to `fit` is also out of scope and tracked in
   `structure_id`, and `is_alphafold`; the existing report uses a colon-separated
   accession string. Reuse these files instead of fetching metadata again.
 - Existing CAPRI fixtures include an unclustered aggregate (`cluster_id` and
-  `cluster_rank` are `-`). A report cannot assume every result has valid clusters.
-  Existing refinement tests cover configuration, chain preparation, CLI parsing,
-  and a manual HADDOCK run; metadata tests cover final-stage selection and joins.
+  `cluster_rank` are `-`). A report cannot assume every result has valid
+  clusters. Existing refinement tests cover configuration, chain preparation,
+  CLI parsing, and a manual HADDOCK run; metadata tests cover final-stage
+  selection and joins.
+- See manual-test/ for output of previous run of
+  `uv run pytest -vv -m manual tests/test_refine.py::test_refine_with_haddock3`.
 
 ## 1. Introduce subcommands and independent refinement runs
 
@@ -71,16 +75,15 @@ Assume PowerFit files are written once. Reuse the existing fitting CSVs for
 input metadata and `io.csv` for the selected fitted-model paths and their
 refinement directories. No separate input snapshot or `run.json` is needed:
 generated HADDOCK configs already record effective tool options, and RO-Crate
-records the invocation and fixed-structure preparation. Use file timestamps
-when inspecting output dates and the expected HADDOCK results to determine
-result availability, without storing a separate timestamp or run status.
-Use session-relative paths in `io.csv` and resolve absolute paths explicitly
-against `session_dir` at the HADDOCK boundary.
-Deduplicate selected model paths and reject missing inputs or an empty selection
-before creating a run. Preserve the source fitting ID in the model directory
-to prevent collisions, without an additional `models/` grouping directory.
-Keep configs outside HADDOCK model run directories,
-as required by the existing `setup_run()` behavior.
+records the invocation and fixed-structure preparation. Use file timestamps when
+inspecting output dates and the expected HADDOCK results to determine result
+availability, without storing a separate timestamp or run status. Use
+session-relative paths in `io.csv` and resolve absolute paths explicitly against
+`session_dir` at the HADDOCK boundary. Deduplicate selected model paths and
+reject missing inputs or an empty selection before creating a run. Preserve the
+source fitting ID in the model directory to prevent collisions, without an
+additional `models/` grouping directory. Keep configs outside HADDOCK model run
+directories, as required by the existing `setup_run()` behavior.
 
 Write `io.csv` with the expected input/output mapping before launching work,
 including `refine_run_id` and source fitting ID. Mapping presence does not imply
@@ -90,9 +93,10 @@ command metadata to reference the particular run, inputs, config, and options.
 Keep index writes in the coordinator; workers write only their own results.
 
 Replace the draft `refine SESSION FIXED_STRUCTURE` command with `refine run`
-directly; no default-command wrapper or CLI transition period is needed.
-New reporting and metadata loading should also recognize the existing
-`refine/io.csv` and old model layout, without moving historical output directories.
+directly; no default-command wrapper or CLI transition period is needed. New
+reporting and metadata loading should also recognize the existing
+`refine/io.csv` and old model layout, without moving historical output
+directories.
 
 Refactor tests/test_refine.py to tests/refine/, layout tests same way as src.
 
@@ -111,9 +115,9 @@ score ascending, with rank/path as deterministic tie breakers. For one fitted
 PDB producing five clusters with three members each, `--top 2` returns ten rows:
 two members from each of the five clusters. A cluster with fewer than N members
 contributes all its members. This report option does not change the workflow's
-`top_clusters` or `top_models` sampling/selection options.
-Allow reporting all refinement runs or one explicit run; report missing IDs
-clearly. An overall ranking across proteins can be a later addition.
+`top_clusters` or `top_models` sampling/selection options. Allow reporting all
+refinement runs or one explicit run; report missing IDs clearly. An overall
+ranking across proteins can be a later addition.
 
 One row per selected member should contain:
 
@@ -124,7 +128,8 @@ One row per selected member should contain:
   standard deviation, repeated for each selected member of that cluster.
 - Model rank within the cluster, model score, and model path. Keep model scores
   and cluster summary scores in separately named columns.
-- Fitted input and model run paths, plus available score-stage fields from step 3.
+- Fitted input and model run paths, plus available score-stage fields from
+  step 3.
 
 Join `io.csv` to `powerfit/fitted_models.csv` through the fitted-model path,
 then join `powerfit/fittable_structures.csv` through the source structure key.
@@ -133,15 +138,15 @@ accessions from `fit_1.pdb` filenames. Missing metadata should give empty
 accessions without dropping valid refinement results.
 
 Use `capri_ss.tsv` to select members grouped by cluster and join `capri_clt.tsv`
-for cluster summaries. Resolve each member's `model`
-path relative to the CAPRI directory and account for `.pdb.gz` output after
-HADDOCK cleanup. Treat `-` values as missing. If there are no valid clusters,
-return the best N individual models per fitted input with `cluster_id=-` and
-empty cluster summary fields; do not label the unclustered aggregate as cluster 1.
-Keep cluster IDs null internally in DuckDB and render them as `-` in CSV output.
-No `result_type` column is needed. Exclude incomplete model runs from ranked
-results and summarize them on stderr. Keep stdout as CSV, with `--output`
-following the existing PowerFit convention.
+for cluster summaries. Resolve each member's `model` path relative to the CAPRI
+directory and account for `.pdb.gz` output after HADDOCK cleanup. Treat `-`
+values as missing. If there are no valid clusters, return the best N individual
+models per fitted input with `cluster_id=-` and empty cluster summary fields; do
+not label the unclustered aggregate as cluster 1. Keep cluster IDs null
+internally in DuckDB and render them as `-` in CSV output. No `result_type`
+column is needed. Exclude incomplete model runs from ranked results and
+summarize them on stderr. Keep stdout as CSV, with `--output` following the
+existing PowerFit convention.
 
 Update `meta.py` to read per-run indexes as well as the legacy root index.
 Discover explicitly selected CAPRI stages from the generated HADDOCK configs,
@@ -149,8 +154,8 @@ with the current `7_caprieval` fallback for historical runs. Do not use an
 unrestricted recursive glob that also includes intermediate or `analysis/`
 copies. Review database joins in documentation notebooks for the new run ID.
 
-Add `--refine-run-id` to `uv run protein-detective meta` and pass it through
-the metadata-loading helpers. When supplied, load refinement mappings and CAPRI
+Add `--refine-run-id` to `uv run protein-detective meta` and pass it through the
+metadata-loading helpers. When supplied, load refinement mappings and CAPRI
 results only for that refinement run; when omitted, load all refinement runs.
 Keep this selector independent of `--powerfit-run-id`, and report an unknown
 refinement run ID clearly.
@@ -163,45 +168,47 @@ Implement the literal `2_caprieval` TODO first without changing the workflow:
    individual/cluster scores from `7_caprieval`.
 2. Expose `best_rigidbody_score` and final scores with their source stages.
    Select numerically by score rather than assuming the first line is best.
-3. Describe this as rigid-body versus mdref comparison. A best early score and
-   a final cluster average summarize different populations; their difference
-   must not be presented as improvement of the same individual model.
+3. Describe this as rigid-body versus mdref comparison. A best early score and a
+   final cluster average summarize different populations; their difference must
+   not be presented as improvement of the same individual model.
 4. Before offering a paired score delta, verify lineage through selection and
-   mdref, and verify scoring weights are comparable. Otherwise report the
-   stage scores separately.
+   mdref, and verify scoring weights are comparable. Otherwise report the stage
+   scores separately.
 
 If the intended requirement is instead a score of the **original fitted pose**,
 that needs an additional scoring experiment. Assemble the fitted and fixed
 partners in the existing coordinate frame, then investigate the installed
 HADDOCK scoring route. Its standard `emscoring` route performs a short energy
-minimization, so it must not be described as an unchanged-coordinate score.
-Keep this separate until the desired baseline and scoring protocol are chosen.
-Any added stage must also update stage discovery, configuration tests, and
-metadata loading.
+minimization, so it must not be described as an unchanged-coordinate score. Keep
+this separate until the desired baseline and scoring protocol are chosen. Any
+added stage must also update stage discovery, configuration tests, and metadata
+loading.
 
-The official [HADDOCK module overview](https://www.bonvinlab.org/haddock3/pages/intro.html)
+The official
+[HADDOCK module overview](https://www.bonvinlab.org/haddock3/pages/intro.html)
 identifies `rigidbody` as rigid-body energy minimization. The
 [scoring CLI documentation](https://www.bonvinlab.org/haddock3-user-manual/clis.html)
-describes topology creation and minimization before scoring. These support
-the distinction between the current early score and an original-pose baseline.
+describes topology creation and minimization before scoring. These support the
+distinction between the current early score and an original-pose baseline.
 
 ## Delivery order and validation
 
 Deliver this as small, reviewable changes:
 
-1. **Run storage and CLI:** refinement subcommands, IDs, per-run IO index,
-   path fixes, legacy metadata loading, and provenance. Test two refinements of
-   the same fitted input, duplicate source names across fit runs, deleted numeric
+1. **Run storage and CLI:** refinement subcommands, IDs, per-run IO index, path
+   fixes, legacy metadata loading, and provenance. Test two refinements of the
+   same fitted input, duplicate source names across fit runs, deleted numeric
    IDs, explicit-ID rejection, empty selections, and relative/absolute sessions
    when invoked outside the session directory.
-2. **Reporting:** member ranking within every cluster, UniProt joins, model fallback, and early score
-   columns. Use existing CAPRI fixtures plus a small clustered fixture. Test
-   the five-cluster/three-member example (`--top 2` yields ten rows), clusters
-   smaller than N, top-N boundaries, missing metadata, compressed model paths, multiple runs,
-   partial results, and exclusion of intermediate/analysis copies. Extend
-   metadata join tests for both layouts and verify `meta --refine-run-id`
-   selects only the requested refinement run. Check that unclustered output
-   uses `cluster_id=-` without a `result_type` column.
+2. **Reporting:** member ranking within every cluster, UniProt joins, model
+   fallback, and early score columns. Use existing CAPRI fixtures plus a small
+   clustered fixture. Test the five-cluster/three-member example (`--top 2`
+   yields ten rows), clusters smaller than N, top-N boundaries, missing
+   metadata, compressed model paths, multiple runs, partial results, and
+   exclusion of intermediate/analysis copies. Extend metadata join tests for
+   both layouts and verify `meta --refine-run-id` selects only the requested
+   refinement run. Check that unclustered output uses `cluster_id=-` without a
+   `result_type` column.
 3. **Score comparison:** early and final stage scores with explicit baseline
    labels, model lineage checks before paired deltas, and fixture-based tests.
 
@@ -209,13 +216,13 @@ For implementation, run the repository checks: `uv run pytest`,
 `uvx ruff format`, `uvx ruff check --fix`, `uv run pyrefly check`, and
 `uvx prek run --all-files`. Use stubs and local fixtures for automated tests;
 then explicitly run the manual HADDOCK integration test with small sampling to
-verify actual output stages, compression, and provenance.
-The manual test's paths and comparison against `manual-refine-test-output`
-will need adjustment for independent refinement run directories.
+verify actual output stages, compression, and provenance. The manual test's
+paths and comparison against `manual-refine-test-output` will need adjustment
+for independent refinement run directories.
 
 The primary decisions are settled above: independent refinement IDs and top N
 members of every cluster per fitted input. Keep the existing `powerfit` command
-name in this PR. The remaining
-scientific decision is whether “before refinement” means the existing pre-mdref
-score or an additional original-pose scoring protocol. The existing-stage report
-can ship without blocking on that decision.
+name in this PR. The remaining scientific decision is whether “before
+refinement” means the existing pre-mdref score or an additional original-pose
+scoring protocol. The existing-stage report can ship without blocking on that
+decision.
