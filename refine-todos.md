@@ -1,5 +1,7 @@
 # Plan for the refinement TODOs
 
+TODO remove this file before merging PR.
+
 This plan covers refinement subcommands, run IDs, reporting, and score
 comparison. It proposes implementation work; no application code has been
 changed. Resume and cleanup of incomplete runs are out of scope and tracked in
@@ -192,9 +194,9 @@ Label the baseline as the unrefined fitted-structure HADDOCK3 score obtained
 with `emscoring`. This protocol includes energy minimization; it is not an
 unchanged-coordinate score. A baseline individual score and a final cluster
 average summarize different populations, so their difference must not be
-presented as improvement of the same individual model. Before offering a
-paired score delta, verify model lineage and comparable scoring weights;
-otherwise report the scores separately.
+presented as improvement of the same individual model. Before offering a paired
+score delta, verify model lineage and comparable scoring weights; otherwise
+report the scores separately.
 
 ## Delivery order and validation
 
@@ -207,18 +209,18 @@ Deliver this as small, reviewable changes:
    invoked outside the session directory.
 2. **Reporting:** member ranking within every cluster, UniProt joins, model
    fallback, and pre-refinement score columns from TODO 3. Use existing CAPRI
-   fixtures plus a small clustered fixture. Test the five-cluster/three-member example (`--top 2`
-   yields ten rows), clusters smaller than N, top-N boundaries, missing
-   metadata, compressed model paths, multiple runs, partial results, and
-   exclusion of intermediate/analysis copies. Extend metadata join tests for
-   both layouts and verify `meta --refine-run-id` selects only the requested
-   refinement run. Check that unclustered output uses `cluster_id=-` without a
-   `result_type` column.
+   fixtures plus a small clustered fixture. Test the five-cluster/three-member
+   example (`--top 2` yields ten rows), clusters smaller than N, top-N
+   boundaries, missing metadata, compressed model paths, multiple runs, partial
+   results, and exclusion of intermediate/analysis copies. Extend metadata join
+   tests for both layouts and verify `meta --refine-run-id` selects only the
+   requested refinement run. Check that unclustered output uses `cluster_id=-`
+   without a `result_type` column.
 3. **Score comparison:** create `fitted-and-fixed.pdb`, run the separate
-   `topoaa` / `emscoring` / `caprieval` workflow, and report the first data row's
-   `score` from its `capri_ss.tsv` alongside final refinement scores. Test chain
-   assignment, configuration, first-row extraction, and baseline/final workflow
-   separation. Verify model lineage before paired deltas.
+   `topoaa` / `emscoring` / `caprieval` workflow, and report the first data
+   row's `score` from its `capri_ss.tsv` alongside final refinement scores. Test
+   chain assignment, configuration, first-row extraction, and baseline/final
+   workflow separation. Verify model lineage before paired deltas.
 
 For implementation, run the repository checks: `uv run pytest`,
 `uvx ruff format`, `uvx ruff check --fix`, `uv run pyrefly check`, and
@@ -230,9 +232,9 @@ for independent refinement run directories.
 
 The primary decisions are settled above: independent refinement IDs and top N
 members of every cluster per fitted input. Keep the existing `powerfit` command
-name in this PR. The pre-refinement baseline is the separate HADDOCK3
-`topoaa` / `emscoring` / `caprieval` protocol specified in TODO 3, replacing the
-refinement workflow's pre-mdref `2_caprieval` score.
+name in this PR. The pre-refinement baseline is the separate HADDOCK3 `topoaa` /
+`emscoring` / `caprieval` protocol specified in TODO 3, replacing the refinement
+workflow's pre-mdref `2_caprieval` score.
 
 ---
 

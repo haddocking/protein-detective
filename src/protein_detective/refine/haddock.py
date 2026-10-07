@@ -20,6 +20,7 @@ class RefineOptions:
 
     Attributes:
         rigidbody_sampling: Number of rigidbody samples.
+        fcc_clust_cutoff: Minimum fraction of common contacts (FCC) to be considered in a cluster.
         top_clusters: Number of top clusters to keep.
         top_models: Number of top models to keep.
         water_refinement_sampling_factor: Factor for determining the number of water refinement samples.
@@ -34,6 +35,7 @@ class RefineOptions:
     water_refinement_sampling_factor: PositiveInt = 1
     water_refinement_solvent: Literal["water", "dmso", "none"] = "none"
     ncores: PositiveInt = 1
+    fcc_clust_cutoff: float = 0.60
 
 
 def generate_haddock3_config_body(
@@ -74,6 +76,7 @@ def generate_haddock3_config_body(
 
         [clustfcc]
         min_population = 1
+        clust_cutoff = {options.fcc_clust_cutoff}
 
         [caprieval]
 

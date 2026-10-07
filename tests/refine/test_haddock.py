@@ -83,6 +83,7 @@ class TestGenerateHaddock3ConfigBody:
             water_refinement_sampling_factor=7,
             water_refinement_solvent="dmso",
             ncores=8,
+            fcc_clust_cutoff=0.95,
         )
 
         expected = dedent(f"""\
@@ -109,6 +110,7 @@ class TestGenerateHaddock3ConfigBody:
 
             [clustfcc]
             min_population = 1
+            clust_cutoff = 0.95
 
             [caprieval]
 
@@ -157,6 +159,7 @@ class TestGenerateHaddock3ConfigBody:
 
             [clustfcc]
             min_population = 1
+            clust_cutoff = 0.65
 
             [caprieval]
 

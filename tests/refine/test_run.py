@@ -10,9 +10,25 @@ from protein_detective.refine.run import (
 )
 from tests.helpers import assert_crate, assert_lines
 
+# TODO use 6J5W instead of 9A2G and friends, use auth chain A as fitted and B as fixed
+
 
 @pytest.mark.manual
-def test_refine_with_haddock3(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Path):
+def test_refine_with_haddock3_unclustered(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Path):
+    assert_refine_with_haddock3(tmp_path, cif_9a2g, cif_1gru_groes, RefineOptions(rigidbody_sampling=40, ncores=6))
+
+# TODO assert clustered results aka no - as cluster_id and top
+@pytest.mark.manual
+def test_refine_with_haddock3_clustered(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Path):
+    assert_refine_with_haddock3(
+        tmp_path,
+        cif_9a2g,
+        cif_1gru_groes,
+        RefineOptions(rigidbody_sampling=80, ncores=14, fcc_clust_cutoff=0.2, top_clusters=80, top_models=80),
+    )
+
+
+def assert_refine_with_haddock3(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Path, options: RefineOptions):
     fixed_structure = cif_1gru_groes
     session_dir = tmp_path / "session"
     session_dir.mkdir(parents=True)
@@ -43,10 +59,7 @@ def test_refine_with_haddock3(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Pa
     refine_with_haddock3(
         session_dir,
         fixed_structure,
-        refine_options=RefineOptions(
-            rigidbody_sampling=10,
-            ncores=6,
-        ),
+        refine_options=options,
         scheduler_address="sequential",
     )
 
@@ -55,6 +68,8 @@ def test_refine_with_haddock3(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Pa
         session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/7_caprieval/capri_ss.tsv"
     ).is_file()
     assert_lines(session_dir / "refine/refine_run_001/io.csv", expected_io_csv_lines)
+    config_file = session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb.cfg"
+    assert f"clust_cutoff = {options.fcc_clust_cutoff}" in config_file.read_text()
     crate, actual_action = assert_crate(
         session_dir,
         input_ids=crate_input_ids,
