@@ -1,4 +1,4 @@
-name: Deploy MkDocs to GitHub Pages
+name: Deploy properdocs to GitHub Pages
 
 on:
   push:
@@ -33,9 +33,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --no-sources --group docs
 
-      - name: Build MkDocs site
+      - name: Build properdocs site
         run: |
-          uv run --no-sources mkdocs build
+          uv run --no-sources properdocs build
         env:
           # Force colored output from rich library
           TTY_COMPATIBLE: "1"

@@ -1,9 +1,11 @@
 import json
+import shutil
 from pathlib import Path
 
 import duckdb
+import pytest
 
-from protein_detective.meta import ddl, in_memory_duckdb_connection, solutions_as_duckdb_ddl
+from protein_detective.meta import capri_as_duckdb_ddl, ddl, in_memory_duckdb_connection, solutions_as_duckdb_ddl
 
 
 def test_solutions_ddl_requires_fittable_structures_and_solutions(tmp_path: Path):
@@ -430,3 +432,142 @@ def test_refine_io_is_loaded_with_ctas(tmp_path: Path):
             "refine/run_001/model.pdb",
         )
     ]
+
+
+@pytest.mark.parametrize("table", ["capri_ss", "capri_clt"])
+def test_capri_tables_join_refinement_runs_and_only_load_final_stage(tmp_path: Path, table: str):
+    session_dir = tmp_path / "session with spaces"
+    refine_dir = session_dir / "refine"
+    refine_dir.mkdir(parents=True)
+    run_dirs = [f"refine/run_00{i}/structure.cif/fit_1.pdb" for i in (1, 2)]
+    (refine_dir / "io.csv").write_text(
+        "fitted_model,refine_run_dir\n"
+        + "".join(f"powerfit/run_00{i}/structure.cif/fit_1.pdb,{run_dir}\n" for i, run_dir in enumerate(run_dirs, 1))
+    )
+    fixture = Path(__file__).parent / "fixtures" / "refine" / f"{table}.tsv"
+    for run_dir in run_dirs:
+        for step in ("2_caprieval", "7_caprieval"):
+            stage_dir = session_dir / run_dir / step
+            stage_dir.mkdir(parents=True)
+            shutil.copyfile(fixture, stage_dir / f"{table}.tsv")
+        # Postprocessed copies must not duplicate the stage results.
+        analysis_dir = session_dir / run_dir / "analysis" / "7_caprieval_analysis"
+        analysis_dir.mkdir(parents=True)
+        shutil.copyfile(fixture, analysis_dir / f"{table}.tsv")
+
+    # Include results from runs not recorded in refinements_io.
+    orphan_dir = refine_dir / "run_003" / "structure.cif" / "fit_1.pdb" / "7_caprieval"
+    orphan_dir.mkdir(parents=True)
+    shutil.copyfile(fixture, orphan_dir / f"{table}.tsv")
+
+    with duckdb.connect(database=":memory:") as con:
+        for statement, params in ddl(session_dir):
+            if "CREATE TABLE refinements_io" in statement or f"CREATE TABLE refinements_{table}" in statement:
+                con.execute(statement, params)
+        columns = [row[0] for row in con.execute(f"DESCRIBE refinements_{table}").fetchall()]
+        if table == "capri_ss":
+            expected_columns = [
+                "refine_run_dir",
+                "model",
+                "md5",
+                "caprieval_rank",
+                "score",
+                "irmsd",
+                "fnat",
+                "lrmsd",
+                "ilrmsd",
+                "dockq",
+                "rmsd",
+                "cluster_id",
+                "cluster_ranking",
+                "modelcluster_ranking",
+                "air",
+                "angles",
+                "bonds",
+                "bsa",
+                "cdih",
+                "coup",
+                "dani",
+                "desolv",
+                "dihe",
+                "elec",
+                "improper",
+                "rdcs",
+                "rg",
+                "sym",
+                "total",
+                "vdw",
+                "vean",
+                "xpcs",
+            ]
+            rows = con.execute(
+                "SELECT refine_run_dir, model, md5, caprieval_rank, score, dockq, bsa, elec, "
+                "cluster_id, cluster_ranking, modelcluster_ranking FROM refinements_capri_ss "
+                "JOIN refinements_io USING (refine_run_dir) WHERE caprieval_rank = 1 ORDER BY refine_run_dir"
+            ).fetchall()
+            expected_rows = [
+                (run_dir, "../6_mdref/mdref_9.pdb", None, 1, -99.224, 1.0, 1765.330, -491.102, None, None, None)
+                for run_dir in run_dirs
+            ]
+            expected_count = 30
+        else:
+            expected_columns = [
+                "refine_run_dir",
+                "cluster_rank",
+                "cluster_id",
+                "n",
+                "under_eval",
+                "score",
+                "score_std",
+                "irmsd",
+                "irmsd_std",
+                "fnat",
+                "fnat_std",
+                "lrmsd",
+                "lrmsd_std",
+                "dockq",
+                "dockq_std",
+                "ilrmsd",
+                "ilrmsd_std",
+                "rmsd",
+                "rmsd_std",
+                "air",
+                "air_std",
+                "bsa",
+                "bsa_std",
+                "desolv",
+                "desolv_std",
+                "elec",
+                "elec_std",
+                "total",
+                "total_std",
+                "vdw",
+                "vdw_std",
+                "caprieval_rank",
+            ]
+            rows = con.execute(
+                "SELECT refine_run_dir, cluster_rank, cluster_id, n, under_eval, score, score_std, dockq, "
+                "dockq_std, caprieval_rank FROM refinements_capri_clt "
+                "JOIN refinements_io USING (refine_run_dir) ORDER BY refine_run_dir"
+            ).fetchall()
+            expected_rows = [(run_dir, None, None, 10, None, -84.827, 13.884, 0.265, 0.424, 1) for run_dir in run_dirs]
+            expected_count = 3
+        assert columns == expected_columns
+        assert rows == expected_rows
+        assert con.table(f"refinements_{table}").count("*").fetchone() == (expected_count,)
+
+
+def test_capri_ddl_loads_without_refinement_io_and_skips_missing_tables(tmp_path: Path):
+    assert capri_as_duckdb_ddl(tmp_path) == []
+    stage_dir = tmp_path / "refine" / "run_001" / "structure" / "fit_1.pdb" / "7_caprieval"
+    stage_dir.mkdir(parents=True)
+    results = stage_dir / "capri_ss.tsv"
+    shutil.copyfile(Path(__file__).parent / "fixtures/refine/capri_ss.tsv", results)
+    statements = capri_as_duckdb_ddl(tmp_path)
+    assert len(statements) == 1
+    assert "CREATE TABLE refinements_capri_ss" in statements[0][0]
+    with duckdb.connect(database=":memory:") as con:
+        con.execute(*statements[0])
+        assert con.table("refinements_capri_ss").count("*").fetchone() == (10,)
+    results.unlink()
+    assert capri_as_duckdb_ddl(tmp_path) == []

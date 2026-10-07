@@ -13,21 +13,13 @@ from haddock.gear.prepare_run import setup_run
 from haddock.libs.libio import working_directory
 from haddock.libs.libworkflow import WorkflowManager
 from protein_quest.cli.common import Common
-from protein_quest.parallel import configure_dask_scheduler, map_with_progress
+from protein_quest.parallel import configure_dask_scheduler, map_with_progress, nr_cpus
 from protein_quest.structure.chains import chains_in_structure
 from protein_quest.structure.formats import read_structure, write_structure
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 
 from protein_detective.common_cli import write_ro_crate
 from protein_detective.filter import _sequential_context
-
-
-def _validate_ncores(_type: object, value: object) -> None:
-    if not isinstance(value, int):
-        return
-    if value != -1 and value <= 0:
-        msg = "Must be -1 or > 0."
-        raise ValueError(msg)
 
 
 @dataclass
@@ -41,7 +33,7 @@ class RefineOptions:
         water_refinement_sampling_factor: Factor for determining the number of water refinement samples.
         water_refinement_solvent: Solvent used for water refinement.
         ncores: Number of CPU cores to use for a single fitted structure.
-            Use -1 for all CPU cores available.
+            Use a large number such as 9999 to use all available CPU cores.
     """
 
     rigidbody_sampling: PositiveInt = 1000
@@ -49,7 +41,7 @@ class RefineOptions:
     top_models: PositiveInt = 2
     water_refinement_sampling_factor: PositiveInt = 1
     water_refinement_solvent: Literal["water", "dmso", "none"] = "none"
-    ncores: Annotated[int, Parameter(validator=_validate_ncores)] = 1
+    ncores: PositiveInt = 1
 
 
 def _write_ro_crate(
@@ -309,7 +301,7 @@ def refine_with_haddock3(
         context = _sequential_context()
     else:
         scheduler_name = "protein_detective_filter"
-        context = configure_dask_scheduler(scheduler_address, name=scheduler_name, nproc=options.ncores)
+        context = configure_dask_scheduler(scheduler_address, name=scheduler_name, nproc=min(options.ncores, nr_cpus()))
 
     structures_to_refine = [Path(f) for f in fitted_models_df["fitted_model_file"]]
     with context as cluster:

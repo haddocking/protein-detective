@@ -42,7 +42,7 @@ refine:
 
 ```mermaid
 flowchart TB
-    subgraph search [protein-detective search]
+    subgraph search [protein-detective candidates search]
         direction TB
         S2[protein-quest search uniprot]
         S3[protein-quest search alphafold]
@@ -56,14 +56,14 @@ flowchart TB
     end
     search -- "UniProt accessions & PDB ids" --> retrieve
 
-    subgraph retrieve [protein-detective retrieve]
+    subgraph retrieve [protein-detective candidates retrieve]
         direction TB
         R2[protein-quest retrieve pdbe]
         R3[protein-quest retrieve alphafold]
     end
     retrieve -- "mmcif_files" --> filter
 
-    subgraph filter [protein-detective filter]
+    subgraph filter [protein-detective candidates filter]
         direction TB
         F2[protein-quest convert structures --uniprots]
         F3[protein-quest filter chain]
@@ -80,13 +80,19 @@ flowchart TB
     M1[protein-detective powerfit fit-models]
     P1 -- "**/solutions.out" --> E1 & M1
 
-    R1[protein-detective refine]
-    M1 -- "**/fit_*.pdb" --> R1
+    subgraph refine [protein-detective refine]
+        R1[haddock3 refine-fitted2fixed.cfg]
+    end
+    M1 -- "**/fit_*.pdb" --> refine
+
+    META[protein-detective meta]
+    refine -- session/ --> META
 
     classDef dashedBorder stroke-dasharray: 5 5;
     S6:::dashedBorder
     F5:::dashedBorder
     I1:::dashedBorder
+    META:::dashedBorder
 ```
 
 (Dashed nodes are optional) (The Mermaid figure might not be rendered, see
@@ -122,7 +128,7 @@ multiple subcommands to perform actions.
 ### Search Uniprot for structures
 
 ```shell
-protein-detective search \
+protein-detective candidates search \
     --taxon-id 9606 \
     --reviewed \
     --subcellular-location-uniprot nucleus \
@@ -142,7 +148,7 @@ In `./mysession` directory, you will find the search results.
 <summary>You can also include interaction partners in the search</summary>
 
 ```shell
-protein-detective search --verbose \
+protein-detective candidates search --verbose \
     --taxon-id 9606 \
     --reviewed \
     --subcellular-location-uniprot nucleus \
@@ -164,7 +170,7 @@ macromolecular [complex](https://www.ebi.ac.uk/complexportal/complex/CPX-6266).
 ### To retrieve a bunch of structures
 
 ```shell
-protein-detective retrieve ./mysession
+protein-detective candidates retrieve ./mysession
 ```
 
 In `./mysession` directory, you will find mmCIF files from PDBe and PDB files
@@ -185,14 +191,14 @@ Also uncompresses \*.cif.gz files to \*.cif files for compatibility with
 powerfit.
 
 ```shell
-protein-detective filter \
+protein-detective candidates filter \
     --min-confidence 50 \
     --min-residues 100 \
     --max-residues 1000 \
     ./mysession
 
 # or to filter on secondary structure having some helices
-protein-detective filter mysession --secondary.abs-min-helix-residues 40
+protein-detective candidates filter mysession --secondary.abs-min-helix-residues 40
 ```
 
 ### Import filtered structures
@@ -361,7 +367,8 @@ for an example.
 
 ## Refine
 
-The models fitted with powerfit can be further refined using the refine command.
+The models fitted with powerfit can be further refined using the refine command
+using haddock3.
 
 ```shell
 protein-detective refine mysession fixed_structure.pdb
