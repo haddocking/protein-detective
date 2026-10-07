@@ -279,6 +279,8 @@ def refine_with_haddock3(
     Args:
         session_dir: Session directory containing fitted PowerFit results
         fixed_structure: Path to the fixed structure to refine against.
+            The fixed structure should be in the same coordinate system as the fitted structure.
+            The fixed structure should contain the known structures in the volume.
             Can be a PDB or mmCIF file either gzipped or not.
             If will be copied into session directory and
             converted into a structure file with all chains renamed to **B**.
