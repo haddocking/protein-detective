@@ -159,36 +159,42 @@ results only for that refinement run; when omitted, load all refinement runs.
 Keep this selector independent of `--powerfit-run-id`, and report an unknown
 refinement run ID clearly.
 
-## 3. Report scores before and after mdref accurately
+## 3. Report HADDOCK3 scores before and after refinement
 
-Implement the literal `2_caprieval` TODO first without changing the workflow:
+For each fitted input, create `fitted-and-fixed.pdb` in the existing coordinate
+frame, with the fitted structure as chain A and the fixed structure as chain B.
+Run a separate HADDOCK3 scoring workflow before refinement using this
+configuration:
 
-1. Read early individual scores from `2_caprieval/capri_ss.tsv` and final
-   individual/cluster scores from `7_caprieval`.
-2. Expose `best_rigidbody_score` and final scores with their source stages.
-   Select numerically by score rather than assuming the first line is best.
-3. Describe this as rigid-body versus mdref comparison. A best early score and a
-   final cluster average summarize different populations; their difference must
-   not be presented as improvement of the same individual model.
-4. Before offering a paired score delta, verify lineage through selection and
-   mdref, and verify scoring weights are comparable. Otherwise report the stage
-   scores separately.
+```toml
+molecules = ["fitted-and-fixed.pdb"] # A: fitted structure; B: fixed structure
 
-If the intended requirement is instead a score of the **original fitted pose**,
-that needs an additional scoring experiment. Assemble the fitted and fixed
-partners in the existing coordinate frame, then investigate the installed
-HADDOCK scoring route. Its standard `emscoring` route performs a short energy
-minimization, so it must not be described as an unchanged-coordinate score. Keep
-this separate until the desired baseline and scoring protocol are chosen. Any
-added stage must also update stage discovery, configuration tests, and metadata
-loading.
+[topoaa]
 
-The official
-[HADDOCK module overview](https://www.bonvinlab.org/haddock3/pages/intro.html)
-identifies `rigidbody` as rigid-body energy minimization. The
-[scoring CLI documentation](https://www.bonvinlab.org/haddock3-user-manual/clis.html)
-describes topology creation and minimization before scoring. These support the
-distinction between the current early score and an original-pose baseline.
+[emscoring]
+
+[caprieval]
+```
+
+Take the `score` column from the first data row of this workflow's
+`2_caprieval/capri_ss.tsv` as the score of the unrefined fitted structure. Skip
+TSV comments and the header; do not select a different row by sorting scores.
+This baseline replaces the existing refinement workflow's `2_caprieval` score
+and the proposed `best_rigidbody_score` field.
+
+Include this pre-refinement score in the report alongside final individual and
+cluster scores from the refinement workflow's final CAPRI stage (currently
+`7_caprieval`). Record the baseline scoring config and output directory so the
+two workflows' `2_caprieval` stages cannot be confused. Update stage discovery,
+configuration tests, and metadata loading for the separate baseline workflow.
+
+Label the baseline as the unrefined fitted-structure HADDOCK3 score obtained
+with `emscoring`. This protocol includes energy minimization; it is not an
+unchanged-coordinate score. A baseline individual score and a final cluster
+average summarize different populations, so their difference must not be
+presented as improvement of the same individual model. Before offering a
+paired score delta, verify model lineage and comparable scoring weights;
+otherwise report the scores separately.
 
 ## Delivery order and validation
 
@@ -200,16 +206,19 @@ Deliver this as small, reviewable changes:
    explicit-ID rejection, empty selections, and relative/absolute sessions when
    invoked outside the session directory.
 2. **Reporting:** member ranking within every cluster, UniProt joins, model
-   fallback, and early score columns. Use existing CAPRI fixtures plus a small
-   clustered fixture. Test the five-cluster/three-member example (`--top 2`
+   fallback, and pre-refinement score columns from TODO 3. Use existing CAPRI
+   fixtures plus a small clustered fixture. Test the five-cluster/three-member example (`--top 2`
    yields ten rows), clusters smaller than N, top-N boundaries, missing
    metadata, compressed model paths, multiple runs, partial results, and
    exclusion of intermediate/analysis copies. Extend metadata join tests for
    both layouts and verify `meta --refine-run-id` selects only the requested
    refinement run. Check that unclustered output uses `cluster_id=-` without a
    `result_type` column.
-3. **Score comparison:** early and final stage scores with explicit baseline
-   labels, model lineage checks before paired deltas, and fixture-based tests.
+3. **Score comparison:** create `fitted-and-fixed.pdb`, run the separate
+   `topoaa` / `emscoring` / `caprieval` workflow, and report the first data row's
+   `score` from its `capri_ss.tsv` alongside final refinement scores. Test chain
+   assignment, configuration, first-row extraction, and baseline/final workflow
+   separation. Verify model lineage before paired deltas.
 
 For implementation, run the repository checks: `uv run pytest`,
 `uvx ruff format`, `uvx ruff check --fix`, `uv run pyrefly check`, and
@@ -221,10 +230,9 @@ for independent refinement run directories.
 
 The primary decisions are settled above: independent refinement IDs and top N
 members of every cluster per fitted input. Keep the existing `powerfit` command
-name in this PR. The remaining scientific decision is whether “before
-refinement” means the existing pre-mdref score or an additional original-pose
-scoring protocol. The existing-stage report can ship without blocking on that
-decision.
+name in this PR. The pre-refinement baseline is the separate HADDOCK3
+`topoaa` / `emscoring` / `caprieval` protocol specified in TODO 3, replacing the
+refinement workflow's pre-mdref `2_caprieval` score.
 
 ---
 
