@@ -13,10 +13,11 @@ from tests.helpers import assert_crate, assert_lines
 
 
 @pytest.mark.manual
-def test_refine_with_haddock3_unclustered(tmp_path: Path, cif_6j5w: Path):
+def test_refine_with_haddock3(tmp_path: Path, cif_6j5w: Path):
     # TODO mdref module strips the cluster id when using
-    # sampling=80, clust_cutoff = 0.1, top_clusters = 80, top_models = 80
+    # options = RefineOptions(rigidbody_sampling=80, ncores=14, top_clusters=80, top_models=80, fcc_clust_cutoff=0.1)  # noqa: ERA001
     # Find way to have cluster ids in 7_caprieval/capri_ss.tsv and not just in 5_seletopclusts/seletopclusts.txt
+    # Now just testing unclustered
     options = RefineOptions(rigidbody_sampling=40, ncores=6)
     fitted_structure = write_single_chain_structure_file(cif_6j5w, chain2keep="A", output_dir=tmp_path, out_chain="A")
     fixed_structure = write_single_chain_structure_file(cif_6j5w, chain2keep="B", output_dir=tmp_path, out_chain="B")
