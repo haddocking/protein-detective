@@ -48,7 +48,6 @@ First add a Cyclopts `refine_app`, following `powerfit/cli.py`, with:
 
 ```text
 protein-detective refine run SESSION FIXED_STRUCTURE [--refine-run-id ID]
-protein-detective refine report SESSION [--refine-run-id ID] [--top N]
 protein-detective refine list-runs SESSION
 ```
 
@@ -96,8 +95,7 @@ Keep index writes in the coordinator; workers write only their own results.
 
 Replace the draft `refine SESSION FIXED_STRUCTURE` command with `refine run`
 directly; no default-command wrapper or CLI transition period is needed.
-Reporting and metadata loading use only the new per-run layout; backwards
-compatibility is unnecessary while this PR is a draft.
+backwards compatibility is unnecessary while this PR is a draft.
 
 Refactor tests/test_refine.py to tests/refine/, layout tests same way as src.
 
