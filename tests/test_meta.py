@@ -441,8 +441,8 @@ def test_refine_io_is_loaded_with_ctas(tmp_path: Path):
     ]
 
 
-@pytest.mark.parametrize("table", ["capri_ss", "capri_clt"])
-def test_capri_tables_join_refinement_runs_and_only_load_final_stage(tmp_path: Path, table: str):
+@pytest.fixture
+def capri_tables(tmp_path: Path, table: str):
     session_dir = tmp_path / "session with spaces"
     refine_dir = session_dir / "refine"
     refine_dir.mkdir(parents=True)
@@ -474,97 +474,114 @@ def test_capri_tables_join_refinement_runs_and_only_load_final_stage(tmp_path: P
         for statement, params in ddl(session_dir):
             if "CREATE TABLE refinements_io" in statement or f"CREATE TABLE refinements_{table}" in statement:
                 con.execute(statement, params)
-        columns = [row[0] for row in con.execute(f"DESCRIBE refinements_{table}").fetchall()]
-        if table == "capri_ss":
-            expected_columns = [
-                "refine_run_dir",
-                "model",
-                "md5",
-                "caprieval_rank",
-                "score",
-                "irmsd",
-                "fnat",
-                "lrmsd",
-                "ilrmsd",
-                "dockq",
-                "rmsd",
-                "cluster_id",
-                "cluster_ranking",
-                "modelcluster_ranking",
-                "air",
-                "angles",
-                "bonds",
-                "bsa",
-                "cdih",
-                "coup",
-                "dani",
-                "desolv",
-                "dihe",
-                "elec",
-                "improper",
-                "rdcs",
-                "rg",
-                "sym",
-                "total",
-                "vdw",
-                "vean",
-                "xpcs",
-            ]
-            rows = con.execute(
-                "SELECT refine_run_dir, model, md5, caprieval_rank, score, dockq, bsa, elec, "
-                "cluster_id, cluster_ranking, modelcluster_ranking FROM refinements_capri_ss "
-                "JOIN refinements_io USING (refine_run_dir) WHERE caprieval_rank = 1 ORDER BY refine_run_dir"
-            ).fetchall()
-            expected_rows = [
-                (run_dir, "../6_mdref/mdref_9.pdb", None, 1, -99.224, 1.0, 1765.330, -491.102, None, None, None)
-                for run_dir in run_dirs
-            ]
-            expected_count = 30
-        else:
-            expected_columns = [
-                "refine_run_dir",
-                "cluster_rank",
-                "cluster_id",
-                "n",
-                "under_eval",
-                "score",
-                "score_std",
-                "irmsd",
-                "irmsd_std",
-                "fnat",
-                "fnat_std",
-                "lrmsd",
-                "lrmsd_std",
-                "dockq",
-                "dockq_std",
-                "ilrmsd",
-                "ilrmsd_std",
-                "rmsd",
-                "rmsd_std",
-                "air",
-                "air_std",
-                "bsa",
-                "bsa_std",
-                "desolv",
-                "desolv_std",
-                "elec",
-                "elec_std",
-                "total",
-                "total_std",
-                "vdw",
-                "vdw_std",
-                "caprieval_rank",
-            ]
-            rows = con.execute(
-                "SELECT refine_run_dir, cluster_rank, cluster_id, n, under_eval, score, score_std, dockq, "
-                "dockq_std, caprieval_rank FROM refinements_capri_clt "
-                "JOIN refinements_io USING (refine_run_dir) ORDER BY refine_run_dir"
-            ).fetchall()
-            expected_rows = [(run_dir, None, None, 10, None, -84.827, 13.884, 0.265, 0.424, 1) for run_dir in run_dirs]
-            expected_count = 3
-        assert columns == expected_columns
-        assert rows == expected_rows
-        assert con.table(f"refinements_{table}").count("*").fetchone() == (expected_count,)
+        yield con, run_dirs
+
+
+@pytest.mark.parametrize("table", ["capri_ss"])
+def test_capri_ss_joins_refinement_runs_and_only_loads_final_stage(
+    capri_tables: tuple[duckdb.DuckDBPyConnection, list[str]], table: str
+):
+    con, run_dirs = capri_tables
+    columns = [row[0] for row in con.execute(f"DESCRIBE refinements_{table}").fetchall()]
+    expected_columns = [
+        "refine_run_dir",
+        "model",
+        "md5",
+        "caprieval_rank",
+        "score",
+        "irmsd",
+        "fnat",
+        "lrmsd",
+        "ilrmsd",
+        "dockq",
+        "rmsd",
+        "cluster_id",
+        "cluster_ranking",
+        "modelcluster_ranking",
+        "air",
+        "angles",
+        "bonds",
+        "bsa",
+        "cdih",
+        "coup",
+        "dani",
+        "desolv",
+        "dihe",
+        "elec",
+        "improper",
+        "rdcs",
+        "rg",
+        "sym",
+        "total",
+        "vdw",
+        "vean",
+        "xpcs",
+    ]
+    rows = con.execute(
+        "SELECT refine_run_dir, model, md5, caprieval_rank, score, dockq, bsa, elec, "
+        "cluster_id, cluster_ranking, modelcluster_ranking FROM refinements_capri_ss "
+        "JOIN refinements_io USING (refine_run_dir) WHERE caprieval_rank = 1 ORDER BY refine_run_dir"
+    ).fetchall()
+    expected_rows = [
+        (run_dir, "../6_mdref/mdref_9.pdb", None, 1, -99.224, 1.0, 1765.330, -491.102, None, None, None)
+        for run_dir in run_dirs
+    ]
+    expected_count = 30
+    assert columns == expected_columns
+    assert rows == expected_rows
+    assert con.table(f"refinements_{table}").count("*").fetchone() == (expected_count,)
+
+
+@pytest.mark.parametrize("table", ["capri_clt"])
+def test_capri_clt_joins_refinement_runs_and_only_loads_final_stage(
+    capri_tables: tuple[duckdb.DuckDBPyConnection, list[str]], table: str
+):
+    con, run_dirs = capri_tables
+    columns = [row[0] for row in con.execute(f"DESCRIBE refinements_{table}").fetchall()]
+    expected_columns = [
+        "refine_run_dir",
+        "cluster_rank",
+        "cluster_id",
+        "n",
+        "under_eval",
+        "score",
+        "score_std",
+        "irmsd",
+        "irmsd_std",
+        "fnat",
+        "fnat_std",
+        "lrmsd",
+        "lrmsd_std",
+        "dockq",
+        "dockq_std",
+        "ilrmsd",
+        "ilrmsd_std",
+        "rmsd",
+        "rmsd_std",
+        "air",
+        "air_std",
+        "bsa",
+        "bsa_std",
+        "desolv",
+        "desolv_std",
+        "elec",
+        "elec_std",
+        "total",
+        "total_std",
+        "vdw",
+        "vdw_std",
+        "caprieval_rank",
+    ]
+    rows = con.execute(
+        "SELECT refine_run_dir, cluster_rank, cluster_id, n, under_eval, score, score_std, dockq, "
+        "dockq_std, caprieval_rank FROM refinements_capri_clt "
+        "JOIN refinements_io USING (refine_run_dir) ORDER BY refine_run_dir"
+    ).fetchall()
+    expected_rows = [(run_dir, None, None, 10, None, -84.827, 13.884, 0.265, 0.424, 1) for run_dir in run_dirs]
+    expected_count = 3
+    assert columns == expected_columns
+    assert rows == expected_rows
+    assert con.table(f"refinements_{table}").count("*").fetchone() == (expected_count,)
 
 
 def test_capri_ddl_loads_without_refinement_io_and_skips_missing_tables(tmp_path: Path):
@@ -583,7 +600,8 @@ def test_capri_ddl_loads_without_refinement_io_and_skips_missing_tables(tmp_path
     assert capri_as_duckdb_ddl(tmp_path) == []
 
 
-def test_multiple_refinement_indexes_load_together(tmp_path: Path):
+@pytest.fixture
+def multiple_refinement_indexes(tmp_path: Path):
     for run_id in ("refine_run_001", "refine_run_003"):
         model_run = f"refine/{run_id}/run_001/same_structure/fit_1.pdb"
         index = tmp_path / "refine" / run_id / "io.csv"
@@ -598,10 +616,15 @@ def test_multiple_refinement_indexes_load_together(tmp_path: Path):
     with duckdb.connect() as con:
         for statement, params in refinements_io_as_duckdb_ddl(tmp_path) + capri_as_duckdb_ddl(tmp_path):
             con.execute(statement, params)
-        assert con.execute(
-            "SELECT count(*) FROM refinements_io JOIN refinements_capri_ss USING (refine_run_dir)"
-        ).fetchone() == (2,)
-        assert con.execute("SELECT DISTINCT refine_run_id FROM refinements_io ORDER BY 1").fetchall() == [
-            ("refine_run_001",),
-            ("refine_run_003",),
-        ]
+        yield con
+
+
+def test_multiple_refinement_indexes_load_together(multiple_refinement_indexes: duckdb.DuckDBPyConnection):
+    con = multiple_refinement_indexes
+    assert con.execute(
+        "SELECT count(*) FROM refinements_io JOIN refinements_capri_ss USING (refine_run_dir)"
+    ).fetchone() == (2,)
+    assert con.execute("SELECT DISTINCT refine_run_id FROM refinements_io ORDER BY 1").fetchall() == [
+        ("refine_run_001",),
+        ("refine_run_003",),
+    ]
