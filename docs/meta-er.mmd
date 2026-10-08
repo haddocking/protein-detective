@@ -154,6 +154,81 @@ erDiagram
     "fittable_structures" ||--o{ "fitted_models" : "structure = structure"
     "structure_files" ||--o{ "fitted_models" : "file = fitted_model_file"
     "structure_files" ||--o{ "fitted_models" : "file = unfitted_model_file"
+    "refinements_io" {
+      VARCHAR fitted_model FK
+      VARCHAR refine_run_dir
+    }
+    "fitted_models" ||--o{ "refinements_io" : "fitted_model_file = fitted_model"
+    "refinements_capri_ss" {
+      VARCHAR refine_run_dir FK
+      VARCHAR model
+      INTEGER md5
+      BIGINT caprieval_rank
+      DOUBLE score
+      DOUBLE irmsd
+      DOUBLE fnat
+      DOUBLE lrmsd
+      DOUBLE ilrmsd
+      DOUBLE dockq
+      DOUBLE rmsd
+      INTEGER cluster_id
+      INTEGER cluster_ranking
+      INTEGER modelcluster_ranking
+      DOUBLE air
+      DOUBLE angles
+      DOUBLE bonds
+      DOUBLE bsa
+      DOUBLE cdih
+      DOUBLE coup
+      DOUBLE dani
+      DOUBLE desolv
+      DOUBLE dihe
+      DOUBLE elec
+      DOUBLE improper
+      DOUBLE rdcs
+      DOUBLE rg
+      DOUBLE sym
+      DOUBLE total
+      DOUBLE vdw
+      DOUBLE vean
+      DOUBLE xpcs
+    }
+    "refinements_capri_clt" {
+      VARCHAR refine_run_dir FK
+      INTEGER cluster_rank
+      INTEGER cluster_id
+      BIGINT n
+      INTEGER under_eval
+      DOUBLE score
+      DOUBLE score_std
+      DOUBLE irmsd
+      DOUBLE irmsd_std
+      DOUBLE fnat
+      DOUBLE fnat_std
+      DOUBLE lrmsd
+      DOUBLE lrmsd_std
+      DOUBLE dockq
+      DOUBLE dockq_std
+      DOUBLE ilrmsd
+      DOUBLE ilrmsd_std
+      DOUBLE rmsd
+      DOUBLE rmsd_std
+      DOUBLE air
+      DOUBLE air_std
+      DOUBLE bsa
+      DOUBLE bsa_std
+      DOUBLE desolv
+      DOUBLE desolv_std
+      DOUBLE elec
+      DOUBLE elec_std
+      DOUBLE total
+      DOUBLE total_std
+      DOUBLE vdw
+      DOUBLE vdw_std
+      BIGINT caprieval_rank
+    }
+    "refinements_io" ||--o{ "refinements_capri_ss" : "refine_run_dir = refine_run_dir"
+    "refinements_io" ||--o{ "refinements_capri_clt" : "refine_run_dir = refine_run_dir"
     "structure_files" {
       VARCHAR file PK
       VARCHAR parent_dir

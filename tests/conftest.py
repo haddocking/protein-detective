@@ -34,8 +34,7 @@ def ksga_pdb() -> Path:
     )
 
 
-def fetch_cif(filename: str, sha256: str) -> Path:
-    base_url = "https://www.ebi.ac.uk/pdbe/entry-files/download/"
+def fetch_cif(filename: str, sha256: str, base_url: str = "https://www.ebi.ac.uk/pdbe/entry-files/download/") -> Path:
     path = pooch.retrieve(
         url=f"{base_url}{filename}",
         known_hash=f"sha256:{sha256}",
@@ -51,4 +50,22 @@ def cif_2y29() -> Path:
     return fetch_cif(
         "2y29_updated.cif.gz",
         "c12e4b9ddd2ac4f7034aa964bb7510e4942c60543a43d84bf8d67df04df4b045",
+    )
+
+
+@pytest.fixture
+def cif_1gru() -> Path:
+    """1gru structure modeled from EMD-1046, used in powerfit benchmarks."""
+    return fetch_cif(
+        "1gru_updated.cif.gz",
+        "9ccead72d2c8bba723516656643eebf77d266f491e6061ac0df32f86978136da",
+    )
+
+
+@pytest.fixture
+def cif_6j5w() -> Path:
+    """6j5w complex with two different proteins on author chains A and B."""
+    return fetch_cif(
+        "6j5w_updated.cif.gz",
+        "a176815c98ed1c3d95b7c235b57b12aaad7f2b97a69dd41680363fd71e359194",
     )

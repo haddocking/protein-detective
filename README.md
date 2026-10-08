@@ -20,6 +20,8 @@ It uses
   retrieve and filter protein structures from Uniprot, PDBe and AlphaFold DB.
 - [powerfit](https://pypi.org/project/powerfit-em/) to fit protein structure in
   a Electron Microscopy (EM) density map.
+- [haddock3](https://www.bonvinlab.org/haddock3) to refine fitted protein
+  structures against a fixed structure.
 - [cyclopts](https://cyclopts.readthedocs.io/en/latest/) for command line
   interface
 - [molviewspec](https://molstar.org/mol-view-spec/) to visualize the fitted
@@ -31,12 +33,16 @@ It uses
   keep track of commands and their input/output files/directories.
 - [duckdb](https://duckdb.org/) to query CSV files like
   powerfit/\*/\*/solutions.out files.
+- [gemmi](https://gemmi.readthedocs.io/en/latest/) to convert mmCIF files to PDB
+  format for haddock3, which requires PDB formatted input. It is also used by
+  protein-quest.
 
-Diagram how protein-detective calls protein-quest and powerfit:
+Diagram how protein-detective calls protein-quest, powerfit and haddock3's
+refine:
 
 ```mermaid
 flowchart TB
-    subgraph search [protein-detective search]
+    subgraph search [protein-detective candidates search]
         direction TB
         S2[protein-quest search uniprot]
         S3[protein-quest search alphafold]
@@ -50,14 +56,14 @@ flowchart TB
     end
     search -- "UniProt accessions & PDB ids" --> retrieve
 
-    subgraph retrieve [protein-detective retrieve]
+    subgraph retrieve [protein-detective candidates retrieve]
         direction TB
         R2[protein-quest retrieve pdbe]
         R3[protein-quest retrieve alphafold]
     end
     retrieve -- "mmcif_files" --> filter
 
-    subgraph filter [protein-detective filter]
+    subgraph filter [protein-detective candidates filter]
         direction TB
         F2[protein-quest convert structures --uniprots]
         F3[protein-quest filter chain]
@@ -74,10 +80,19 @@ flowchart TB
     M1[protein-detective powerfit fit-models]
     P1 -- "**/solutions.out" --> E1 & M1
 
+    subgraph refine [protein-detective refine run]
+        R1[haddock3 refine-fitted2fixed.cfg]
+    end
+    M1 -- "**/fit_*.pdb" --> refine
+
+    META[protein-detective meta]
+    refine -- session/ --> META
+
     classDef dashedBorder stroke-dasharray: 5 5;
     S6:::dashedBorder
     F5:::dashedBorder
     I1:::dashedBorder
+    META:::dashedBorder
 ```
 
 (Dashed nodes are optional) (The Mermaid figure might not be rendered, see
@@ -113,7 +128,7 @@ multiple subcommands to perform actions.
 ### Search Uniprot for structures
 
 ```shell
-protein-detective search \
+protein-detective candidates search \
     --taxon-id 9606 \
     --reviewed \
     --subcellular-location-uniprot nucleus \
@@ -133,7 +148,7 @@ In `./mysession` directory, you will find the search results.
 <summary>You can also include interaction partners in the search</summary>
 
 ```shell
-protein-detective search --verbose \
+protein-detective candidates search --verbose \
     --taxon-id 9606 \
     --reviewed \
     --subcellular-location-uniprot nucleus \
@@ -155,7 +170,7 @@ macromolecular [complex](https://www.ebi.ac.uk/complexportal/complex/CPX-6266).
 ### To retrieve a bunch of structures
 
 ```shell
-protein-detective retrieve ./mysession
+protein-detective candidates retrieve ./mysession
 ```
 
 In `./mysession` directory, you will find mmCIF files from PDBe and PDB files
@@ -176,14 +191,14 @@ Also uncompresses \*.cif.gz files to \*.cif files for compatibility with
 powerfit.
 
 ```shell
-protein-detective filter \
+protein-detective candidates filter \
     --min-confidence 50 \
     --min-residues 100 \
     --max-residues 1000 \
     ./mysession
 
 # or to filter on secondary structure having some helices
-protein-detective filter mysession --secondary.abs-min-helix-residues 40
+protein-detective candidates filter mysession --secondary.abs-min-helix-residues 40
 ```
 
 ### Import filtered structures
@@ -349,6 +364,16 @@ and `unfitted_model_file` is the original structure file.
 The results can also be visualized see
 [visualization.ipynb](https://bonvinlab.org/protein-detective/docs/visualization.html)
 for an example.
+
+## Refine
+
+The models fitted with powerfit can be further refined using the refine command
+using haddock3.
+
+```shell
+protein-detective refine run mysession fixed_structure.pdb
+protein-detective refine list-runs mysession
+```
 
 ### Metadata database
 
