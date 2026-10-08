@@ -454,7 +454,7 @@ def test_capri_tables_join_refinement_runs_and_only_load_final_stage(tmp_path: P
             "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
             f"refine_run_00{i},run_001,powerfit/run_001/structure.cif/fit_1.pdb,{run_dir}\n"
         )
-    fixture = Path(__file__).parent / "fixtures" / "refine" / f"{table}.tsv"
+    fixture = Path(__file__).parent / "refine" / "fixtures" / f"{table}.tsv"
     for run_dir in run_dirs:
         for step in ("2_caprieval", "7_caprieval"):
             stage_dir = session_dir / run_dir / step
@@ -572,7 +572,7 @@ def test_capri_ddl_loads_without_refinement_io_and_skips_missing_tables(tmp_path
     stage_dir = tmp_path / "refine" / "refine_run_001" / "run_001" / "structure" / "fit_1.pdb" / "7_caprieval"
     stage_dir.mkdir(parents=True)
     results = stage_dir / "capri_ss.tsv"
-    shutil.copyfile(Path(__file__).parent / "fixtures/refine/capri_ss.tsv", results)
+    shutil.copyfile(Path(__file__).parent / "refine/fixtures/capri_ss.tsv", results)
     statements = capri_as_duckdb_ddl(tmp_path)
     assert len(statements) == 1
     assert "CREATE TABLE refinements_capri_ss" in statements[0][0]
