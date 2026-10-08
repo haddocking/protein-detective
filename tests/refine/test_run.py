@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from protein_quest.structure.chains import write_single_chain_structure_file
 from protein_quest.structure.formats import read_structure, write_structure
 
 from protein_detective.refine.haddock import RefineOptions
@@ -10,26 +11,15 @@ from protein_detective.refine.run import (
 )
 from tests.helpers import assert_crate, assert_lines
 
-# TODO use 6J5W instead of 9A2G and friends, use auth chain A as fitted and B as fixed
-
 
 @pytest.mark.manual
-def test_refine_with_haddock3_unclustered(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Path):
-    assert_refine_with_haddock3(tmp_path, cif_9a2g, cif_1gru_groes, RefineOptions(rigidbody_sampling=40, ncores=6))
-
-# TODO assert clustered results aka no - as cluster_id and top
-@pytest.mark.manual
-def test_refine_with_haddock3_clustered(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Path):
-    assert_refine_with_haddock3(
-        tmp_path,
-        cif_9a2g,
-        cif_1gru_groes,
-        RefineOptions(rigidbody_sampling=80, ncores=14, fcc_clust_cutoff=0.2, top_clusters=80, top_models=80),
-    )
-
-
-def assert_refine_with_haddock3(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Path, options: RefineOptions):
-    fixed_structure = cif_1gru_groes
+def test_refine_with_haddock3_unclustered(tmp_path: Path, cif_6j5w: Path):
+    # TODO mdref module strips the cluster id when using
+    # sampling=80, clust_cutoff = 0.1, top_clusters = 80, top_models = 80
+    # Find way to have cluster ids in 7_caprieval/capri_ss.tsv and not just in 5_seletopclusts/seletopclusts.txt
+    options = RefineOptions(rigidbody_sampling=40, ncores=6)
+    fitted_structure = write_single_chain_structure_file(cif_6j5w, chain2keep="A", output_dir=tmp_path, out_chain="A")
+    fixed_structure = write_single_chain_structure_file(cif_6j5w, chain2keep="B", output_dir=tmp_path, out_chain="B")
     session_dir = tmp_path / "session"
     session_dir.mkdir(parents=True)
     powerfit_root_dir = session_dir / "powerfit"
@@ -37,7 +27,7 @@ def assert_refine_with_haddock3(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: 
     powerfit_run_dir.mkdir(parents=True)
     fitted_model = powerfit_run_dir / "fit_1.pdb"
     # Need pdb format so convert
-    write_structure(read_structure(cif_9a2g), fitted_model)
+    write_structure(read_structure(fitted_structure), fitted_model)
     # fake fitted_models.csv
     fitted_models_csv = powerfit_root_dir / "fitted_models.csv"
     fitted_models_csv.write_text("fitted_model_file\npowerfit/run_001/fakestructure.cif/fit_1.pdb\n")

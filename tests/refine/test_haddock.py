@@ -159,7 +159,7 @@ class TestGenerateHaddock3ConfigBody:
 
             [clustfcc]
             min_population = 1
-            clust_cutoff = 0.65
+            clust_cutoff = 0.6
 
             [caprieval]
 

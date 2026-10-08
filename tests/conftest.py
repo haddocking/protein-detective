@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pooch
 import pytest
-from protein_quest.structure.chains import write_single_chain_structure_file
 
 # Make asserts in test.helpers render with pytest verbosity
 pytest.register_assert_rewrite("tests.helpers")
@@ -64,17 +63,9 @@ def cif_1gru() -> Path:
 
 
 @pytest.fixture
-def cif_1gru_groes(cif_1gru: Path, tmp_path: Path) -> Path:
-    """1gru structure with only chain O kept, representing the groes protein."""
-    return write_single_chain_structure_file(cif_1gru, chain2keep="O", output_dir=tmp_path, out_chain="O")
-
-
-@pytest.fixture
-def cif_9a2g() -> Path:
-    """9a2g modeled structure of groel protein in 1gru."""
-    # For some reason 9a2g is not on pdbe, but is on rcsb.
+def cif_6j5w() -> Path:
+    """6j5w complex with two different proteins on author chains A and B."""
     return fetch_cif(
-        "9A2G.cif.gz",
-        "90b1187f6e855c85a32d820156231438ee23f8923fbba2cf5d8eae227149fc72",
-        base_url="https://files.rcsb.org/download/",
+        "6j5w_updated.cif.gz",
+        "a176815c98ed1c3d95b7c235b57b12aaad7f2b97a69dd41680363fd71e359194",
     )
