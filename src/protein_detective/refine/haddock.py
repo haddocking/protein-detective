@@ -76,7 +76,6 @@ def generate_haddock3_config_body(
 
         [clustfcc]
         min_population = 1
-        clust_cutoff = {options.fcc_clust_cutoff}
 
         [caprieval]
 
@@ -87,6 +86,10 @@ def generate_haddock3_config_body(
         [mdref]
         sampling_factor = {options.water_refinement_sampling_factor}
         solvent = "{options.water_refinement_solvent}"
+
+        [clustfcc]
+        min_population = 1
+        clust_cutoff = {options.fcc_clust_cutoff}
 
         [caprieval]
         """)

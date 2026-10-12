@@ -110,7 +110,6 @@ class TestGenerateHaddock3ConfigBody:
 
             [clustfcc]
             min_population = 1
-            clust_cutoff = 0.95
 
             [caprieval]
 
@@ -121,6 +120,10 @@ class TestGenerateHaddock3ConfigBody:
             [mdref]
             sampling_factor = 7
             solvent = "dmso"
+
+            [clustfcc]
+            min_population = 1
+            clust_cutoff = 0.95
 
             [caprieval]
         """)
@@ -159,7 +162,6 @@ class TestGenerateHaddock3ConfigBody:
 
             [clustfcc]
             min_population = 1
-            clust_cutoff = 0.65
 
             [caprieval]
 
@@ -170,6 +172,10 @@ class TestGenerateHaddock3ConfigBody:
             [mdref]
             sampling_factor = 1
             solvent = "none"
+
+            [clustfcc]
+            min_population = 1
+            clust_cutoff = 0.6
 
             [caprieval]
         """)

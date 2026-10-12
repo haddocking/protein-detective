@@ -1,6 +1,8 @@
 from pathlib import Path
 
+import pandas as pd
 import pytest
+from pandas.testing import assert_frame_equal
 from protein_quest.structure.formats import read_structure, write_structure
 
 from protein_detective.refine.haddock import RefineOptions
@@ -14,22 +16,39 @@ from tests.helpers import assert_crate, assert_lines
 
 
 @pytest.mark.manual
-def test_refine_with_haddock3_unclustered(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Path):
-    assert_refine_with_haddock3(tmp_path, cif_9a2g, cif_1gru_groes, RefineOptions(rigidbody_sampling=40, ncores=6))
+def test_refine_with_haddock3_unclustered(
+    tmp_path: Path,
+    cif_9a2g: Path,
+    cif_1gru_groes: Path,
+    unclustered_refinement_results: dict[str, pd.DataFrame],
+):
+    session_dir = setup_refinement_session(tmp_path, cif_9a2g)
+    options = RefineOptions(rigidbody_sampling=10, ncores=6, top_clusters=4, top_models=1)
 
-# TODO assert clustered results aka no - as cluster_id and top
+    refine_with_haddock3(session_dir, cif_1gru_groes, refine_options=options, scheduler_address="sequential")
+
+    assert_refinement_rocrate(session_dir, cif_1gru_groes)
+    assert_refinement_results(session_dir, unclustered_refinement_results)
+
+
 @pytest.mark.manual
-def test_refine_with_haddock3_clustered(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Path):
-    assert_refine_with_haddock3(
-        tmp_path,
-        cif_9a2g,
-        cif_1gru_groes,
-        RefineOptions(rigidbody_sampling=80, ncores=14, fcc_clust_cutoff=0.2, top_clusters=80, top_models=80),
-    )
+def test_refine_with_haddock3_clustered(
+    tmp_path: Path,
+    cif_9a2g: Path,
+    cif_1gru_groes: Path,
+    clustered_refinement_results: dict[str, pd.DataFrame],
+):
+    session_dir = setup_refinement_session(tmp_path, cif_9a2g)
+    # A zero cutoff groups the small sample without relying on chance contact overlap.
+    options = RefineOptions(rigidbody_sampling=10, ncores=6, fcc_clust_cutoff=0.0, top_clusters=4, top_models=1)
+
+    refine_with_haddock3(session_dir, cif_1gru_groes, refine_options=options, scheduler_address="sequential")
+
+    assert_refinement_rocrate(session_dir, cif_1gru_groes)
+    assert_refinement_results(session_dir, clustered_refinement_results)
 
 
-def assert_refine_with_haddock3(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: Path, options: RefineOptions):
-    fixed_structure = cif_1gru_groes
+def setup_refinement_session(tmp_path: Path, fitted_structure: Path) -> Path:
     session_dir = tmp_path / "session"
     session_dir.mkdir(parents=True)
     powerfit_root_dir = session_dir / "powerfit"
@@ -37,11 +56,28 @@ def assert_refine_with_haddock3(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: 
     powerfit_run_dir.mkdir(parents=True)
     fitted_model = powerfit_run_dir / "fit_1.pdb"
     # Need pdb format so convert
-    write_structure(read_structure(cif_9a2g), fitted_model)
+    write_structure(read_structure(fitted_structure), fitted_model)
     # fake fitted_models.csv
     fitted_models_csv = powerfit_root_dir / "fitted_models.csv"
     fitted_models_csv.write_text("fitted_model_file\npowerfit/run_001/fakestructure.cif/fit_1.pdb\n")
 
+    return session_dir
+
+
+def assert_refinement_results(session_dir: Path, expected_results: dict[str, pd.DataFrame]):
+    assert (session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/6_mdref/mdref_1.pdb.gz").exists()
+    capri_dir = session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/8_caprieval"
+    results = {
+        "models": pd.read_csv(capri_dir / "capri_ss.tsv", sep="\t", comment="#"),
+        "clusters": pd.read_csv(capri_dir / "capri_clt.tsv", sep="\t", comment="#"),
+    }
+    assert_frame_equal(results["models"], expected_results["models"], check_exact=True)
+    assert_frame_equal(results["clusters"], expected_results["clusters"], check_exact=True)
+
+    return results
+
+
+def assert_refinement_rocrate(session_dir: Path, fixed_structure: Path):
     expected_io_csv_lines = {
         "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir",
         "refine_run_001,run_001,powerfit/run_001/fakestructure.cif/fit_1.pdb,refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb",
@@ -56,20 +92,7 @@ def assert_refine_with_haddock3(tmp_path: Path, cif_9a2g: Path, cif_1gru_groes: 
         "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb.cfg",
     }
 
-    refine_with_haddock3(
-        session_dir,
-        fixed_structure,
-        refine_options=options,
-        scheduler_address="sequential",
-    )
-
-    assert (session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/6_mdref/mdref_1.pdb.gz").exists()
-    assert (
-        session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/7_caprieval/capri_ss.tsv"
-    ).is_file()
     assert_lines(session_dir / "refine/refine_run_001/io.csv", expected_io_csv_lines)
-    config_file = session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb.cfg"
-    assert f"clust_cutoff = {options.fcc_clust_cutoff}" in config_file.read_text()
     crate, actual_action = assert_crate(
         session_dir,
         input_ids=crate_input_ids,

@@ -5,6 +5,34 @@ import pytest
 
 
 @pytest.fixture
+def unclustered_refinement_results():
+    """Generated with HADDOCK3 2026.8.0 by test_refine_with_haddock3_unclustered.
+
+    Copied its 8_caprieval/capri_ss.tsv and capri_clt.tsv as is.
+    Newer HADDOCK3 versions may change the output and fail these comparisons.
+    """
+    fixture_dir = Path(__file__).parents[1] / "fixtures/refine"
+    return {
+        "models": pd.read_csv(fixture_dir / "example-unclustered-refined-capri_ss.tsv", sep="\t", comment="#"),
+        "clusters": pd.read_csv(fixture_dir / "example-unclustered-refined-capri_clt.tsv", sep="\t", comment="#"),
+    }
+
+
+@pytest.fixture
+def clustered_refinement_results():
+    """Generated with HADDOCK3 2026.8.0 by test_refine_with_haddock3_clustered.
+
+    Copied its 8_caprieval/capri_ss.tsv and capri_clt.tsv as is.
+    Newer HADDOCK3 versions may change the output and fail these comparisons.
+    """
+    fixture_dir = Path(__file__).parents[1] / "fixtures/refine"
+    return {
+        "models": pd.read_csv(fixture_dir / "example-clustered-refined-capri_ss.tsv", sep="\t", comment="#"),
+        "clusters": pd.read_csv(fixture_dir / "example-clustered-refined-capri_clt.tsv", sep="\t", comment="#"),
+    }
+
+
+@pytest.fixture
 def session_with_powerfit_results(tmp_path: Path) -> Path:
     session_with_powerfit_results = tmp_path / "session"
     models = []
