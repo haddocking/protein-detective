@@ -11,7 +11,7 @@ def single_member_cluster_refinement_results():
     Copied its 8_caprieval/capri_ss.tsv and capri_clt.tsv as is.
     Newer HADDOCK3 versions may change the output and fail these comparisons.
     """
-    fixture_dir = Path(__file__).parents[1] / "fixtures/refine"
+    fixture_dir = Path(__file__).parent / "fixtures"
     return {
         "models": pd.read_csv(
             fixture_dir / "example-single-member-clusters-refined-capri_ss.tsv", sep="\t", comment="#"

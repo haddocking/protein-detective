@@ -14,7 +14,7 @@ from protein_detective.meta import capri_as_duckdb_ddl, create_meta_duckdb_file,
 from protein_detective.refine.report import refinement_report
 from tests.helpers import cli
 
-FIXTURES = Path(__file__).parents[1] / "fixtures/refine"
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def add_run(session: Path, run_id: str = "experiment") -> Path:
@@ -144,8 +144,8 @@ def test_invalid_top(tmp_path: Path, top: int):
         refinement_report(tmp_path, top=top)
 
 
-@pytest.mark.parametrize("state", ["no_runs", "missing_final", "empty_scores"])
-def test_no_complete_results_is_rejected_without_writing_csv(tmp_path: Path, state: str):
+@pytest.fixture
+def incomplete_session(tmp_path: Path, state: str) -> Path:
     add_metadata(tmp_path)
     if state != "no_runs":
         run = add_run(tmp_path)
@@ -154,28 +154,48 @@ def test_no_complete_results_is_rejected_without_writing_csv(tmp_path: Path, sta
             scores.unlink()
         else:
             scores.write_text("model\tcaprieval_rank\tscore\tcluster_id\tmodel-cluster_ranking\n")
+    return tmp_path
+
+
+@pytest.mark.parametrize("state", ["no_runs", "missing_final", "empty_scores"])
+def test_no_complete_results_is_rejected_without_writing_csv(incomplete_session: Path, state: str):
+    tmp_path = incomplete_session
     output = tmp_path / "report.csv"
     with pytest.raises(ValueError, match="No complete refinement results"):
         cli(["refine", "report", str(tmp_path), "--output", str(output)])
     assert not output.exists()
 
 
-def test_final_stage_and_meta_selector(tmp_path: Path):
+@pytest.fixture
+def session_with_earlier_stages(tmp_path: Path) -> Path:
     first = add_run(tmp_path, "first")
     add_run(tmp_path, "second")
     for stage in ("2_caprieval", "7_caprieval", "analysis/8_caprieval"):
         directory = first / stage
         directory.mkdir(parents=True)
         shutil.copyfile(FIXTURES / "capri_ss.tsv", directory / "capri_ss.tsv")
+    return tmp_path
+
+
+@pytest.fixture
+def selected_refinement_metadata(session_with_earlier_stages: Path):
     with duckdb.connect() as con:
-        for statement, params in refinements_io_as_duckdb_ddl(tmp_path, "first") + capri_as_duckdb_ddl(
-            tmp_path, "first"
-        ):
+        for statement, params in refinements_io_as_duckdb_ddl(
+            session_with_earlier_stages, "first"
+        ) + capri_as_duckdb_ddl(session_with_earlier_stages, "first"):
             con.execute(statement, params)
-        assert con.execute("SELECT DISTINCT refine_run_id FROM refinements_io").fetchall() == [("first",)]
-        assert con.execute(
-            "SELECT count(*) FROM refinements_capri_ss JOIN refinements_io USING (refine_run_dir)"
-        ).fetchone() == (4,)
+        yield con
+
+
+def test_final_stage_and_meta_selector(
+    session_with_earlier_stages: Path, selected_refinement_metadata: duckdb.DuckDBPyConnection
+):
+    tmp_path = session_with_earlier_stages
+    con = selected_refinement_metadata
+    assert con.execute("SELECT DISTINCT refine_run_id FROM refinements_io").fetchall() == [("first",)]
+    assert con.execute(
+        "SELECT count(*) FROM refinements_capri_ss JOIN refinements_io USING (refine_run_dir)"
+    ).fetchone() == (4,)
     # Unknown selector is rejected before a persistent database is created.
     with pytest.raises(ValueError, match="Unknown refinement run ID"):
         create_meta_duckdb_file(tmp_path, refine_run_id="unknown")
@@ -198,9 +218,8 @@ def test_missing_metadata_row_preserves_members(tmp_path: Path):
     assert results["uniprot_accessions"].tolist() == ["", ""]
 
 
-@pytest.mark.parametrize("filename", ["fitted_models.csv", "fittable_structures.csv"])
-@pytest.mark.parametrize("contents", [None, "", "header_only"])
-def test_missing_or_empty_powerfit_file_is_rejected(tmp_path: Path, filename: str, contents: str | None):
+@pytest.fixture
+def session_with_invalid_metadata(tmp_path: Path, filename: str, contents: str | None) -> Path:
     add_run(tmp_path)
     add_metadata(tmp_path)
     path = tmp_path / "powerfit" / filename
@@ -210,9 +229,17 @@ def test_missing_or_empty_powerfit_file_is_rejected(tmp_path: Path, filename: st
         path.write_text(path.read_text().splitlines()[0] + "\n")
     else:
         path.write_text(contents)
+    return tmp_path
+
+
+@pytest.mark.parametrize("filename", ["fitted_models.csv", "fittable_structures.csv"])
+@pytest.mark.parametrize("contents", [None, "", "header_only"])
+def test_missing_or_empty_powerfit_file_is_rejected(
+    session_with_invalid_metadata: Path, filename: str, contents: str | None
+):
     error = FileNotFoundError if contents is None else ValueError
     with pytest.raises(error, match=filename):
-        refinement_report(tmp_path)
+        refinement_report(session_with_invalid_metadata)
 
 
 def test_metadata_is_required_for_complete_refinement_runs(tmp_path: Path):
@@ -291,8 +318,8 @@ def test_empty_model_run_is_warned(tmp_path: Path):
     assert str(partial.relative_to(tmp_path)) in str(caught[0].message)
 
 
-@pytest.mark.parametrize("index_contents", [None, "not a valid IO index"])
-def test_report_discovers_results_without_io_indexes(tmp_path: Path, index_contents: str | None):
+@pytest.fixture
+def session_without_io_indexes(tmp_path: Path, index_contents: str | None) -> Path:
     for run_id in ("first", "second"):
         run = add_run(tmp_path, run_id)
         index = run.parents[2] / "io.csv"
@@ -301,6 +328,12 @@ def test_report_discovers_results_without_io_indexes(tmp_path: Path, index_conte
         else:
             index.write_text(index_contents)
     add_metadata(tmp_path)
+    return tmp_path
+
+
+@pytest.mark.parametrize("index_contents", [None, "not a valid IO index"])
+def test_report_discovers_results_without_io_indexes(session_without_io_indexes: Path, index_contents: str | None):
+    tmp_path = session_without_io_indexes
     results = refinement_report(tmp_path, top=2)
     assert len(results) == 4
     assert set(results["refine_run_id"]) == {"first", "second"}

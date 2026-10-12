@@ -226,3 +226,12 @@ markers = [
 [tool.coverage.run]
 source = ["src/protein_detective"]
 branch = true
+
+[tool.zorilla]
+include = ["tests/**/*.py"]
+exclude = ["**/fixtures/**", "**/cassettes/**"]
+
+
+[tool.zorilla.rules]
+ZR004 = { enabled = false }
+ZR005 = { enabled = false }

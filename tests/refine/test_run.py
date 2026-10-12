@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
+from protein_quest.structure.chains import write_single_chain_structure_file
 from protein_quest.structure.formats import read_structure, write_structure
 from protein_quest.structure.metadata import structure_metadata
 from protein_quest.structure.uniprot_extraction import structure2uniprot_accessions
@@ -14,8 +15,6 @@ from protein_detective.refine.run import (
     refine_with_haddock3,
 )
 from tests.helpers import assert_crate, assert_lines
-
-# TODO use 6J5W instead of 9A2G and friends, use auth chain A as fitted and B as fixed
 
 
 @pytest.mark.manual
@@ -55,6 +54,23 @@ def test_refine_with_haddock3_clustered(
     assert populations.max() >= 3
 
 
+@pytest.mark.manual
+def test_refine_with_haddock3(tmp_path: Path, cif_6j5w: Path):
+    fitted_structure = write_single_chain_structure_file(cif_6j5w, chain2keep="A", output_dir=tmp_path, out_chain="A")
+    fixed_structure = write_single_chain_structure_file(cif_6j5w, chain2keep="B", output_dir=tmp_path, out_chain="B")
+    session_dir = setup_refinement_session(tmp_path, fitted_structure)
+    options = RefineOptions(rigidbody_sampling=40, ncores=6)
+
+    refine_with_haddock3(session_dir, fixed_structure, refine_options=options, scheduler_address="sequential")
+
+    assert_refinement_rocrate(session_dir, fixed_structure)
+    assert_refinement_results(
+        session_dir, expected_accessions=":".join(sorted(structure2uniprot_accessions(fitted_structure)))
+    )
+    config_file = session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb.cfg"
+    assert f"clust_cutoff = {options.fcc_clust_cutoff}" in config_file.read_text()
+
+
 def setup_refinement_session(tmp_path: Path, fitted_structure: Path) -> Path:
     session_dir = tmp_path / "session"
     session_dir.mkdir(parents=True)
@@ -92,7 +108,9 @@ def setup_refinement_session(tmp_path: Path, fitted_structure: Path) -> Path:
     return session_dir
 
 
-def assert_refinement_results(session_dir: Path, expected_results: dict[str, pd.DataFrame] | None = None):
+def assert_refinement_results(
+    session_dir: Path, expected_results: dict[str, pd.DataFrame] | None = None, *, expected_accessions: str = "P0A6F5"
+):
     assert (session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/6_mdref/mdref_1.pdb.gz").exists()
     capri_dir = session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/8_caprieval"
     results = {
@@ -104,7 +122,7 @@ def assert_refinement_results(session_dir: Path, expected_results: dict[str, pd.
         assert_frame_equal(results["clusters"], expected_results["clusters"], check_exact=True)
 
     report = refinement_report(session_dir, top=2)
-    assert report["uniprot_accessions"].tolist() == ["P0A6F5"] * len(report)
+    assert report["uniprot_accessions"].tolist() == [expected_accessions] * len(report)
     assert report["fitted_rank"].tolist() == [1] * len(report)
     assert (
         report["model_score"].tolist()

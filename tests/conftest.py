@@ -64,6 +64,15 @@ def cif_1gru() -> Path:
 
 
 @pytest.fixture
+def cif_6j5w() -> Path:
+    """6j5w complex with two different proteins on author chains A and B."""
+    return fetch_cif(
+        "6j5w_updated.cif.gz",
+        "a176815c98ed1c3d95b7c235b57b12aaad7f2b97a69dd41680363fd71e359194",
+    )
+
+
+@pytest.fixture
 def cif_1gru_groes(cif_1gru: Path, tmp_path: Path) -> Path:
     """1gru structure with only chain O kept, representing the groes protein."""
     return write_single_chain_structure_file(cif_1gru, chain2keep="O", output_dir=tmp_path, out_chain="O")
