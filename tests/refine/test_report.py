@@ -6,6 +6,7 @@ from contextlib import chdir
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 import pytest
 from cyclopts.exceptions import ValidationError
 
@@ -27,8 +28,8 @@ def add_run(session: Path, run_id: str = "experiment") -> Path:
     stage = run / "8_caprieval"
     stage.mkdir()
     for table in ("ss", "clt"):
-        fixture = f"example-clustered-refined-capri_{table}.tsv"
-        shutil.copyfile(FIXTURES / fixture, stage / f"capri_{table}.tsv")
+        fixture = pd.read_csv(FIXTURES / f"6j5w-clustered-capri_{table}.csv")
+        fixture.to_csv(stage / f"capri_{table}.tsv", sep="\t", index=False)
     return run
 
 
@@ -46,19 +47,19 @@ def add_metadata(session: Path):
 def test_cluster_members_metadata_and_compressed_paths(tmp_path: Path):
     run = add_run(tmp_path)
     add_metadata(tmp_path)
-    model = run / "6_mdref/mdref_2.pdb.gz"
+    model = run / "6_mdref/mdref_9.pdb.gz"
     model.parent.mkdir()
     model.write_bytes(b"")
     results = refinement_report(tmp_path, top=2)
-    assert len(results) == 2
-    assert results["uniprot_accessions"].tolist() == ["P12345:Q67890"] * 2
-    assert results["fitted_rank"].tolist() == [1, 1]
-    assert results["cluster_id"].tolist() == [1, 1]
-    assert results["population"].tolist() == [4, 4]
-    assert results["cluster_score"].tolist() == [-62.215, -62.215]
-    assert results["cluster_score_std"].tolist() == [21.593, 21.593]
-    assert results["model_score"].tolist() == [-97.977, -55.704]
-    assert results["model_rank"].tolist() == [1, 2]
+    assert len(results) == 8
+    assert results["uniprot_accessions"].tolist() == ["P12345:Q67890"] * 8
+    assert results["fitted_rank"].tolist() == [1] * 8
+    assert results["cluster_id"].tolist() == [2, 2, 1, 1, 4, 4, 3, 3]
+    assert results["population"].tolist() == [3] * 8
+    assert results["cluster_score"].tolist() == [-121.192] * 2 + [-70.837] * 2 + [-63.228] * 2 + [-58.954] * 2
+    assert results["cluster_score_std"].tolist() == [0] * 8
+    assert results["model_score"].tolist() == [-121.192] * 2 + [-70.837] * 2 + [-63.228] * 2 + [-58.954] * 2
+    assert results["model_rank"].tolist() == [1, 2] * 4
     assert results.iloc[0]["model_path"] == str(model.relative_to(tmp_path))
 
 
@@ -108,18 +109,18 @@ def test_multiple_runs_csv_and_partial_results(tmp_path: Path, capsys: pytest.Ca
         cli(["refine", "report", str(tmp_path), "--top", "2", "--output", str(output)])
     with output.open() as fh:
         rows = list(csv.DictReader(fh))
-    assert len(rows) == 4
+    assert len(rows) == 16
     assert "result_type" not in rows[0]
     assert {row["refine_run_id"] for row in rows} == {"first", "second"}
-    assert {row["cluster_id"] for row in rows} == {"1"}
-    assert [int(row["model_rank"]) for row in rows] == [1, 2, 1, 2]
-    assert {row["population"] for row in rows} == {"4"}
+    assert {row["cluster_id"] for row in rows} == {"1", "2", "3", "4"}
+    assert [int(row["model_rank"]) for row in rows] == [1, 2] * 8
+    assert {row["population"] for row in rows} == {"3"}
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == ""
     assert str(partial.relative_to(tmp_path)) in str(caught[0].message)
     results = refinement_report(tmp_path, "first")
-    assert len(results) == 1
+    assert len(results) == 4
     with pytest.raises(ValueError, match="Unknown refinement run ID"):
         refinement_report(tmp_path, "missing")
 
@@ -130,8 +131,8 @@ def test_stdout_is_csv_and_no_crate_write(tmp_path: Path, capsys: pytest.Capture
     cli(["refine", "report", str(tmp_path)])
     captured = capsys.readouterr()
     rows = list(csv.DictReader(captured.out.splitlines()))
-    assert len(rows) == 1
-    assert rows[0]["cluster_id"] == "1"
+    assert len(rows) == 4
+    assert rows[0]["cluster_id"] == "2"
     assert captured.err == ""
     assert not (tmp_path / "ro-crate-metadata.json").exists()
 
@@ -195,7 +196,7 @@ def test_final_stage_and_meta_selector(
     assert con.execute("SELECT DISTINCT refine_run_id FROM refinements_io").fetchall() == [("first",)]
     assert con.execute(
         "SELECT count(*) FROM refinements_capri_ss JOIN refinements_io USING (refine_run_dir)"
-    ).fetchone() == (4,)
+    ).fetchone() == (12,)
     # Unknown selector is rejected before a persistent database is created.
     with pytest.raises(ValueError, match="Unknown refinement run ID"):
         create_meta_duckdb_file(tmp_path, refine_run_id="unknown")
@@ -214,8 +215,8 @@ def test_missing_metadata_row_preserves_members(tmp_path: Path):
     metadata = tmp_path / "powerfit/fittable_structures.csv"
     metadata.write_text(metadata.read_text().replace("protein,1abc", "other,1abc"))
     results = refinement_report(tmp_path, top=2)
-    assert len(results) == 2
-    assert results["uniprot_accessions"].tolist() == ["", ""]
+    assert len(results) == 8
+    assert results["uniprot_accessions"].tolist() == [""] * 8
 
 
 @pytest.fixture
@@ -277,7 +278,7 @@ def test_meta_cli_loads_only_selected_refinement(tmp_path: Path):
         assert con.execute("SELECT DISTINCT powerfit_run_id FROM refinements_io").fetchall() == [("run_001",)]
         assert con.execute(
             "SELECT count(*) FROM refinements_capri_ss JOIN refinements_io USING (refine_run_dir)"
-        ).fetchone() == (4,)
+        ).fetchone() == (12,)
 
 
 def test_each_fitted_input_has_independent_clusters(tmp_path: Path):
@@ -289,8 +290,8 @@ def test_each_fitted_input_has_independent_clusters(tmp_path: Path):
         fh.write(f"experiment,run_003,powerfit/run_003/protein/fit_2.pdb,{second.relative_to(tmp_path)}\n")
     results = refinement_report(tmp_path, top=2)
     assert results.groupby("powerfit_run_id")["model_rank"].apply(list).to_dict() == {
-        "run_001": [1, 2],
-        "run_003": [1, 2],
+        "run_001": [1, 2] * 4,
+        "run_003": [1, 2] * 4,
     }
 
 
@@ -302,7 +303,7 @@ def test_partial_tsv_is_not_loaded_when_cluster_output_is_missing(tmp_path: Path
     (partial / "8_caprieval/capri_ss.tsv").write_text("unfinished")
     with pytest.warns(UserWarning, match="Excluded 1 incomplete") as caught:
         results = refinement_report(tmp_path)
-    assert len(results) == 1
+    assert len(results) == 4
     assert str(partial.relative_to(tmp_path)) in str(caught[0].message)
 
 
@@ -314,7 +315,7 @@ def test_empty_model_run_is_warned(tmp_path: Path):
     partial.mkdir()
     with pytest.warns(UserWarning, match="Excluded 1 incomplete") as caught:
         results = refinement_report(tmp_path)
-    assert len(results) == 1
+    assert len(results) == 4
     assert str(partial.relative_to(tmp_path)) in str(caught[0].message)
 
 
@@ -335,13 +336,13 @@ def session_without_io_indexes(tmp_path: Path, index_contents: str | None) -> Pa
 def test_report_discovers_results_without_io_indexes(session_without_io_indexes: Path, index_contents: str | None):
     tmp_path = session_without_io_indexes
     results = refinement_report(tmp_path, top=2)
-    assert len(results) == 4
+    assert len(results) == 16
     assert set(results["refine_run_id"]) == {"first", "second"}
-    assert results["uniprot_accessions"].tolist() == ["P12345:Q67890"] * 4
-    assert results["fitted_model"].tolist() == ["powerfit/run_001/protein/fit_1.pdb"] * 4
+    assert results["uniprot_accessions"].tolist() == ["P12345:Q67890"] * 16
+    assert results["fitted_model"].tolist() == ["powerfit/run_001/protein/fit_1.pdb"] * 16
     selected = refinement_report(tmp_path, "second", top=2)
-    assert len(selected) == 2
-    assert selected["refine_run_id"].tolist() == ["second", "second"]
+    assert len(selected) == 8
+    assert selected["refine_run_id"].tolist() == ["second"] * 8
 
 
 def test_report_rejects_empty_run_without_io_index(tmp_path: Path):
@@ -377,7 +378,7 @@ def test_csv_paths_are_relative_to_cwd(tmp_path: Path, cwd_location: str, absolu
     fitted_model = session / "powerfit/run_001/protein/fit_1.pdb"
     fitted_model.parent.mkdir(parents=True)
     fitted_model.write_text("MODEL\nENDMDL\n")
-    model = run / "6_mdref/mdref_2.pdb.gz"
+    model = run / "6_mdref/mdref_9.pdb.gz"
     model.parent.mkdir()
     model.write_bytes(b"")
     cwd = {"parent": tmp_path, "session": session, "elsewhere": tmp_path / "elsewhere"}[cwd_location]
