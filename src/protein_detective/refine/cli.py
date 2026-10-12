@@ -1,16 +1,17 @@
-"""Expose commands for running and listing HADDOCK3 refinements."""
+"""Expose commands for running, listing and reporting HADDOCK3 refinements."""
 
 import csv
 from pathlib import Path
 from typing import Annotated
 
 from cyclopts import App, Group, Parameter, validators
-from cyclopts.types import StdioPath
+from cyclopts.types import PositiveInt, StdioPath
 from protein_quest.cli.common import Common
 
 from protein_detective.meta import refinement_run_io_paths
 from protein_detective.refine.haddock import RefineOptions
 from protein_detective.refine.provenance import refine_run_arguments_from_rocrate
+from protein_detective.refine.report import refinement_report
 from protein_detective.refine.run import refine_with_haddock3
 
 refine_app = App(name="refine", help="HADDOCK3 refinement commands")
@@ -91,3 +92,39 @@ def list_runs(
         for index in refinement_run_io_paths(session_dir):
             fixed_structure, options = arguments.get(index.parent.name, ("", ""))
             writer.writerow([index.parent.name, index.parent, fixed_structure, options])
+
+
+@refine_app.command(help=refinement_report.__doc__)
+def report(
+    session_dir: Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=True, exists=True))],
+    /,
+    *,
+    refine_run_id: str | None = None,
+    top: PositiveInt = 1,
+    no_group_by_structure: Annotated[bool, Parameter(negative="")] = False,
+    output: StdioPath | None = None,
+):
+    """Report the best final members of every cluster for each fitted input.
+
+    Args:
+        session_dir: Session directory containing refinement results.
+        refine_run_id: Independent refinement run to select; defaults to all runs.
+        top: Positive number of best members per cluster, or overall when grouping is disabled.
+            This does not change the workflow's top_clusters or top_models options.
+        no_group_by_structure: Select the best top models overall instead of per
+            fitted input and cluster.
+        output: CSV output path; defaults to standard output.
+    """
+    results = refinement_report(session_dir, refine_run_id, top, group_by_structure=not no_group_by_structure)
+    cwd = Path.cwd()
+    for column in ("model_path", "fitted_model", "refine_run_dir"):
+        results[column] = results[column].map(
+            lambda path: str((session_dir / path).resolve().relative_to(cwd, walk_up=True))
+        )
+    results["cluster_id"] = (
+        results["cluster_id"].map(lambda cluster_id: f"{cluster_id:.0f}", na_action="ignore").fillna("-")
+    )
+    if output is None:
+        output = StdioPath("-")
+    with output.open("wt") as fh:
+        results.to_csv(fh, index=False)

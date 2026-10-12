@@ -11,6 +11,7 @@ from rocrate.metadata import BASENAME
 
 from protein_detective.common_cli import rprint
 from protein_detective.powerfit.workflow import powerfit_solutions_query
+from protein_detective.refine import LAST_CAPRIEVAL_MODULE
 
 DDLStatement = tuple[str, dict[str, str | list[str]]]
 """SQL DDL statement and named parameters (use $ prefix in SQL) to be passed to DuckDB connection.execute()"""
@@ -325,7 +326,7 @@ def _filter_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     return statements
 
 
-def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+def stats_csv_as_duckdb_ddl(session_dir: Path, refine_run_id: str | None = None) -> list[DDLStatement]:
     statements: list[DDLStatement] = []
     statements.extend(_search_csv_as_duckdb_ddl(session_dir))
 
@@ -336,6 +337,14 @@ def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     statements.extend(_retrieve_csv_as_duckdb_ddl(session_dir))
     statements.extend(_filter_csv_as_duckdb_ddl(session_dir))
 
+    statements.extend(powerfit_metadata_as_duckdb_ddl(session_dir))
+    statements.extend(refinements_io_as_duckdb_ddl(session_dir, refine_run_id=refine_run_id))
+    return statements
+
+
+def powerfit_metadata_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    """Load existing fitting indexes for metadata joins and refinement reporting."""
+    statements: list[DDLStatement] = []
     fittable_structures_csv = session_dir / "powerfit" / "fittable_structures.csv"
     if fittable_structures_csv.exists():
         statements.extend(_fittable_structures_csv_as_duckdb_ddl(fittable_structures_csv))
@@ -343,8 +352,6 @@ def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     fitted_models_csv = session_dir / "powerfit" / "fitted_models.csv"
     if fitted_models_csv.exists():
         statements.extend(_fitted_models_csv_as_duckdb_ddl(fitted_models_csv))
-
-    statements.extend(refinements_io_as_duckdb_ddl(session_dir))
 
     return statements
 
@@ -390,17 +397,30 @@ def solutions_as_duckdb_ddl(session_dir: Path, powerfit_run_id: str | None = Non
     ]
 
 
-def capri_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+def capri_as_duckdb_ddl(
+    session_dir: Path, refine_run_id: str | None = None, *, model_runs: list[Path] | None = None
+) -> list[DDLStatement]:
     """Load final CAPRI results with session-relative refinement run keys.
 
-    Read 7_caprieval only, excluding earlier stages and postprocessed copies
-    under analysis/. Like solutions, the keys describe relationships without
-    adding database foreign key constraints.
+    Read 8_caprieval, excluding earlier stages and postprocessed copies under
+    analysis/. Optionally restrict loading to a list of model runs, for
+    reporting complete results only. Like solutions, the keys describe
+    relationships without adding database foreign key constraints.
     """
+    session_dir = session_dir.resolve()
+    if refine_run_id is not None:
+        refinement_run_io_paths(session_dir, refine_run_id)
+    if model_runs is None:
+        model_runs = sorted(path for path in (session_dir / "refine").glob("*/*/*/*") if path.is_dir())
+    if refine_run_id is not None:
+        model_runs = [path for path in model_runs if path.relative_to(session_dir / "refine").parts[0] == refine_run_id]
     statements: list[DDLStatement] = []
     for table in ("capri_ss", "capri_clt"):
-        pattern = Path("refine") / "*" / "*" / "*" / "*" / "7_caprieval" / f"{table}.tsv"
-        files = sorted(str(path) for path in session_dir.glob(str(pattern)))
+        files = [
+            str(stage / f"{table}.tsv")
+            for model_run in model_runs
+            if (stage := model_run / LAST_CAPRIEVAL_MODULE).joinpath(f"{table}.tsv").is_file()
+        ]
         if not files:
             continue
         statements.append(
@@ -421,13 +441,13 @@ def capri_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     return statements
 
 
-def ddl(session_dir: Path, powerfit_run_id: str | None = None) -> list[DDLStatement]:
+def ddl(session_dir: Path, powerfit_run_id: str | None = None, refine_run_id: str | None = None) -> list[DDLStatement]:
     statements: list[DDLStatement] = []
     statements.extend(structure_files_as_duckdb_ddl(session_dir))
     statements.extend(rocrate_as_duckdb_ddl(session_dir))
-    statements.extend(stats_csv_as_duckdb_ddl(session_dir))
+    statements.extend(stats_csv_as_duckdb_ddl(session_dir, refine_run_id=refine_run_id))
     statements.extend(solutions_as_duckdb_ddl(session_dir, powerfit_run_id=powerfit_run_id))
-    statements.extend(capri_as_duckdb_ddl(session_dir))
+    statements.extend(capri_as_duckdb_ddl(session_dir, refine_run_id=refine_run_id))
     return statements
 
 
@@ -436,15 +456,22 @@ def _execute_ddl_statements(con: duckdb.DuckDBPyConnection, statements: list[DDL
         con.execute(statement, params)
 
 
-def in_memory_duckdb_connection(session_dir: Path, powerfit_run_id: str | None = None):
-    statements = ddl(session_dir, powerfit_run_id=powerfit_run_id)
+def in_memory_duckdb_connection(
+    session_dir: Path, powerfit_run_id: str | None = None, refine_run_id: str | None = None
+):
+    statements = ddl(session_dir, powerfit_run_id=powerfit_run_id, refine_run_id=refine_run_id)
     con = duckdb.connect(database=":memory:")
     _execute_ddl_statements(con, statements)
     return con
 
 
-def create_meta_duckdb_file(session_dir: Path, duckdb_file: Path | None = None, powerfit_run_id: str | None = None):
-    statements = ddl(session_dir, powerfit_run_id=powerfit_run_id)
+def create_meta_duckdb_file(
+    session_dir: Path,
+    duckdb_file: Path | None = None,
+    powerfit_run_id: str | None = None,
+    refine_run_id: str | None = None,
+):
+    statements = ddl(session_dir, powerfit_run_id=powerfit_run_id, refine_run_id=refine_run_id)
     if duckdb_file is None:
         duckdb_file = session_dir / "meta.duckdb"
     con = duckdb.connect(database=str(duckdb_file))
@@ -457,14 +484,16 @@ def create_meta_duckdb(
     /,
     *,
     powerfit_run_id: str | None = None,
+    refine_run_id: str | None = None,
 ) -> None:
     """Generate a DuckDB metadata database for a Protein Detective session.
 
     Args:
         session_dir: Session directory containing the files to include.
         powerfit_run_id: Optional PowerFit run ID used to restrict solutions.
+        refine_run_id: Optional independent refinement run ID used to restrict mappings and CAPRI results.
     """
-    create_meta_duckdb_file(session_dir, powerfit_run_id=powerfit_run_id)
+    create_meta_duckdb_file(session_dir, powerfit_run_id=powerfit_run_id, refine_run_id=refine_run_id)
     duckdb_file = session_dir / "meta.duckdb"
     rprint(
         f"[green]{duckdb_file} has been generated.[/green]\n"

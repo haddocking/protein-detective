@@ -4,8 +4,11 @@ import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
 from protein_quest.structure.formats import read_structure, write_structure
+from protein_quest.structure.metadata import structure_metadata
+from protein_quest.structure.uniprot_extraction import structure2uniprot_accessions
 
 from protein_detective.refine.haddock import RefineOptions
+from protein_detective.refine.report import refinement_report
 from protein_detective.refine.run import (
     create_refinement_run,
     refine_with_haddock3,
@@ -16,11 +19,11 @@ from tests.helpers import assert_crate, assert_lines
 
 
 @pytest.mark.manual
-def test_refine_with_haddock3_unclustered(
+def test_refine_with_haddock3_single_member_clusters(
     tmp_path: Path,
     cif_9a2g: Path,
     cif_1gru_groes: Path,
-    unclustered_refinement_results: dict[str, pd.DataFrame],
+    single_member_cluster_refinement_results: dict[str, pd.DataFrame],
 ):
     session_dir = setup_refinement_session(tmp_path, cif_9a2g)
     options = RefineOptions(rigidbody_sampling=10, ncores=6, top_clusters=4, top_models=1)
@@ -28,7 +31,7 @@ def test_refine_with_haddock3_unclustered(
     refine_with_haddock3(session_dir, cif_1gru_groes, refine_options=options, scheduler_address="sequential")
 
     assert_refinement_rocrate(session_dir, cif_1gru_groes)
-    assert_refinement_results(session_dir, unclustered_refinement_results)
+    assert_refinement_results(session_dir, single_member_cluster_refinement_results)
 
 
 @pytest.mark.manual
@@ -36,16 +39,20 @@ def test_refine_with_haddock3_clustered(
     tmp_path: Path,
     cif_9a2g: Path,
     cif_1gru_groes: Path,
-    clustered_refinement_results: dict[str, pd.DataFrame],
 ):
     session_dir = setup_refinement_session(tmp_path, cif_9a2g)
-    # A zero cutoff groups the small sample without relying on chance contact overlap.
-    options = RefineOptions(rigidbody_sampling=10, ncores=6, fcc_clust_cutoff=0.0, top_clusters=4, top_models=1)
+    options = RefineOptions(
+        rigidbody_sampling=10, ncores=6, top_clusters=4, top_models=1, water_refinement_sampling_factor=3
+    )
 
     refine_with_haddock3(session_dir, cif_1gru_groes, refine_options=options, scheduler_address="sequential")
 
     assert_refinement_rocrate(session_dir, cif_1gru_groes)
-    assert_refinement_results(session_dir, clustered_refinement_results)
+    results = assert_refinement_results(session_dir)
+    members = results["models"]
+    populations = members[members["cluster_id"] != "-"].groupby("cluster_id").size()
+    assert len(populations) >= 2
+    assert populations.max() >= 3
 
 
 def setup_refinement_session(tmp_path: Path, fitted_structure: Path) -> Path:
@@ -57,22 +64,57 @@ def setup_refinement_session(tmp_path: Path, fitted_structure: Path) -> Path:
     fitted_model = powerfit_run_dir / "fit_1.pdb"
     # Need pdb format so convert
     write_structure(read_structure(fitted_structure), fitted_model)
-    # fake fitted_models.csv
-    fitted_models_csv = powerfit_root_dir / "fitted_models.csv"
-    fitted_models_csv.write_text("fitted_model_file\npowerfit/run_001/fakestructure.cif/fit_1.pdb\n")
+    source_file = str(fitted_structure.relative_to(session_dir, walk_up=True))
+    metadata = structure_metadata(fitted_structure)
+    pd.DataFrame(
+        [
+            {
+                "structure_file": source_file,
+                "structure": powerfit_run_dir.name,
+                "structure_id": metadata.id,
+                "is_alphafold": metadata.is_alphafold,
+                "uniprot_accessions": ":".join(sorted(structure2uniprot_accessions(fitted_structure))),
+            }
+        ]
+    ).to_csv(powerfit_root_dir / "fittable_structures.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                "powerfit_run_id": "run_001",
+                "structure": powerfit_run_dir.name,
+                "rank": 1,
+                "fitted_model_file": str(fitted_model.relative_to(session_dir)),
+                "unfitted_model_file": source_file,
+            }
+        ]
+    ).to_csv(powerfit_root_dir / "fitted_models.csv", index=False)
 
     return session_dir
 
 
-def assert_refinement_results(session_dir: Path, expected_results: dict[str, pd.DataFrame]):
+def assert_refinement_results(session_dir: Path, expected_results: dict[str, pd.DataFrame] | None = None):
     assert (session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/6_mdref/mdref_1.pdb.gz").exists()
     capri_dir = session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/8_caprieval"
     results = {
         "models": pd.read_csv(capri_dir / "capri_ss.tsv", sep="\t", comment="#"),
         "clusters": pd.read_csv(capri_dir / "capri_clt.tsv", sep="\t", comment="#"),
     }
-    assert_frame_equal(results["models"], expected_results["models"], check_exact=True)
-    assert_frame_equal(results["clusters"], expected_results["clusters"], check_exact=True)
+    if expected_results is not None:
+        assert_frame_equal(results["models"], expected_results["models"], check_exact=True)
+        assert_frame_equal(results["clusters"], expected_results["clusters"], check_exact=True)
+
+    report = refinement_report(session_dir, top=2)
+    assert report["uniprot_accessions"].tolist() == ["P0A6F5"] * len(report)
+    assert report["fitted_rank"].tolist() == [1] * len(report)
+    assert (
+        report["model_score"].tolist()
+        == results["models"]
+        .sort_values(["cluster_ranking", "score", "caprieval_rank", "model"])
+        .groupby("cluster_id", sort=False)
+        .head(2)["score"]
+        .tolist()
+    )
+    assert all((session_dir / path).is_file() and path.endswith(".pdb.gz") for path in report["model_path"])
 
     return results
 

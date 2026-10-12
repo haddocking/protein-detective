@@ -456,17 +456,17 @@ def test_capri_tables_join_refinement_runs_and_only_load_final_stage(tmp_path: P
         )
     fixture = Path(__file__).parent / "fixtures" / "refine" / f"{table}.tsv"
     for run_dir in run_dirs:
-        for step in ("2_caprieval", "7_caprieval"):
+        for step in ("2_caprieval", "8_caprieval"):
             stage_dir = session_dir / run_dir / step
             stage_dir.mkdir(parents=True)
             shutil.copyfile(fixture, stage_dir / f"{table}.tsv")
         # Postprocessed copies must not duplicate the stage results.
-        analysis_dir = session_dir / run_dir / "analysis" / "7_caprieval_analysis"
+        analysis_dir = session_dir / run_dir / "analysis" / "8_caprieval_analysis"
         analysis_dir.mkdir(parents=True)
         shutil.copyfile(fixture, analysis_dir / f"{table}.tsv")
 
     # Include results from runs not recorded in refinements_io.
-    orphan_dir = refine_dir / "refine_run_003" / "run_001" / "structure.cif" / "fit_1.pdb" / "7_caprieval"
+    orphan_dir = refine_dir / "refine_run_003" / "run_001" / "structure.cif" / "fit_1.pdb" / "8_caprieval"
     orphan_dir.mkdir(parents=True)
     shutil.copyfile(fixture, orphan_dir / f"{table}.tsv")
 
@@ -569,7 +569,7 @@ def test_capri_tables_join_refinement_runs_and_only_load_final_stage(tmp_path: P
 
 def test_capri_ddl_loads_without_refinement_io_and_skips_missing_tables(tmp_path: Path):
     assert capri_as_duckdb_ddl(tmp_path) == []
-    stage_dir = tmp_path / "refine" / "refine_run_001" / "run_001" / "structure" / "fit_1.pdb" / "7_caprieval"
+    stage_dir = tmp_path / "refine" / "refine_run_001" / "run_001" / "structure" / "fit_1.pdb" / "8_caprieval"
     stage_dir.mkdir(parents=True)
     results = stage_dir / "capri_ss.tsv"
     shutil.copyfile(Path(__file__).parent / "fixtures/refine/capri_ss.tsv", results)
@@ -592,7 +592,7 @@ def test_multiple_refinement_indexes_load_together(tmp_path: Path):
             "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
             f"{run_id},run_001,powerfit/run_001/same_structure/fit_1.pdb,{model_run}\n"
         )
-        stage = tmp_path / model_run / "7_caprieval"
+        stage = tmp_path / model_run / "8_caprieval"
         stage.mkdir(parents=True)
         (stage / "capri_ss.tsv").write_text("model\tscore\tcaprieval_rank\tcluster_id\nx.pdb\t-10\t1\t-\n")
     with duckdb.connect() as con:

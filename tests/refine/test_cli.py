@@ -119,3 +119,24 @@ def test_list_runs_without_crate(session_with_powerfit_results: Path, tmp_path: 
             "options": "",
         }
     ]
+
+
+def test_report_help_documents_ranking_metadata_and_output(capsys: pytest.CaptureFixture[str]):
+    cli(["refine", "report", "--help"])
+    captured = capsys.readouterr()
+    help_text = " ".join((captured.out + captured.err).split())
+    assert "from every cluster" in help_text
+    assert "powerfit/fitted_models.csv" in help_text
+    assert "powerfit/fittable_structures.csv" in help_text
+    assert "contain data rows" in help_text
+    assert "compressed PDBs" in help_text
+    assert "current working directory" in help_text
+    assert "stderr" in help_text and "stdout" in help_text
+    assert "--top" in help_text and "--output" in help_text
+    assert "--no-group-by-structure" in help_text
+    assert "models overall" in help_text
+    assert "cluster_score_std: capri_clt.tsv column score_std" in help_text
+    assert "model_score: capri_ss.tsv column score" in help_text
+    assert "fitted_rank: powerfit/fitted_models.csv column rank" in help_text
+    assert "refine/{refine_run_id}" in help_text
+    assert "{structure}/{fitted_model_name}" in help_text

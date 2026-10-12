@@ -85,6 +85,9 @@ flowchart TB
     end
     M1 -- "**/fit_*.pdb" --> refine
 
+    E2[protein-detective refine report]
+    refine -- "**/8_caprieval/capri_*.tsv" --> E2
+
     META[protein-detective meta]
     refine -- session/ --> META
 
@@ -373,7 +376,10 @@ using haddock3.
 ```shell
 protein-detective refine run mysession fixed_structure.pdb
 protein-detective refine list-runs mysession
+protein-detective refine report mysession --top 2 --output refined.csv
 ```
+
+See `protein-detective refine report --help` for reporting options and details.
 
 ### Metadata database
 
