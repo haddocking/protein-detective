@@ -7,6 +7,15 @@ import pytest
 pytest.register_assert_rewrite("tests.helpers")
 
 
+@pytest.fixture
+def clustered_refinement_results_paths() -> dict[str, Path]:
+    fixture_dir = Path(__file__).parent / "refine" / "fixtures"
+    return {
+        "models": fixture_dir / "6j5w-clustered-capri_ss.tsv",
+        "clusters": fixture_dir / "6j5w-clustered-capri_clt.tsv",
+    }
+
+
 def _fetch_tutorial_fixture(filename: str, sha256: str) -> Path:
     base_url = "https://github.com/haddocking/powerfit-tutorial/raw/master"
     path = pooch.retrieve(

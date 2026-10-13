@@ -442,7 +442,7 @@ def test_refine_io_is_loaded_with_ctas(tmp_path: Path):
 
 
 @pytest.fixture
-def capri_tables(tmp_path: Path, table: str):
+def capri_tables(tmp_path: Path, table: str, clustered_refinement_results_paths: dict[str, Path]):
     session_dir = tmp_path / "session with spaces"
     refine_dir = session_dir / "refine"
     refine_dir.mkdir(parents=True)
@@ -454,7 +454,7 @@ def capri_tables(tmp_path: Path, table: str):
             "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
             f"refine_run_00{i},run_001,powerfit/run_001/structure.cif/fit_1.pdb,{run_dir}\n"
         )
-    fixture = Path(__file__).parent / "refine" / "fixtures" / f"{table}.tsv"
+    fixture = clustered_refinement_results_paths["models" if table == "capri_ss" else "clusters"]
     for run_dir in run_dirs:
         for step in ("2_caprieval", "8_caprieval"):
             stage_dir = session_dir / run_dir / step
@@ -523,10 +523,9 @@ def test_capri_ss_joins_refinement_runs_and_only_loads_final_stage(
         "JOIN refinements_io USING (refine_run_dir) WHERE caprieval_rank = 1 ORDER BY refine_run_dir"
     ).fetchall()
     expected_rows = [
-        (run_dir, "../6_mdref/mdref_9.pdb", None, 1, -99.224, 1.0, 1765.330, -491.102, None, None, None)
-        for run_dir in run_dirs
+        (run_dir, "../6_mdref/mdref_9.pdb", None, 1, -121.192, 1.0, 1472.42, -607.892, 2, 1, 1) for run_dir in run_dirs
     ]
-    expected_count = 30
+    expected_count = 36
     assert columns == expected_columns
     assert rows == expected_rows
     assert con.table(f"refinements_{table}").count("*").fetchone() == (expected_count,)
@@ -575,27 +574,38 @@ def test_capri_clt_joins_refinement_runs_and_only_loads_final_stage(
     rows = con.execute(
         "SELECT refine_run_dir, cluster_rank, cluster_id, n, under_eval, score, score_std, dockq, "
         "dockq_std, caprieval_rank FROM refinements_capri_clt "
-        "JOIN refinements_io USING (refine_run_dir) ORDER BY refine_run_dir"
+        "JOIN refinements_io USING (refine_run_dir) ORDER BY refine_run_dir, cluster_rank"
     ).fetchall()
-    expected_rows = [(run_dir, None, None, 10, None, -84.827, 13.884, 0.265, 0.424, 1) for run_dir in run_dirs]
-    expected_count = 3
+    expected_rows = [
+        (run_dir, rank, cluster_id, 3, True, score, 0.0, dockq, 0.0, rank)
+        for run_dir in run_dirs
+        for rank, cluster_id, score, dockq in (
+            (1, 2, -121.192, 1.0),
+            (2, 1, -70.837, 0.017),
+            (3, 4, -63.228, 0.025),
+            (4, 3, -58.954, 0.004),
+        )
+    ]
+    expected_count = 12
     assert columns == expected_columns
     assert rows == expected_rows
     assert con.table(f"refinements_{table}").count("*").fetchone() == (expected_count,)
 
 
-def test_capri_ddl_loads_without_refinement_io_and_skips_missing_tables(tmp_path: Path):
+def test_capri_ddl_loads_without_refinement_io_and_skips_missing_tables(
+    tmp_path: Path, clustered_refinement_results_paths: dict[str, Path]
+):
     assert capri_as_duckdb_ddl(tmp_path) == []
     stage_dir = tmp_path / "refine" / "refine_run_001" / "run_001" / "structure" / "fit_1.pdb" / "8_caprieval"
     stage_dir.mkdir(parents=True)
     results = stage_dir / "capri_ss.tsv"
-    shutil.copyfile(Path(__file__).parent / "refine/fixtures/capri_ss.tsv", results)
+    shutil.copyfile(clustered_refinement_results_paths["models"], results)
     statements = capri_as_duckdb_ddl(tmp_path)
     assert len(statements) == 1
     assert "CREATE TABLE refinements_capri_ss" in statements[0][0]
     with duckdb.connect(database=":memory:") as con:
         con.execute(*statements[0])
-        assert con.table("refinements_capri_ss").count("*").fetchone() == (10,)
+        assert con.table("refinements_capri_ss").count("*").fetchone() == (12,)
     results.unlink()
     assert capri_as_duckdb_ddl(tmp_path) == []
 
