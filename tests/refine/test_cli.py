@@ -59,10 +59,10 @@ def test_run_accepts_independent_run_ids(session_with_powerfit_results: Path, fi
 def refinement_run(session_with_powerfit_results: Path) -> Path:
     run_dir = session_with_powerfit_results / "refine" / "experiment"
     run_dir.mkdir(parents=True)
-    model_run = "refine/experiment/run_003/same_structure/fit_1.pdb"
+    refinement_run = "refine/experiment/run_003/same_structure/fit_1.pdb"
     (run_dir / "io.csv").write_text(
         "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
-        f"experiment,run_003,powerfit/run_003/same_structure/fit_1.pdb,{model_run}\n"
+        f"experiment,run_003,powerfit/run_003/same_structure/fit_1.pdb,{refinement_run}\n"
     )
     return run_dir
 

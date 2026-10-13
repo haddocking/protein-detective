@@ -38,6 +38,65 @@ class RefineOptions:
     fcc_clust_cutoff: float = 0.60
 
 
+def prepare_fitted_and_fixed(fitted_model: Path, fixed_structure: Path, output_dir: Path) -> Path:
+    """Combine fitted chain A and fixed chain B without transforming coordinates.
+
+    Args:
+        fitted_model: Fitted structure containing only chain A.
+        fixed_structure: Prepared fixed structure containing only chain B.
+        output_dir: Directory in which to write the combined structure.
+
+    Returns:
+        Path to fitted-and-fixed.pdb.
+
+    Raises:
+        ValueError: An input has multiple models or unexpected chains.
+    """
+    structure = read_structure(fitted_model)
+    fixed = read_structure(fixed_structure)
+    if len(structure) != 1 or len(fixed) != 1:
+        msg = "Baseline scoring requires single-model fitted and fixed structures."
+        raise ValueError(msg)
+    if [chain.name for chain in structure[0]] != ["A"]:
+        msg = "Fitted structure must contain only chain A."
+        raise ValueError(msg)
+    if [chain.name for chain in fixed[0]] != ["B"]:
+        msg = "Fixed structure must contain only chain B."
+        raise ValueError(msg)
+    structure[0].add_chain(fixed[0]["B"].clone())
+    output = output_dir / "fitted-and-fixed.pdb"
+    write_structure(structure, output)
+    return output
+
+
+def generate_unrefined_config_body(run_dir: Path, complex_file: Path, ncores: int) -> str:
+    """Configure the separate energy-minimized fitted-structure baseline.
+
+    Args:
+        run_dir: HADDOCK3 scoring output directory.
+        complex_file: Combined fitted and fixed structure file.
+        ncores: Number of CPU cores to use.
+
+    Returns:
+        HADDOCK3 configuration text for baseline scoring.
+    """
+    return dedent(f"""\
+        run_dir = "{run_dir}"
+        mode = "local"
+        ncores = {ncores}
+        clean = true
+        postprocess = true
+
+        molecules = ["{complex_file}"]
+
+        [topoaa]
+
+        [emscoring]
+
+        [caprieval]
+        """)
+
+
 def generate_haddock3_config_body(
     run_dir: Path, fitted_model: Path, fixed_structure: Path, options: RefineOptions
 ) -> str:
@@ -141,12 +200,13 @@ def prepare_fixed_structure(
 
 
 def run_haddock3(config_file: Path) -> None:
-    """Execute a HADDOCK3 workflow and clean its intermediate output.
+    """Execute a HADDOCK3 workflow, do postprocessing and clean its intermediate output.
 
     Args:
         config_file: Configuration file describing the workflow and output directory.
     """
-    modules_params, general_params = setup_run(config_file)
+    # Start at step zero to allow the config and inputs inside same existing directory as output.
+    modules_params, general_params = setup_run(config_file, restart_from=0)
     run_dir = general_params[RUNDIR]
 
     with working_directory(run_dir):

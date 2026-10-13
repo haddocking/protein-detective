@@ -68,8 +68,12 @@ Proposed layout:
 session/refine/refine_run_001/
     fixed_structure.pdb
     io.csv
-    <source-fit-run-id>/<structure>/fit_1.pdb.cfg
-    <source-fit-run-id>/<structure>/fit_1.pdb/<HADDOCK steps>
+    <source-fit-run-id>/<structure>/fit_1.pdb/
+        baseline/workflow.cfg
+        refinement/workflow.cfg
+        baseline/fitted-and-fixed.pdb
+        baseline/<HADDOCK scoring steps>
+        refinement/<HADDOCK refinement steps>
 ```
 
 Assume PowerFit files are written once. Reuse the existing fitting CSVs for
@@ -83,15 +87,17 @@ session-relative paths in `io.csv` and resolve absolute paths explicitly against
 `session_dir` at the HADDOCK boundary. Deduplicate selected model paths and
 reject missing inputs or an empty selection before creating a run. Preserve the
 source fitting ID in the model directory to prevent collisions, without an
-additional `models/` grouping directory. Keep configs outside HADDOCK model run
-directories, as required by the existing `setup_run()` behavior.
+additional `models/` grouping directory. Keep configs inside their workflow
+directories, using HADDOCK's `restart_from=0` for fresh workflows that already
+contain their config and input files.
 
 Write `io.csv` with the expected input/output mapping before launching work,
 including `refine_run_id` and source fitting ID. Mapping presence does not imply
-completion. Keep `refine_run_dir` as the session-relative model-level HADDOCK
-directory so existing joins remain meaningful. Update RO-Crate outputs and
-command metadata to reference the particular run, inputs, config, and options.
-Keep index writes in the coordinator; workers write only their own results.
+completion. Keep `refine_run_dir` as the session-relative fitted-input directory
+containing both workflows so existing joins remain meaningful. Update RO-Crate
+outputs and command metadata to reference the particular run, inputs, config,
+and options. Keep index writes in the coordinator; workers write only their own
+results.
 
 Replace the draft `refine SESSION FIXED_STRUCTURE` command with `refine run`
 directly; no default-command wrapper or CLI transition period is needed.
@@ -183,13 +189,14 @@ Take the `score` column from the first data row of this workflow's
 `2_caprieval/capri_ss.tsv` as the score of the unrefined fitted structure. Skip
 TSV comments and the header; do not select a different row by sorting scores.
 This baseline replaces the existing refinement workflow's `2_caprieval` score
-and the proposed `best_rigidbody_score` field.
+and the proposed `best_unrefined_score` field.
 
-Include this pre-refinement score in the report alongside final individual and
-cluster scores from the refinement workflow's final CAPRI stage (currently
-`7_caprieval`). Record the baseline scoring config and output directory so the
-two workflows' `2_caprieval` stages cannot be confused. Update stage discovery,
-configuration tests, and metadata loading for the separate baseline workflow.
+Include this pre-refinement score in the report as `unrefined_score` alongside
+final individual and cluster scores from the refinement workflow's final CAPRI
+stage (currently `8_caprieval`). Record the baseline scoring config and output
+directory so the two workflows' `2_caprieval` stages cannot be confused. Update
+stage discovery, configuration tests, and metadata loading for the separate
+baseline workflow.
 
 Label the baseline as the unrefined fitted-structure HADDOCK3 score obtained
 with `emscoring`. This protocol includes energy minimization; it is not an
@@ -374,3 +381,44 @@ manual tests excluded. Ruff, Pyrefly and all pre-commit hooks passed. Both
 manual HADDOCK tests previously passed after the clustered test was changed to
 require multiple clusters with at least one population of three or more (184.20
 seconds); they were not rerun after the report refactors.
+
+---
+
+## Refinement TODO 3: completed
+
+Implemented on 2026-10-13:
+
+- Each fitted input is combined as chain A with the prepared fixed structure as
+  chain B in `fitted-and-fixed.pdb`, preserving the existing coordinate frame.
+- A separate `topoaa` / `emscoring` / `caprieval` baseline workflow runs before
+  refinement. Each fitted-input directory contains `baseline/` with
+  `fitted-and-fixed.pdb` and scoring outputs, and `refinement/` with refinement
+  outputs. Each workflow directory contains its own `workflow.cfg`. RO-Crate
+  records the fitted-input directory, covering both workflows and configs.
+- The report includes `unrefined_score` from the first data row of the
+  baseline's `baseline/2_caprieval/capri_ss.tsv`, skipping comments and the
+  header without sorting scores. Final model and cluster scores still come from
+  `refinement/8_caprieval`. Results without a baseline retain an empty
+  `unrefined_score`.
+- Metadata loads `refinements_unrefined` with the same session-relative
+  `refine_run_dir` join key and honors `--refine-run-id`. Baseline directories
+  are excluded from final-result discovery. README, metadata notebook and ER
+  diagram document the baseline and its joins.
+- Scores are reported separately, without paired deltas. The baseline includes
+  energy minimization; final cluster averages summarize a different population.
+- Tests cover chain assignment and coordinates, baseline configuration,
+  first-row extraction, missing baseline scores, workflow separation, selectors,
+  report values, compressed outputs and provenance.
+
+Validation: `uv run pytest` passed with **126 passed, 2 skipped, 2 manual tests
+excluded**. Ruff and Pyrefly passed. Both real HADDOCK integration tests passed
+in **402.37 seconds**, verifying baseline and final workflows, report scores,
+compression and provenance. All pre-commit hooks passed.
+
+Layout follow-up: baseline and refinement now live in separate subdirectories of
+each fitted-input directory. Both manual HADDOCK tests passed for this layout in
+**417.42 seconds**. Non-manual tests also call HADDOCK's real `setup_run()` with
+each `workflow.cfg` inside its workflow directory, using `restart_from=0`.
+RO-Crate records only the enclosing fitted-input directory as an output
+directory. The updated automated suite passed with **130 passed, 2 skipped, 2
+manual tests excluded**.

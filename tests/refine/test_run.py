@@ -8,6 +8,7 @@ from protein_quest.structure.metadata import structure_metadata
 from protein_quest.structure.uniprot_extraction import structure2uniprot_accessions
 
 from protein_detective.refine.haddock import RefineOptions
+from protein_detective.refine.report import refinement_report
 from protein_detective.refine.run import (
     create_refinement_run,
     refine_with_haddock3,
@@ -84,8 +85,16 @@ def setup_refinement_session(tmp_path: Path, fitted_structure: Path) -> Path:
 
 
 def assert_refinement_results(session_dir: Path, expected_results: dict[str, pd.DataFrame]):
-    assert (session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/6_mdref/mdref_1.pdb.gz").exists()
-    capri_dir = session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/8_caprieval"
+    baseline = session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/baseline"
+    baseline_scores = pd.read_csv(baseline / "2_caprieval/capri_ss.tsv", sep="\t", comment="#")
+    report = refinement_report(session_dir)
+    assert report["unrefined_score"].notna().all()
+    assert report["unrefined_score"].eq(baseline_scores.iloc[0]["score"]).all()
+    assert (baseline / "1_emscoring/emscoring_1.pdb.gz").is_file()
+    assert (
+        session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/refinement/6_mdref/mdref_1.pdb.gz"
+    ).exists()
+    capri_dir = session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/refinement/8_caprieval"
     results = {
         "models": pd.read_csv(capri_dir / "capri_ss.tsv", sep="\t", comment="#"),
         "clusters": pd.read_csv(capri_dir / "capri_clt.tsv", sep="\t", comment="#"),
@@ -117,7 +126,6 @@ def assert_refinement_rocrate(session_dir: Path, fixed_structure: Path):
     crate_output_ids = {
         "refine/refine_run_001/io.csv",
         "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/",
-        "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb.cfg",
     }
 
     assert_lines(session_dir / "refine/refine_run_001/io.csv", expected_io_csv_lines)

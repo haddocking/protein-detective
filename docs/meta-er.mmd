@@ -159,6 +159,11 @@ erDiagram
       VARCHAR refine_run_dir
     }
     "fitted_models" ||--o{ "refinements_io" : "fitted_model_file = fitted_model"
+    "refinements_unrefined" {
+      VARCHAR refine_run_dir FK
+      DOUBLE unrefined_score
+    }
+    "refinements_io" ||--o| "refinements_unrefined" : "refine_run_dir = refine_run_dir"
     "refinements_capri_ss" {
       VARCHAR refine_run_dir FK
       VARCHAR model

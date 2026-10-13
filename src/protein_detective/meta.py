@@ -398,11 +398,11 @@ def solutions_as_duckdb_ddl(session_dir: Path, powerfit_run_id: str | None = Non
 
 
 def capri_as_duckdb_ddl(
-    session_dir: Path, refine_run_id: str | None = None, *, model_runs: list[Path] | None = None
+    session_dir: Path, refine_run_id: str | None = None, *, refinement_runs: list[Path] | None = None
 ) -> list[DDLStatement]:
     """Load final CAPRI results with session-relative refinement run keys.
 
-    Read 8_caprieval, excluding earlier stages and postprocessed copies under
+    Read refinement/8_caprieval, excluding earlier stages and postprocessed copies under
     analysis/. Optionally restrict loading to a list of model runs, for
     reporting complete results only. Like solutions, the keys describe
     relationships without adding database foreign key constraints.
@@ -410,16 +410,18 @@ def capri_as_duckdb_ddl(
     session_dir = session_dir.resolve()
     if refine_run_id is not None:
         refinement_run_io_paths(session_dir, refine_run_id)
-    if model_runs is None:
-        model_runs = sorted(path for path in (session_dir / "refine").glob("*/*/*/*") if path.is_dir())
+    if refinement_runs is None:
+        refinement_runs = sorted(path for path in (session_dir / "refine").glob("*/*/*/*") if path.is_dir())
     if refine_run_id is not None:
-        model_runs = [path for path in model_runs if path.relative_to(session_dir / "refine").parts[0] == refine_run_id]
+        refinement_runs = [
+            path for path in refinement_runs if path.relative_to(session_dir / "refine").parts[0] == refine_run_id
+        ]
     statements: list[DDLStatement] = []
     for table in ("capri_ss", "capri_clt"):
         files = [
             str(stage / f"{table}.tsv")
-            for model_run in model_runs
-            if (stage := model_run / LAST_CAPRIEVAL_MODULE).joinpath(f"{table}.tsv").is_file()
+            for refinement_run in refinement_runs
+            if (stage := refinement_run / "refinement" / LAST_CAPRIEVAL_MODULE).joinpath(f"{table}.tsv").is_file()
         ]
         if not files:
             continue
@@ -428,7 +430,9 @@ def capri_as_duckdb_ddl(
                 f"""\
                 CREATE TABLE refinements_{table} AS
                 SELECT
-                    replace(parse_dirpath(parse_dirpath(filename)), $session_dir || '/', '') AS refine_run_dir,
+                    replace(
+                        parse_dirpath(parse_dirpath(parse_dirpath(filename))), $session_dir || '/', ''
+                    ) AS refine_run_dir,
                     * EXCLUDE (filename)
                 FROM read_csv(
                     $capri_pattern, delim = '\t', header = true, comment = '#',
@@ -441,6 +445,61 @@ def capri_as_duckdb_ddl(
     return statements
 
 
+def unrefined_scores_as_duckdb_ddl(
+    session_dir: Path, refine_run_id: str | None = None, *, refinement_runs: list[Path] | None = None
+) -> list[DDLStatement]:
+    """Load the single baseline CAPRI data row per fitted input.
+
+    Keep baseline keys identical to final CAPRI keys, and leave missing or empty
+    baseline results absent so reports can retain older refinement results.
+
+    Args:
+        session_dir: Session directory containing refinement runs.
+        refine_run_id: Refinement run to select; defaults to all runs.
+        refinement_runs: Refinement run directories to load; defaults to discovered runs.
+
+    Returns:
+        SQL statements and parameters for loading refinements_unrefined.
+
+    Raises:
+        ValueError: The requested refinement run has no IO index.
+    """
+    session_dir = session_dir.resolve()
+    if refine_run_id is not None:
+        refinement_run_io_paths(session_dir, refine_run_id)
+    root = session_dir / "refine"
+    if refine_run_id is not None:
+        root /= refine_run_id
+        pattern = root / "*/*/*/baseline/2_caprieval/capri_ss.tsv"
+    else:
+        pattern = root / "*/*/*/*/baseline/2_caprieval/capri_ss.tsv"
+    baseline_pattern: str | list[str] = str(pattern)
+    files = sorted(session_dir.glob(str(pattern.relative_to(session_dir))))
+    if refinement_runs is not None:
+        selected = {run / "baseline/2_caprieval/capri_ss.tsv" for run in refinement_runs}
+        files = [path for path in files if path in selected]
+        baseline_pattern = [str(path) for path in files]
+    if not files:
+        return [("CREATE TABLE refinements_unrefined (refine_run_dir VARCHAR, unrefined_score DOUBLE);", {})]
+    return [
+        (
+            """\
+            CREATE TABLE refinements_unrefined AS
+            SELECT
+                replace(
+                    parse_dirpath(parse_dirpath(parse_dirpath(filename))), $session_dir || '/', ''
+                ) AS refine_run_dir,
+                score AS unrefined_score
+            FROM read_csv(
+                $baseline_pattern, delim = '\t', header = true, comment = '#',
+                nullstr = '-'
+            );
+            """,
+            {"baseline_pattern": baseline_pattern, "session_dir": str(session_dir)},
+        )
+    ]
+
+
 def ddl(session_dir: Path, powerfit_run_id: str | None = None, refine_run_id: str | None = None) -> list[DDLStatement]:
     statements: list[DDLStatement] = []
     statements.extend(structure_files_as_duckdb_ddl(session_dir))
@@ -448,6 +507,7 @@ def ddl(session_dir: Path, powerfit_run_id: str | None = None, refine_run_id: st
     statements.extend(stats_csv_as_duckdb_ddl(session_dir, refine_run_id=refine_run_id))
     statements.extend(solutions_as_duckdb_ddl(session_dir, powerfit_run_id=powerfit_run_id))
     statements.extend(capri_as_duckdb_ddl(session_dir, refine_run_id=refine_run_id))
+    statements.extend(unrefined_scores_as_duckdb_ddl(session_dir, refine_run_id=refine_run_id))
     return statements
 
 

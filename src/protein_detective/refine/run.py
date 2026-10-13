@@ -13,6 +13,8 @@ from protein_detective.filter import _sequential_context
 from protein_detective.refine.haddock import (
     RefineOptions,
     generate_haddock3_config_body,
+    generate_unrefined_config_body,
+    prepare_fitted_and_fixed,
     prepare_fixed_structure,
     run_haddock3,
 )
@@ -32,7 +34,7 @@ def refine_structure_task(
         options: Refinement parameters for HADDOCK3.
 
     Returns:
-        Absolute fitted input and its model-level HADDOCK3 output directory.
+        Absolute fitted input and its directory containing both workflows.
 
     Raises:
         FileExistsError: The model output directory already exists.
@@ -45,12 +47,19 @@ def refine_structure_task(
         msg = f"Refine directory already exists: {refine_run_dir}"
         raise FileExistsError(msg)
 
-    # Keep the workflow config outside the run_dir because HADDOCK3's
-    # setup_run refuses to start in a non-empty directory.
-    refine_run_dir.parent.mkdir(parents=True, exist_ok=True)
-    config_file = refine_run_dir.parent / f"{refine_run_dir.name}.cfg"
+    refine_run_dir.mkdir(parents=True)
+    baseline_dir = refine_run_dir / "baseline"
+    baseline_dir.mkdir()
+    complex_file = prepare_fitted_and_fixed(abs_fitted_model, fixed_structure, baseline_dir)
+    baseline_config = baseline_dir / "workflow.cfg"
+    baseline_config.write_text(generate_unrefined_config_body(baseline_dir, complex_file, options.ncores))
+    run_haddock3(baseline_config)
+
+    refinement_dir = refine_run_dir / "refinement"
+    refinement_dir.mkdir()
+    config_file = refinement_dir / "workflow.cfg"
     config_body = generate_haddock3_config_body(
-        run_dir=refine_run_dir,
+        run_dir=refinement_dir,
         fitted_model=abs_fitted_model,
         fixed_structure=fixed_structure,
         options=options,
@@ -82,7 +91,7 @@ def refine_structures(
         scheduler_address: Dask scheduler address, or sequential execution mode.
 
     Returns:
-        Absolute fitted inputs paired with their model-level output directories.
+        Absolute fitted inputs paired with their directories containing both workflows.
     """
     return map_with_progress(
         scheduler_address,

@@ -457,16 +457,18 @@ def capri_tables(tmp_path: Path, table: str, clustered_refinement_results_paths:
     fixture = clustered_refinement_results_paths["models" if table == "capri_ss" else "clusters"]
     for run_dir in run_dirs:
         for step in ("2_caprieval", "8_caprieval"):
-            stage_dir = session_dir / run_dir / step
+            stage_dir = session_dir / run_dir / "refinement" / step
             stage_dir.mkdir(parents=True)
             shutil.copyfile(fixture, stage_dir / f"{table}.tsv")
         # Postprocessed copies must not duplicate the stage results.
-        analysis_dir = session_dir / run_dir / "analysis" / "8_caprieval_analysis"
+        analysis_dir = session_dir / run_dir / "refinement" / "analysis" / "8_caprieval_analysis"
         analysis_dir.mkdir(parents=True)
         shutil.copyfile(fixture, analysis_dir / f"{table}.tsv")
 
     # Include results from runs not recorded in refinements_io.
-    orphan_dir = refine_dir / "refine_run_003" / "run_001" / "structure.cif" / "fit_1.pdb" / "8_caprieval"
+    orphan_dir = (
+        refine_dir / "refine_run_003" / "run_001" / "structure.cif" / "fit_1.pdb" / "refinement" / "8_caprieval"
+    )
     orphan_dir.mkdir(parents=True)
     shutil.copyfile(fixture, orphan_dir / f"{table}.tsv")
 
@@ -596,7 +598,9 @@ def test_capri_ddl_loads_without_refinement_io_and_skips_missing_tables(
     tmp_path: Path, clustered_refinement_results_paths: dict[str, Path]
 ):
     assert capri_as_duckdb_ddl(tmp_path) == []
-    stage_dir = tmp_path / "refine" / "refine_run_001" / "run_001" / "structure" / "fit_1.pdb" / "8_caprieval"
+    stage_dir = (
+        tmp_path / "refine" / "refine_run_001" / "run_001" / "structure" / "fit_1.pdb" / "refinement" / "8_caprieval"
+    )
     stage_dir.mkdir(parents=True)
     results = stage_dir / "capri_ss.tsv"
     shutil.copyfile(clustered_refinement_results_paths["models"], results)
@@ -613,14 +617,14 @@ def test_capri_ddl_loads_without_refinement_io_and_skips_missing_tables(
 @pytest.fixture
 def multiple_refinement_indexes(tmp_path: Path):
     for run_id in ("refine_run_001", "refine_run_003"):
-        model_run = f"refine/{run_id}/run_001/same_structure/fit_1.pdb"
+        refinement_run = f"refine/{run_id}/run_001/same_structure/fit_1.pdb"
         index = tmp_path / "refine" / run_id / "io.csv"
         index.parent.mkdir(parents=True)
         index.write_text(
             "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
-            f"{run_id},run_001,powerfit/run_001/same_structure/fit_1.pdb,{model_run}\n"
+            f"{run_id},run_001,powerfit/run_001/same_structure/fit_1.pdb,{refinement_run}\n"
         )
-        stage = tmp_path / model_run / "8_caprieval"
+        stage = tmp_path / refinement_run / "refinement" / "8_caprieval"
         stage.mkdir(parents=True)
         (stage / "capri_ss.tsv").write_text("model\tscore\tcaprieval_rank\tcluster_id\nx.pdb\t-10\t1\t-\n")
     with duckdb.connect() as con:

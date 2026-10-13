@@ -10,7 +10,13 @@ import pytest
 from cyclopts.exceptions import ValidationError
 
 from protein_detective.cli import app
-from protein_detective.meta import capri_as_duckdb_ddl, create_meta_duckdb_file, refinements_io_as_duckdb_ddl
+from protein_detective.meta import (
+    _execute_ddl_statements,
+    capri_as_duckdb_ddl,
+    create_meta_duckdb_file,
+    refinements_io_as_duckdb_ddl,
+    unrefined_scores_as_duckdb_ddl,
+)
 from protein_detective.refine.report import refinement_report
 from tests.helpers import cli
 
@@ -22,8 +28,8 @@ def add_run(session: Path, clustered_refinement_results_paths: dict[str, Path], 
         "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
         f"{run_id},run_001,powerfit/run_001/protein/fit_1.pdb,{run.relative_to(session)}\n"
     )
-    stage = run / "8_caprieval"
-    stage.mkdir()
+    stage = run / "refinement/8_caprieval"
+    stage.mkdir(parents=True)
     for key, table in (("models", "ss"), ("clusters", "clt")):
         shutil.copyfile(clustered_refinement_results_paths[key], stage / f"capri_{table}.tsv")
     return run
@@ -40,12 +46,66 @@ def add_metadata(session: Path):
     )
 
 
+@pytest.fixture
+def session_with_baseline(clustered_refinement_results_paths: dict[str, Path], tmp_path: Path):
+    add_metadata(tmp_path)
+    run = add_run(tmp_path, clustered_refinement_results_paths, "first")
+    add_run(tmp_path, clustered_refinement_results_paths, "second")
+    baseline = run / "baseline/2_caprieval"
+    baseline.mkdir(parents=True)
+    scores = "# comment\nmodel\tscore\nfirst.pdb\t-42.5\n"
+    (baseline / "capri_ss.tsv").write_text(scores)
+    for stage in (run / "refinement/2_caprieval", baseline.parent / "analysis/2_caprieval"):
+        stage.mkdir(parents=True)
+        (stage / "capri_ss.tsv").write_text(scores.replace("-42.5", "-999"))
+    return tmp_path
+
+
+def test_unrefined_score_and_workflow_separation(session_with_baseline: Path):
+    tmp_path = session_with_baseline
+    run = tmp_path / "refine/first/run_001/protein/fit_1.pdb"
+    results = refinement_report(tmp_path, top=2)
+    assert results.loc[results["refine_run_id"] == "first", "unrefined_score"].tolist() == [-42.5] * 8
+    assert results.loc[results["refine_run_id"] == "second", "unrefined_score"].isna().all()
+    assert (
+        results["model_score"].tolist()
+        == [-121.192] * 2
+        + [-70.837] * 2
+        + [-63.228] * 2
+        + [-58.954] * 2
+        + [-121.192] * 2
+        + [-70.837] * 2
+        + [-63.228] * 2
+        + [-58.954] * 2
+    )
+    with duckdb.connect() as con:
+        _execute_ddl_statements(con, unrefined_scores_as_duckdb_ddl(tmp_path, "first"))
+        assert con.table("refinements_unrefined").fetchall() == [(str(run.relative_to(tmp_path)), -42.5)]
+    with duckdb.connect() as con:
+        _execute_ddl_statements(con, unrefined_scores_as_duckdb_ddl(tmp_path, "second"))
+        assert con.table("refinements_unrefined").fetchall() == []
+
+
+@pytest.mark.parametrize("contents", ["# comment\nmodel\tscore\n", "model\tscore\na.pdb\t-\n"])
+def test_missing_baseline_score_preserves_final_members(
+    clustered_refinement_results_paths: dict[str, Path], tmp_path: Path, contents: str
+):
+    add_metadata(tmp_path)
+    run = add_run(tmp_path, clustered_refinement_results_paths)
+    stage = run / "baseline/2_caprieval"
+    stage.mkdir(parents=True)
+    (stage / "capri_ss.tsv").write_text(contents)
+    results = refinement_report(tmp_path)
+    assert len(results) == 4
+    assert results["unrefined_score"].isna().all()
+
+
 def test_cluster_members_metadata_and_compressed_paths(
     clustered_refinement_results_paths: dict[str, Path], tmp_path: Path
 ):
     run = add_run(tmp_path, clustered_refinement_results_paths)
     add_metadata(tmp_path)
-    model = run / "6_mdref/mdref_9.pdb.gz"
+    model = run / "refinement/6_mdref/mdref_9.pdb.gz"
     model.parent.mkdir()
     model.write_bytes(b"")
     results = refinement_report(tmp_path, top=2)
@@ -67,7 +127,7 @@ def test_top_members_of_every_cluster(
 ):
     add_metadata(tmp_path)
     run = add_run(tmp_path, clustered_refinement_results_paths)
-    stage = run / "8_caprieval"
+    stage = run / "refinement/8_caprieval"
     (stage / "capri_ss.tsv").write_text(
         "model\tcaprieval_rank\tscore\tcluster_id\tmodel-cluster_ranking\n"
         + "".join(
@@ -89,7 +149,7 @@ def test_top_members_of_every_cluster(
 def test_capri_member_ranks(clustered_refinement_results_paths: dict[str, Path], tmp_path: Path):
     add_metadata(tmp_path)
     run = add_run(tmp_path, clustered_refinement_results_paths)
-    (run / "8_caprieval/capri_ss.tsv").write_text(
+    (run / "refinement/8_caprieval/capri_ss.tsv").write_text(
         "model\tcaprieval_rank\tscore\tcluster_id\tmodel-cluster_ranking\n"
         "z.pdb\t1\t-9\t1\t1\na.pdb\t2\t-100\t1\t3\nc.pdb\t3\t-100\t1\t4\nb.pdb\t3\t-100\t1\t2\n"
     )
@@ -105,7 +165,7 @@ def test_multiple_runs_csv_and_partial_results(
     add_run(tmp_path, clustered_refinement_results_paths, "first")
     add_run(tmp_path, clustered_refinement_results_paths, "second")
     partial = add_run(tmp_path, clustered_refinement_results_paths, "partial")
-    (partial / "8_caprieval").rename(partial / "7_caprieval")
+    (partial / "refinement/8_caprieval").rename(partial / "refinement/7_caprieval")
     output = tmp_path / "report.csv"
     with pytest.warns(UserWarning, match="Excluded 1 incomplete") as caught:
         cli(["refine", "report", str(tmp_path), "--top", "2", "--output", str(output)])
@@ -154,7 +214,7 @@ def incomplete_session(clustered_refinement_results_paths: dict[str, Path], tmp_
     add_metadata(tmp_path)
     if state != "no_runs":
         run = add_run(tmp_path, clustered_refinement_results_paths)
-        scores = run / "8_caprieval/capri_ss.tsv"
+        scores = run / "refinement/8_caprieval/capri_ss.tsv"
         if state == "missing_final":
             scores.unlink()
         else:
@@ -175,7 +235,7 @@ def test_no_complete_results_is_rejected_without_writing_csv(incomplete_session:
 def session_with_earlier_stages(clustered_refinement_results_paths: dict[str, Path], tmp_path: Path) -> Path:
     first = add_run(tmp_path, clustered_refinement_results_paths, "first")
     add_run(tmp_path, clustered_refinement_results_paths, "second")
-    for stage in ("2_caprieval", "7_caprieval", "analysis/8_caprieval"):
+    for stage in ("refinement/2_caprieval", "refinement/7_caprieval", "refinement/analysis/8_caprieval"):
         directory = first / stage
         directory.mkdir(parents=True)
         shutil.copyfile(clustered_refinement_results_paths["models"], directory / "capri_ss.tsv")
@@ -311,15 +371,15 @@ def test_partial_tsv_is_not_loaded_when_cluster_output_is_missing(
     add_metadata(tmp_path)
     add_run(tmp_path, clustered_refinement_results_paths, "complete")
     partial = add_run(tmp_path, clustered_refinement_results_paths, "partial")
-    (partial / "8_caprieval/capri_clt.tsv").unlink()
-    (partial / "8_caprieval/capri_ss.tsv").write_text("unfinished")
+    (partial / "refinement/8_caprieval/capri_clt.tsv").unlink()
+    (partial / "refinement/8_caprieval/capri_ss.tsv").write_text("unfinished")
     with pytest.warns(UserWarning, match="Excluded 1 incomplete") as caught:
         results = refinement_report(tmp_path)
     assert len(results) == 4
     assert str(partial.relative_to(tmp_path)) in str(caught[0].message)
 
 
-def test_empty_model_run_is_warned(clustered_refinement_results_paths: dict[str, Path], tmp_path: Path):
+def test_empty_refinement_run_is_warned(clustered_refinement_results_paths: dict[str, Path], tmp_path: Path):
     add_metadata(tmp_path)
     add_run(tmp_path, clustered_refinement_results_paths, "complete")
     partial = add_run(tmp_path, clustered_refinement_results_paths, "partial")
@@ -372,10 +432,10 @@ def test_missing_scores_in_another_run_preserve_numeric_ranking(
     add_metadata(tmp_path)
     valid = add_run(tmp_path, clustered_refinement_results_paths, "valid")
     missing = add_run(tmp_path, clustered_refinement_results_paths, "missing")
-    (valid / "8_caprieval/capri_ss.tsv").write_text(
+    (valid / "refinement/8_caprieval/capri_ss.tsv").write_text(
         "model\tcaprieval_rank\tscore\tcluster_id\tmodel-cluster_ranking\na.pdb\t1\t-9\t1\t2\nb.pdb\t2\t-100\t1\t1\n"
     )
-    (missing / "8_caprieval/capri_ss.tsv").write_text(
+    (missing / "refinement/8_caprieval/capri_ss.tsv").write_text(
         "model\tcaprieval_rank\tscore\tcluster_id\tmodel-cluster_ranking\nmissing.pdb\t1\t-\t-\t-\n"
     )
     with pytest.warns(UserWarning, match="Excluded 1 incomplete") as caught:
@@ -396,7 +456,7 @@ def test_csv_paths_are_relative_to_cwd(
     fitted_model = session / "powerfit/run_001/protein/fit_1.pdb"
     fitted_model.parent.mkdir(parents=True)
     fitted_model.write_text("MODEL\nENDMDL\n")
-    model = run / "6_mdref/mdref_9.pdb.gz"
+    model = run / "refinement/6_mdref/mdref_9.pdb.gz"
     model.parent.mkdir()
     model.write_bytes(b"")
     cwd = {"parent": tmp_path, "session": session, "elsewhere": tmp_path / "elsewhere"}[cwd_location]
@@ -426,16 +486,16 @@ def test_no_group_by_structure_selects_best_models_overall(
     second = add_run(tmp_path, clustered_refinement_results_paths, "second")
     second.parent.rename(second.parent.with_name("other_protein"))
     second = second.parent.with_name("other_protein") / second.name
-    (first / "8_caprieval/capri_ss.tsv").write_text(
+    (first / "refinement/8_caprieval/capri_ss.tsv").write_text(
         "model\tcaprieval_rank\tscore\tcluster_id\tmodel-cluster_ranking\na.pdb\t1\t-100\t1\t1\nb.pdb\t2\t-95\t1\t2\nc.pdb\t3\t-90\t2\t1\n"
     )
-    (first / "8_caprieval/capri_clt.tsv").write_text(
+    (first / "refinement/8_caprieval/capri_clt.tsv").write_text(
         "cluster_id\tcluster_rank\tn\tunder_eval\tscore\tscore_std\n1\t1\t2\tyes\t-97.5\t2.5\n2\t2\t1\tyes\t-90\t0\n"
     )
-    (second / "8_caprieval/capri_ss.tsv").write_text(
+    (second / "refinement/8_caprieval/capri_ss.tsv").write_text(
         "model\tcaprieval_rank\tscore\tcluster_id\tmodel-cluster_ranking\nbest.pdb\t1\t-120\t1\t1\nz.pdb\t2\t-80\t2\t1\n"
     )
-    (second / "8_caprieval/capri_clt.tsv").write_text(
+    (second / "refinement/8_caprieval/capri_clt.tsv").write_text(
         "cluster_id\tcluster_rank\tn\tunder_eval\tscore\tscore_std\n1\t1\t1\tyes\t-120\t0\n2\t2\t1\tyes\t-80\t0\n"
     )
     output = tmp_path / "report.csv"

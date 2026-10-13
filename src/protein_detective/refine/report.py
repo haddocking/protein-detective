@@ -6,7 +6,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from protein_detective.meta import capri_as_duckdb_ddl
+from protein_detective.meta import capri_as_duckdb_ddl, unrefined_scores_as_duckdb_ddl
 from protein_detective.refine import LAST_CAPRIEVAL_MODULE
 
 REPORT_QUERY = """
@@ -31,6 +31,7 @@ SELECT m.refine_run_id, m.powerfit_run_id, m.structure,
     cl.score AS cluster_score,
     cl.score_std AS cluster_score_std,
     m.model_rank,
+    u.unrefined_score,
     m.score AS model_score,
     m.model AS model_path,
     m.fitted_model, m.refine_run_dir
@@ -40,6 +41,7 @@ LEFT JOIN (SELECT DISTINCT * FROM fitted_models) fm ON m.fitted_model = fm.fitte
 LEFT JOIN fittable_structures fs ON m.structure = fs.structure
 LEFT JOIN refinements_capri_clt cl
     ON m.refine_run_dir = cl.refine_run_dir AND m.cluster_id = cl.cluster_id
+LEFT JOIN refinements_unrefined u ON m.refine_run_dir = u.refine_run_dir
 WHERE NOT $group_by_structure OR m.model_rank <= $top
 ORDER BY m.refine_run_id, m.powerfit_run_id, m.structure, fitted_rank,
     cluster_rank, m.cluster_id, model_rank, model_path
@@ -88,7 +90,7 @@ def _ensure_metadata(con: duckdb.DuckDBPyConnection, session_dir: Path) -> None:
         raise ValueError(msg)
 
 
-def _find_model_runs(session_dir: Path, refine_run_id: str | None = None) -> tuple[set[str], list[Path]]:
+def _find_refinement_runs(session_dir: Path, refine_run_id: str | None = None) -> tuple[set[str], list[Path]]:
     """Find model run directories and those with both final CAPRI files.
 
     Args:
@@ -111,15 +113,16 @@ def _find_model_runs(session_dir: Path, refine_run_id: str | None = None) -> tup
             msg = f"Unknown refinement run ID: {refine_run_id}"
             raise ValueError(msg)
 
-    model_runs = {
+    refinement_runs = {
         str(path.relative_to(session_dir)) for run_dir in run_dirs for path in run_dir.glob("*/*/*") if path.is_dir()
     }
 
     complete_runs = [
         session_dir / run
-        for run in sorted(model_runs)
+        for run in sorted(refinement_runs)
         if all(
-            (session_dir / run / LAST_CAPRIEVAL_MODULE / name).is_file() for name in ("capri_ss.tsv", "capri_clt.tsv")
+            (session_dir / run / "refinement" / LAST_CAPRIEVAL_MODULE / name).is_file()
+            for name in ("capri_ss.tsv", "capri_clt.tsv")
         )
     ]
 
@@ -127,7 +130,7 @@ def _find_model_runs(session_dir: Path, refine_run_id: str | None = None) -> tup
         msg = f"No complete refinement results found in {session_dir}"
         raise ValueError(msg)
 
-    return model_runs, complete_runs
+    return refinement_runs, complete_runs
 
 
 def refinement_report(
@@ -156,7 +159,7 @@ def refinement_report(
 
     Require powerfit/fitted_models.csv and powerfit/fittable_structures.csv to
     contain data rows. Missing metadata rows leave accessions empty without
-    dropping members. Discover final results directly in 8_caprieval and join
+    dropping members. Discover final results directly in refinement/8_caprieval and join
     PowerFit CSVs in memory; no IO index or persistent database is needed.
 
     Exclude incomplete model runs and emit a UserWarning listing them, shown
@@ -183,14 +186,15 @@ def refinement_report(
     - cluster_score_std: capri_clt.tsv column score_std.
     - model_rank: capri_ss.tsv column model-cluster_ranking; starts at 1.
     - model_score: capri_ss.tsv column score.
-    - model_path: capri_ss.tsv column model, resolved relative to 8_caprieval
+    - unrefined_score: CAPRI score of unrefined structure and the fixed structure.
+    - model_path: capri_ss.tsv column model, resolved relative to refinement/8_caprieval
       and printed relative to the current working directory with a .pdb.gz
       extension, as produced by HADDOCK cleanup.
     - fitted_model: source input path derived as
       powerfit/{powerfit_run_id}/{structure}/{fitted_model_name} from the refinement
       directory layout, matched to fitted_models.csv column fitted_model_file.
     - refine_run_dir: model run directory containing
-      8_caprieval, discovered as
+      baseline and refinement/8_caprieval, discovered as
       refine/{refine_run_id}/{powerfit_run_id}/{structure}/{fitted_model_name}.
 
     Cluster summary columns are joined from capri_clt.tsv using cluster_id
@@ -221,12 +225,14 @@ def refinement_report(
         raise ValueError(msg)
 
     session_dir = session_dir.resolve()
-    model_runs, complete_runs = _find_model_runs(session_dir, refine_run_id)
+    refinement_runs, complete_runs = _find_refinement_runs(session_dir, refine_run_id)
 
     with duckdb.connect() as con:
         _ensure_metadata(con, session_dir)
 
-        for statement, params in capri_as_duckdb_ddl(session_dir, model_runs=complete_runs):
+        for statement, params in capri_as_duckdb_ddl(session_dir, refinement_runs=complete_runs):
+            con.execute(statement, params)
+        for statement, params in unrefined_scores_as_duckdb_ddl(session_dir, refinement_runs=complete_runs):
             con.execute(statement, params)
 
         results = con.execute(REPORT_QUERY, {"top": top, "group_by_structure": group_by_structure}).df()
@@ -235,7 +241,7 @@ def refinement_report(
             msg = f"No complete refinement results found in {session_dir}"
             raise ValueError(msg)
 
-    incomplete = sorted(model_runs - set(results["refine_run_dir"]))
+    incomplete = sorted(refinement_runs - set(results["refine_run_dir"]))
     if incomplete:
         warnings.warn(
             f"Excluded {len(incomplete)} incomplete refinement model run(s):\n" + "\n".join(incomplete),
@@ -258,11 +264,11 @@ def _resolve_model_path(session_dir: Path, run: str, model: str) -> str:
 
     Args:
         session_dir: Absolute session directory.
-        run: Session-relative model-level HADDOCK run directory.
+        run: Session-relative fitted-input directory containing both workflows.
         model: Uncompressed PDB path recorded relative to the final CAPRI directory.
 
     Returns:
         Session-relative .pdb.gz path, assuming the workflow uses clean = True.
     """
-    path = (session_dir / run / LAST_CAPRIEVAL_MODULE / model).with_suffix(".pdb.gz").resolve()
+    path = (session_dir / run / "refinement" / LAST_CAPRIEVAL_MODULE / model).with_suffix(".pdb.gz").resolve()
     return str(path.relative_to(session_dir))

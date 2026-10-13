@@ -2,10 +2,99 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
+from haddock.gear.prepare_run import setup_run
 from protein_quest.structure.chains import chains_in_structure
-from protein_quest.structure.formats import read_structure
+from protein_quest.structure.formats import read_structure, write_structure
 
-from protein_detective.refine.haddock import RefineOptions, generate_haddock3_config_body, prepare_fixed_structure
+from protein_detective.refine.haddock import (
+    RefineOptions,
+    generate_haddock3_config_body,
+    generate_unrefined_config_body,
+    prepare_fitted_and_fixed,
+    prepare_fixed_structure,
+)
+
+
+def test_baseline_complex_preserves_coordinates_and_chains(
+    tmp_path: Path, fitted_structure: Path, fixed_structure: Path
+):
+    result = read_structure(prepare_fitted_and_fixed(fitted_structure, fixed_structure, tmp_path))
+    assert [chain.name for chain in result[0]] == ["A", "B"]
+    for chain, source in zip(
+        result[0], (read_structure(fitted_structure)[0], read_structure(fixed_structure)[0]), strict=True
+    ):
+        actual = [(atom.name, (atom.pos.x, atom.pos.y, atom.pos.z)) for residue in chain for atom in residue]
+        expected = [
+            (atom.name, (atom.pos.x, atom.pos.y, atom.pos.z))
+            for source_chain in source
+            for residue in source_chain
+            for atom in residue
+        ]
+        assert actual == expected
+
+
+@pytest.mark.parametrize("partner,chain_name", [("fitted", "Z"), ("fixed", "A")])
+def test_baseline_rejects_wrong_chains(
+    tmp_path: Path, fitted_structure: Path, fixed_structure: Path, partner: str, chain_name: str
+):
+    inputs = {"fitted": fitted_structure, "fixed": fixed_structure}
+    structure = read_structure(inputs[partner])
+    structure[0][0].name = chain_name
+    wrong = tmp_path / "wrong.pdb"
+    write_structure(structure, wrong)
+    inputs[partner] = wrong
+    with pytest.raises(ValueError, match="must contain only chain"):
+        prepare_fitted_and_fixed(inputs["fitted"], inputs["fixed"], tmp_path)
+    assert not (tmp_path / "fitted-and-fixed.pdb").exists()
+
+
+def test_baseline_configuration(tmp_path: Path):
+    run = tmp_path / "baseline"
+    complex_file = run / "fitted-and-fixed.pdb"
+    config = generate_unrefined_config_body(run, complex_file, 3)
+    assert config == dedent(f"""\
+        run_dir = "{run}"
+        mode = "local"
+        ncores = 3
+        clean = true
+        postprocess = true
+
+        molecules = ["{complex_file}"]
+
+        [topoaa]
+
+        [emscoring]
+
+        [caprieval]
+        """)
+
+
+@pytest.fixture
+def workflow_config(tmp_path: Path, fitted_structure: Path, fixed_structure: Path, workflow_name: str) -> Path:
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    fitted = inputs / "fitted.pdb"
+    write_structure(read_structure(fitted_structure), fitted)
+    fixed = prepare_fixed_structure(fixed_structure, inputs)
+    run_dir = tmp_path / workflow_name
+    run_dir.mkdir()
+    config = run_dir / "workflow.cfg"
+    if workflow_name == "baseline":
+        complex_file = prepare_fitted_and_fixed(fitted, fixed, run_dir)
+        body = generate_unrefined_config_body(run_dir, complex_file, 1)
+    else:
+        body = generate_haddock3_config_body(run_dir, fitted, fixed, RefineOptions())
+    config.write_text(body)
+    return config
+
+
+@pytest.mark.parametrize("workflow_name", ["baseline", "refinement"])
+def test_workflow_setup_with_config_inside_run_directory(workflow_config: Path, workflow_name: str):
+    modules, params = setup_run(workflow_config, restart_from=0)
+    assert Path(params["run_dir"]) == workflow_config.parent
+    assert workflow_config.is_file()
+    assert (workflow_config.parent / "data/configurations").is_dir()
+    assert "topoaa.1" in modules
 
 
 class TestPrepareFixedStructure:

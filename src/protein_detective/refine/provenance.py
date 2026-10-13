@@ -93,7 +93,7 @@ def write_refinement_ro_crate(
             IOArgumentPath(
                 name=f"refined_{i}",
                 path=refined_path,
-                help="Refined structure result.",
+                help="Baseline and refinement haddock3 results.",
             )
             for i, (_, refined_path) in enumerate(refined)
         ],
@@ -103,14 +103,6 @@ def write_refinement_ro_crate(
                 path=io_csv,
                 help="CSV file containing fitted model path and refine run dir.",
             )
-        ]
-        + [
-            IOArgumentPath(
-                name=f"config_{i}",
-                path=refined_path.with_name(f"{refined_path.name}.cfg"),
-                help="Effective HADDOCK3 configuration.",
-            )
-            for i, (_, refined_path) in enumerate(refined)
         ],
     )
     argv = [
