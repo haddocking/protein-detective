@@ -233,5 +233,5 @@ exclude = ["**/fixtures/**", "**/cassettes/**"]
 
 
 [tool.zorilla.rules]
-ZR004 = { enabled = false }
-ZR005 = { enabled = false }
+ZR004 = { enabled = false }  # disabled as sometimes you need many asserts
+ZR005 = { enabled = false }  # disabled as sometimes you need absolute paths
