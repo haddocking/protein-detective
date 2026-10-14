@@ -139,7 +139,7 @@ uv run properdocs build
 python3 -m http.server -d site
 ```
 
-The Jupyter notebooks (docs/*.ipynb) can be run with
+The Jupyter notebooks (docs/\*.ipynb) can be run with
 
 ```shell
 uv run --group docs jupyter nbconvert --to notebook --execute --inplace docs/tutorial.ipynb
