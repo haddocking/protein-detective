@@ -128,6 +128,10 @@ pip install "protein-detective[cuda12]"
 The main entry point is the `protein-detective` command line tool which has
 multiple subcommands to perform actions.
 
+For an end-to-end example using [6J5W](https://www.rcsb.org/structure/6J5W) and
+its [EMD-0683](https://www.ebi.ac.uk/emdb/EMD-0683) density map, including
+candidate search, fitting and refinement, see [the tutorial](docs/tutorial.md).
+
 ### Search Uniprot for structures
 
 ```shell

@@ -109,6 +109,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Tutorial (6J5W): tutorial.md
   - CLI Reference: cli.md
   - Notebooks:
       - Prepare EM map: em_prepare.ipynb
