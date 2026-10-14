@@ -57,7 +57,8 @@ repos:
       - id: codespell
         additional_dependencies:
           - tomli; python_version<'3.11'
-        exclude: "docs/visualization.ipynb" # has binary data that triggers false positives
+        # visualization has binary data and tutorial has truncated progress bars that trigger false positives
+        exclude: "docs/(visualization|tutorial).ipynb"
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: "v0.11.0.1"

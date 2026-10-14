@@ -193,6 +193,8 @@ ignore = [
     "PD901",
     # Allow suspicious-url-open-usage
     "S310",
+    # Allow asserts to check tutorial results
+    "S101",
 ]
 
 [tool.ruff.lint.pydocstyle]

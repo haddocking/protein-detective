@@ -6,6 +6,8 @@ repo_url: https://github.com/haddocking/protein-detective
 edit_uri: edit/main/docs/
 watch: [properdocs.yml, README.md, src/protein_detective]
 use_directory_urls: false
+# Exclude session directory written when running docs/tutorial.ipynb
+exclude_docs: tutorial-6j5w/
 theme:
   name: materialx
   code:
@@ -109,9 +111,9 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Tutorial (6J5W): tutorial.md
   - CLI Reference: cli.md
   - Notebooks:
+      - Tutorial: tutorial.ipynb
       - Prepare EM map: em_prepare.ipynb
       - Determine the fraction of Secondary Structure Elements (SSE): SSE_elements.ipynb
       - Visualization: visualization.ipynb
