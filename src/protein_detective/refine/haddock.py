@@ -1,5 +1,6 @@
 """Prepare structures, configure workflows and execute HADDOCK3 refinement."""
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
@@ -199,12 +200,30 @@ def prepare_fixed_structure(
     return fixed_structure_dest
 
 
-def run_haddock3(config_file: Path) -> None:
+def set_haddock3_log_level(log_level: int) -> None:
+    """Set the level of the HADDOCK3 logger and its own console handler.
+
+    HADDOCK3 logs through its own stdout handler at INFO level, so the root logger level does not apply.
+    Propagation to the root logger is disabled to avoid printing each message twice.
+
+    Args:
+        log_level: Logging level, for example `logging.WARNING`.
+    """
+    haddock_logger = logging.getLogger("haddock")
+    haddock_logger.setLevel(log_level)
+    for handler in haddock_logger.handlers:
+        handler.setLevel(log_level)
+    haddock_logger.propagate = False
+
+
+def run_haddock3(config_file: Path, log_level: int = logging.INFO) -> None:
     """Execute a HADDOCK3 workflow, do postprocessing and clean its intermediate output.
 
     Args:
         config_file: Configuration file describing the workflow and output directory.
+        log_level: Logging level of HADDOCK3 messages.
     """
+    set_haddock3_log_level(log_level)
     # Start at step zero to allow the config and inputs inside same existing directory as output.
     modules_params, general_params = setup_run(config_file, restart_from=0)
     run_dir = general_params[RUNDIR]

@@ -1,6 +1,7 @@
 """Expose commands for running, listing and reporting HADDOCK3 refinements."""
 
 import csv
+import logging
 from pathlib import Path
 from typing import Annotated
 
@@ -67,6 +68,7 @@ def run(
         refine_run_id=refine_run_id,
         powerfit_run_id=powerfit_run_id,
         scheduler_address=scheduler_address,
+        haddock_log_level=logging.root.level,
     )
 
 

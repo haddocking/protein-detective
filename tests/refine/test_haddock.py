@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from textwrap import dedent
 
@@ -12,6 +13,7 @@ from protein_detective.refine.haddock import (
     generate_unrefined_config_body,
     prepare_fitted_and_fixed,
     prepare_fixed_structure,
+    set_haddock3_log_level,
 )
 
 
@@ -272,3 +274,23 @@ class TestGenerateHaddock3ConfigBody:
         config = generate_haddock3_config_body(run_dir, fitted_model, fixed_structure, options)
 
         assert config == expected
+
+
+@pytest.fixture
+def haddock_logger():
+    logger = logging.getLogger("haddock")
+    level, propagate = logger.level, logger.propagate
+    handler_levels = [(handler, handler.level) for handler in logger.handlers]
+    yield logger
+    logger.setLevel(level)
+    logger.propagate = propagate
+    for handler, handler_level in handler_levels:
+        handler.setLevel(handler_level)
+
+
+def test_set_haddock3_log_level_hides_info(haddock_logger: logging.Logger):
+    set_haddock3_log_level(logging.WARNING)
+
+    assert haddock_logger.level == logging.WARNING
+    assert {handler.level for handler in haddock_logger.handlers} == {logging.WARNING}
+    assert not haddock_logger.propagate

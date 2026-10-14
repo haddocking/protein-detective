@@ -1,6 +1,7 @@
 """Select fitted structures and coordinate independent refinement runs."""
 
 import csv
+import logging
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,7 +23,14 @@ from protein_detective.refine.provenance import write_refinement_ro_crate
 
 
 def refine_structure_task(
-    fitted_model: Path, /, *, session_dir: Path, root_refine_dir: Path, fixed_structure: Path, options: RefineOptions
+    fitted_model: Path,
+    /,
+    *,
+    session_dir: Path,
+    root_refine_dir: Path,
+    fixed_structure: Path,
+    options: RefineOptions,
+    haddock_log_level: int = logging.INFO,
 ) -> tuple[Path, Path]:
     """Configure and run HADDOCK3 for one fitted model.
 
@@ -32,6 +40,7 @@ def refine_structure_task(
         root_refine_dir: Directory for the independent refinement run.
         fixed_structure: Prepared fixed partner with chains renamed to B.
         options: Refinement parameters for HADDOCK3.
+        haddock_log_level: Logging level of HADDOCK3 messages.
 
     Returns:
         Absolute fitted input and its directory containing both workflows.
@@ -53,7 +62,7 @@ def refine_structure_task(
     complex_file = prepare_fitted_and_fixed(abs_fitted_model, fixed_structure, baseline_dir)
     baseline_config = baseline_dir / "workflow.cfg"
     baseline_config.write_text(generate_unrefined_config_body(baseline_dir, complex_file, options.ncores))
-    run_haddock3(baseline_config)
+    run_haddock3(baseline_config, haddock_log_level)
 
     refinement_dir = refine_run_dir / "refinement"
     refinement_dir.mkdir()
@@ -66,7 +75,7 @@ def refine_structure_task(
     )
     config_file.write_text(config_body)
 
-    run_haddock3(config_file)
+    run_haddock3(config_file, haddock_log_level)
 
     return abs_fitted_model, refine_run_dir
 
@@ -79,6 +88,7 @@ def refine_structures(
     fixed_structure: Path,
     options: RefineOptions,
     scheduler_address: str,
+    haddock_log_level: int = logging.INFO,
 ) -> list[tuple[Path, Path]]:
     """Refine selected models using the configured scheduler.
 
@@ -89,6 +99,7 @@ def refine_structures(
         fixed_structure: Prepared fixed partner with chains renamed to B.
         options: Refinement parameters for HADDOCK3.
         scheduler_address: Dask scheduler address, or sequential execution mode.
+        haddock_log_level: Logging level of HADDOCK3 messages.
 
     Returns:
         Absolute fitted inputs paired with their directories containing both workflows.
@@ -101,6 +112,7 @@ def refine_structures(
         session_dir=session_dir,
         fixed_structure=fixed_structure,
         root_refine_dir=refine_dir,
+        haddock_log_level=haddock_log_level,
         map_with_progress_options={
             "tqdm_desc": "Refined structures",
             "tqdm_unit": "file",
@@ -169,6 +181,7 @@ def refine_with_haddock3(
     refine_run_id: str | None = None,
     powerfit_run_id: str | None = None,
     scheduler_address: str | None = None,
+    haddock_log_level: int = logging.INFO,
 ):
     """Refine selected fitted models against a fixed structure with HADDOCK3.
 
@@ -186,6 +199,8 @@ def refine_with_haddock3(
         powerfit_run_id: Source fitting run to select; defaults to all fitting runs.
         scheduler_address: Dask scheduler address, or 'sequential' to run locally
             without Dask. When omitted, create a local cluster.
+        haddock_log_level: Logging level of HADDOCK3 messages.
+            Applied inside each worker, as workers do not share the logging configuration.
 
     Raises:
         ValueError: No models are selected, an input path or run ID is invalid,
@@ -245,6 +260,7 @@ def refine_with_haddock3(
             fixed_structure=session_fixed_structure,
             options=refine_options,
             scheduler_address=real_scheduler_address,
+            haddock_log_level=haddock_log_level,
         )
 
     write_refinement_ro_crate(
