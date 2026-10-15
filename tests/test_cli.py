@@ -43,14 +43,14 @@ def test_app_help(capsys: pytest.CaptureFixture[str]):
     assert captured.out.count("╭─ ") == 2
     assert "Workflow" in captured.out
     assert "Utilities" in captured.out
-    commands = ["search", "retrieve", "filter", "powerfit", "meta", "import-structures"]
+    commands = ["candidates", "powerfit", "meta", "import-structures"]
     positions = [captured.out.index(command) for command in commands]
     assert positions == sorted(positions)
 
 
 def test_search_help(capsys: pytest.CaptureFixture[str]):
     # Smoke test to ensure the search command can be invoked
-    cli(["search", "--help"])
+    cli(["candidates", "search", "--help"])
 
     captured = capsys.readouterr()
     assert "Search for candidate protein structures" in captured.out
@@ -60,6 +60,7 @@ def test_search_help(capsys: pytest.CaptureFixture[str]):
 def test_search(tmp_path: Path):
     session_dir = tmp_path / "session"
     argv = [
+        "candidates",
         "search",
         str(session_dir),
         "--taxon-id",
@@ -104,7 +105,7 @@ def test_search(tmp_path: Path):
 
     assert_crate(
         session_dir,
-        action_id=f"protein-detective search {session_dir} --taxon-id 9606 --reviewed --limit-uniprot 50 --pdbe.limit 50",
+        action_id=f"protein-detective candidates search {session_dir} --taxon-id 9606 --reviewed --limit-uniprot 50 --pdbe.limit 50",
         output_ids={
             "uniprot.txt",
             "alphafold.csv",
@@ -118,6 +119,7 @@ def test_search(tmp_path: Path):
 def test_search_with_interaction_partners(tmp_path: Path):
     session_dir = tmp_path / "session"
     argv = [
+        "candidates",
         "search",
         str(session_dir),
         "--taxon-id",
@@ -215,7 +217,7 @@ def test_search_with_interaction_partners(tmp_path: Path):
 
     assert_crate(
         session_dir,
-        action_id=f"protein-detective search {session_dir} --taxon-id 9606 --reviewed --limit-uniprot 50 --pdbe.limit 50 --interaction.seed Q05471",
+        action_id=f"protein-detective candidates search {session_dir} --taxon-id 9606 --reviewed --limit-uniprot 50 --pdbe.limit 50 --interaction.seed Q05471",
         output_ids={
             "uniprot.txt",
             "alphafold.csv",
@@ -232,6 +234,7 @@ def test_search_with_interaction_partners(tmp_path: Path):
 def test_search_just_uniprot(tmp_path: Path):
     session_dir = tmp_path / "session"
     argv = [
+        "candidates",
         "search",
         str(session_dir),
         "--taxon-id",
@@ -257,7 +260,7 @@ def test_search_just_uniprot(tmp_path: Path):
 
     assert_crate(
         session_dir,
-        action_id=f"protein-detective search {session_dir} --taxon-id 9606 --reviewed --limit-uniprot 50 --pdbe.limit 0 --alphafold.limit 0",
+        action_id=f"protein-detective candidates search {session_dir} --taxon-id 9606 --reviewed --limit-uniprot 50 --pdbe.limit 0 --alphafold.limit 0",
         output_ids={
             "uniprot.txt",
             "alphafold.csv",
@@ -303,7 +306,7 @@ def test_retrieve(tmp_path: Path):
 
     assert_crate(
         session_dir,
-        action_id=f"protein-detective retrieve {session_dir} --alphafold-db-version 6",
+        action_id=f"protein-detective candidates retrieve {session_dir} --alphafold-db-version 6",
         input_ids={
             "alphafold.csv",
             "pdbe.csv",
@@ -322,13 +325,13 @@ def test_retrieve(tmp_path: Path):
 def test_retrieve_without_search(tmp_path: Path):
     session_dir = tmp_path / "session"
     session_dir.mkdir()
-    argv = ["retrieve", str(session_dir)]
+    argv = ["candidates", "retrieve", str(session_dir)]
     with pytest.raises(FileNotFoundError):
         cli(argv)
 
 
 def test_filter_help(capsys: pytest.CaptureFixture[str]):
-    cli(["filter", "--help"])
+    cli(["candidates", "filter", "--help"])
 
     captured = capsys.readouterr()
     assert "Filter structure files based on specified parameters" in captured.out
@@ -342,6 +345,7 @@ def test_filter_defaults(tmp_path: Path):
     pdbe_quality_json.write_text("{}")
 
     argv = [
+        "candidates",
         "filter",
         str(session_dir),
         "--scheduler-address",
@@ -429,7 +433,7 @@ def test_filter_defaults(tmp_path: Path):
 
     assert_crate(
         session_dir,
-        action_id=f"protein-detective filter {session_dir} --scheduler-address sequential",
+        action_id=f"protein-detective candidates filter {session_dir} --scheduler-address sequential",
         input_ids={
             "pdbe.csv",
             "downloads/pdbe/",
@@ -458,6 +462,7 @@ def test_filter_with_secondary_structure(tmp_path: Path):
     pdbe_quality_json.write_text("{}")
 
     argv = [
+        "candidates",
         "filter",
         str(session_dir),
         "--secondary.abs-min-helix-residues",
@@ -521,7 +526,7 @@ def test_filter_with_secondary_structure(tmp_path: Path):
 
     assert_crate(
         session_dir,
-        action_id=f"protein-detective filter {session_dir} --secondary.abs-min-helix-residues 5 --scheduler-address sequential",
+        action_id=f"protein-detective candidates filter {session_dir} --secondary.abs-min-helix-residues 5 --scheduler-address sequential",
         input_ids={
             "pdbe.csv",
             "downloads/pdbe/",

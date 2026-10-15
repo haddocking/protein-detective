@@ -1,7 +1,17 @@
 import json
+import shutil
 from pathlib import Path
 
-from protein_detective.meta import in_memory_duckdb_connection, solutions_as_duckdb_ddl
+import duckdb
+import pytest
+
+from protein_detective.meta import (
+    capri_as_duckdb_ddl,
+    ddl,
+    in_memory_duckdb_connection,
+    refinements_io_as_duckdb_ddl,
+    solutions_as_duckdb_ddl,
+)
 
 
 def test_solutions_ddl_requires_fittable_structures_and_solutions(tmp_path: Path):
@@ -405,3 +415,230 @@ def test_fitted_models_table_is_absent_without_csv(tmp_path: Path):
     tables = [row[0] for row in con.execute("SHOW TABLES").fetchall()]
 
     assert "fitted_models" not in tables
+
+
+def test_refine_io_is_loaded_with_ctas(tmp_path: Path):
+    session_dir = tmp_path / "session"
+    refine_dir = session_dir / "refine/refine_run_001"
+    refine_dir.mkdir(parents=True)
+    (refine_dir / "io.csv").write_text(
+        "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
+        "refine_run_001,run_001,powerfit/run_001/structure/model.pdb,refine/refine_run_001/run_001/structure/model.pdb\n"
+    )
+
+    statements = ddl(session_dir)
+    io_statement = next(statement for statement in statements if "CREATE TABLE refinements_io" in statement[0])
+    con = duckdb.connect(database=":memory:")
+    con.execute(*io_statement)
+
+    rows = con.execute("SELECT fitted_model, refine_run_dir FROM refinements_io").fetchall()
+
+    assert rows == [
+        (
+            "powerfit/run_001/structure/model.pdb",
+            "refine/refine_run_001/run_001/structure/model.pdb",
+        )
+    ]
+
+
+@pytest.fixture
+def capri_tables(tmp_path: Path, table: str, clustered_refinement_results_paths: dict[str, Path]):
+    session_dir = tmp_path / "session with spaces"
+    refine_dir = session_dir / "refine"
+    refine_dir.mkdir(parents=True)
+    run_dirs = [f"refine/refine_run_00{i}/run_001/structure.cif/fit_1.pdb" for i in (1, 2)]
+    for i, run_dir in enumerate(run_dirs, 1):
+        index = refine_dir / f"refine_run_00{i}" / "io.csv"
+        index.parent.mkdir()
+        index.write_text(
+            "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
+            f"refine_run_00{i},run_001,powerfit/run_001/structure.cif/fit_1.pdb,{run_dir}\n"
+        )
+    fixture = clustered_refinement_results_paths["models" if table == "capri_ss" else "clusters"]
+    for run_dir in run_dirs:
+        for step in ("2_caprieval", "8_caprieval"):
+            stage_dir = session_dir / run_dir / "refinement" / step
+            stage_dir.mkdir(parents=True)
+            shutil.copyfile(fixture, stage_dir / f"{table}.tsv")
+        # Postprocessed copies must not duplicate the stage results.
+        analysis_dir = session_dir / run_dir / "refinement" / "analysis" / "8_caprieval_analysis"
+        analysis_dir.mkdir(parents=True)
+        shutil.copyfile(fixture, analysis_dir / f"{table}.tsv")
+
+    # Include results from runs not recorded in refinements_io.
+    orphan_dir = (
+        refine_dir / "refine_run_003" / "run_001" / "structure.cif" / "fit_1.pdb" / "refinement" / "8_caprieval"
+    )
+    orphan_dir.mkdir(parents=True)
+    shutil.copyfile(fixture, orphan_dir / f"{table}.tsv")
+
+    with duckdb.connect(database=":memory:") as con:
+        for statement, params in ddl(session_dir):
+            if "CREATE TABLE refinements_io" in statement or f"CREATE TABLE refinements_{table}" in statement:
+                con.execute(statement, params)
+        yield con, run_dirs
+
+
+@pytest.mark.parametrize("table", ["capri_ss"])
+def test_capri_ss_joins_refinement_runs_and_only_loads_final_stage(
+    capri_tables: tuple[duckdb.DuckDBPyConnection, list[str]], table: str
+):
+    con, run_dirs = capri_tables
+    columns = [row[0] for row in con.execute(f"DESCRIBE refinements_{table}").fetchall()]
+    expected_columns = [
+        "refine_run_dir",
+        "model",
+        "md5",
+        "caprieval_rank",
+        "score",
+        "irmsd",
+        "fnat",
+        "lrmsd",
+        "ilrmsd",
+        "dockq",
+        "rmsd",
+        "cluster_id",
+        "cluster_ranking",
+        "modelcluster_ranking",
+        "air",
+        "angles",
+        "bonds",
+        "bsa",
+        "cdih",
+        "coup",
+        "dani",
+        "desolv",
+        "dihe",
+        "elec",
+        "improper",
+        "rdcs",
+        "rg",
+        "sym",
+        "total",
+        "vdw",
+        "vean",
+        "xpcs",
+    ]
+    rows = con.execute(
+        "SELECT refine_run_dir, model, md5, caprieval_rank, score, dockq, bsa, elec, "
+        "cluster_id, cluster_ranking, modelcluster_ranking FROM refinements_capri_ss "
+        "JOIN refinements_io USING (refine_run_dir) WHERE caprieval_rank = 1 ORDER BY refine_run_dir"
+    ).fetchall()
+    expected_rows = [
+        (run_dir, "../6_mdref/mdref_8.pdb", None, 1, -123.367, 1.0, 1367.51, -638.662, 2, 1, 1) for run_dir in run_dirs
+    ]
+    expected_count = 36
+    assert columns == expected_columns
+    assert rows == expected_rows
+    assert con.table(f"refinements_{table}").count("*").fetchone() == (expected_count,)
+
+
+@pytest.mark.parametrize("table", ["capri_clt"])
+def test_capri_clt_joins_refinement_runs_and_only_loads_final_stage(
+    capri_tables: tuple[duckdb.DuckDBPyConnection, list[str]], table: str
+):
+    con, run_dirs = capri_tables
+    columns = [row[0] for row in con.execute(f"DESCRIBE refinements_{table}").fetchall()]
+    expected_columns = [
+        "refine_run_dir",
+        "cluster_rank",
+        "cluster_id",
+        "n",
+        "under_eval",
+        "score",
+        "score_std",
+        "irmsd",
+        "irmsd_std",
+        "fnat",
+        "fnat_std",
+        "lrmsd",
+        "lrmsd_std",
+        "dockq",
+        "dockq_std",
+        "ilrmsd",
+        "ilrmsd_std",
+        "rmsd",
+        "rmsd_std",
+        "air",
+        "air_std",
+        "bsa",
+        "bsa_std",
+        "desolv",
+        "desolv_std",
+        "elec",
+        "elec_std",
+        "total",
+        "total_std",
+        "vdw",
+        "vdw_std",
+        "caprieval_rank",
+    ]
+    rows = con.execute(
+        "SELECT refine_run_dir, cluster_rank, cluster_id, n, under_eval, score, score_std, dockq, "
+        "dockq_std, caprieval_rank FROM refinements_capri_clt "
+        "JOIN refinements_io USING (refine_run_dir) ORDER BY refine_run_dir, cluster_rank"
+    ).fetchall()
+    expected_rows = [
+        (run_dir, rank, cluster_id, 3, True, score, score_std, dockq, dockq_std, rank)
+        for run_dir in run_dirs
+        for rank, cluster_id, score, score_std, dockq, dockq_std in (
+            (1, 2, -122.586, 0.989, 0.924, 0.057),
+            (2, 1, -73.422, 2.078, 0.017, 0.0),
+            (3, 3, -63.730, 4.865, 0.004, 0.0),
+            (4, 4, -53.309, 9.861, 0.025, 0.0),
+        )
+    ]
+    expected_count = 12
+    assert columns == expected_columns
+    assert rows == expected_rows
+    assert con.table(f"refinements_{table}").count("*").fetchone() == (expected_count,)
+
+
+def test_capri_ddl_loads_without_refinement_io_and_skips_missing_tables(
+    tmp_path: Path, clustered_refinement_results_paths: dict[str, Path]
+):
+    assert capri_as_duckdb_ddl(tmp_path) == []
+    stage_dir = (
+        tmp_path / "refine" / "refine_run_001" / "run_001" / "structure" / "fit_1.pdb" / "refinement" / "8_caprieval"
+    )
+    stage_dir.mkdir(parents=True)
+    results = stage_dir / "capri_ss.tsv"
+    shutil.copyfile(clustered_refinement_results_paths["models"], results)
+    statements = capri_as_duckdb_ddl(tmp_path)
+    assert len(statements) == 1
+    assert "CREATE TABLE refinements_capri_ss" in statements[0][0]
+    with duckdb.connect(database=":memory:") as con:
+        con.execute(*statements[0])
+        assert con.table("refinements_capri_ss").count("*").fetchone() == (12,)
+    results.unlink()
+    assert capri_as_duckdb_ddl(tmp_path) == []
+
+
+@pytest.fixture
+def multiple_refinement_indexes(tmp_path: Path):
+    for run_id in ("refine_run_001", "refine_run_003"):
+        refinement_run = f"refine/{run_id}/run_001/same_structure/fit_1.pdb"
+        index = tmp_path / "refine" / run_id / "io.csv"
+        index.parent.mkdir(parents=True)
+        index.write_text(
+            "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
+            f"{run_id},run_001,powerfit/run_001/same_structure/fit_1.pdb,{refinement_run}\n"
+        )
+        stage = tmp_path / refinement_run / "refinement" / "8_caprieval"
+        stage.mkdir(parents=True)
+        (stage / "capri_ss.tsv").write_text("model\tscore\tcaprieval_rank\tcluster_id\nx.pdb\t-10\t1\t-\n")
+    with duckdb.connect() as con:
+        for statement, params in refinements_io_as_duckdb_ddl(tmp_path) + capri_as_duckdb_ddl(tmp_path):
+            con.execute(statement, params)
+        yield con
+
+
+def test_multiple_refinement_indexes_load_together(multiple_refinement_indexes: duckdb.DuckDBPyConnection):
+    con = multiple_refinement_indexes
+    assert con.execute(
+        "SELECT count(*) FROM refinements_io JOIN refinements_capri_ss USING (refine_run_dir)"
+    ).fetchone() == (2,)
+    assert con.execute("SELECT DISTINCT refine_run_id FROM refinements_io ORDER BY 1").fetchall() == [
+        ("refine_run_001",),
+        ("refine_run_003",),
+    ]

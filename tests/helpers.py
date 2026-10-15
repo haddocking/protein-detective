@@ -43,7 +43,7 @@ def fake_setup_retrieve(tmp_path: Path):
     pdbe_csv = session_dir / "pdbe.csv"
     pdbe_csv.write_text("pdb_id,uniprot_accession,uniprot_chains,chain\n2Y29,P05067,A=687-692,A\n")
 
-    argv = ["retrieve", str(session_dir), "--alphafold-db-version", "6"]
+    argv = ["candidates", "retrieve", str(session_dir), "--alphafold-db-version", "6"]
     return session_dir, argv
 
 
