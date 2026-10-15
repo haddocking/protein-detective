@@ -525,7 +525,7 @@ def test_capri_ss_joins_refinement_runs_and_only_loads_final_stage(
         "JOIN refinements_io USING (refine_run_dir) WHERE caprieval_rank = 1 ORDER BY refine_run_dir"
     ).fetchall()
     expected_rows = [
-        (run_dir, "../6_mdref/mdref_9.pdb", None, 1, -121.192, 1.0, 1472.42, -607.892, 2, 1, 1) for run_dir in run_dirs
+        (run_dir, "../6_mdref/mdref_8.pdb", None, 1, -123.367, 1.0, 1367.51, -638.662, 2, 1, 1) for run_dir in run_dirs
     ]
     expected_count = 36
     assert columns == expected_columns
@@ -579,13 +579,13 @@ def test_capri_clt_joins_refinement_runs_and_only_loads_final_stage(
         "JOIN refinements_io USING (refine_run_dir) ORDER BY refine_run_dir, cluster_rank"
     ).fetchall()
     expected_rows = [
-        (run_dir, rank, cluster_id, 3, True, score, 0.0, dockq, 0.0, rank)
+        (run_dir, rank, cluster_id, 3, True, score, score_std, dockq, dockq_std, rank)
         for run_dir in run_dirs
-        for rank, cluster_id, score, dockq in (
-            (1, 2, -121.192, 1.0),
-            (2, 1, -70.837, 0.017),
-            (3, 4, -63.228, 0.025),
-            (4, 3, -58.954, 0.004),
+        for rank, cluster_id, score, score_std, dockq, dockq_std in (
+            (1, 2, -122.586, 0.989, 0.924, 0.057),
+            (2, 1, -73.422, 2.078, 0.017, 0.0),
+            (3, 3, -63.730, 4.865, 0.004, 0.0),
+            (4, 4, -53.309, 9.861, 0.025, 0.0),
         )
     ]
     expected_count = 12
