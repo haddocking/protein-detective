@@ -69,14 +69,7 @@ def test_unrefined_score_and_workflow_separation(session_with_baseline: Path):
     assert results.loc[results["refine_run_id"] == "second", "unrefined_score"].isna().all()
     assert (
         results["model_score"].tolist()
-        == [-121.192] * 2
-        + [-70.837] * 2
-        + [-63.228] * 2
-        + [-58.954] * 2
-        + [-121.192] * 2
-        + [-70.837] * 2
-        + [-63.228] * 2
-        + [-58.954] * 2
+        == [-123.367, -123.200, -75.926, -73.504, -70.407, -61.827, -63.228, -56.840] * 2
     )
     with duckdb.connect() as con:
         _execute_ddl_statements(con, unrefined_scores_as_duckdb_ddl(tmp_path, "first"))
@@ -105,18 +98,18 @@ def test_cluster_members_metadata_and_compressed_paths(
 ):
     run = add_run(tmp_path, clustered_refinement_results_paths)
     add_metadata(tmp_path)
-    model = run / "refinement/6_mdref/mdref_9.pdb.gz"
+    model = run / "refinement/6_mdref/mdref_8.pdb.gz"
     model.parent.mkdir()
     model.write_bytes(b"")
     results = refinement_report(tmp_path, top=2)
     assert len(results) == 8
     assert results["uniprot_accessions"].tolist() == ["P12345:Q67890"] * 8
     assert results["fitted_rank"].tolist() == [1] * 8
-    assert results["cluster_id"].tolist() == [2, 2, 1, 1, 4, 4, 3, 3]
+    assert results["cluster_id"].tolist() == [2, 2, 1, 1, 3, 3, 4, 4]
     assert results["population"].tolist() == [3] * 8
-    assert results["cluster_score"].tolist() == [-121.192] * 2 + [-70.837] * 2 + [-63.228] * 2 + [-58.954] * 2
-    assert results["cluster_score_std"].tolist() == [0] * 8
-    assert results["model_score"].tolist() == [-121.192] * 2 + [-70.837] * 2 + [-63.228] * 2 + [-58.954] * 2
+    assert results["cluster_score"].tolist() == [-122.586] * 2 + [-73.422] * 2 + [-63.730] * 2 + [-53.309] * 2
+    assert results["cluster_score_std"].tolist() == [0.989] * 2 + [2.078] * 2 + [4.865] * 2 + [9.861] * 2
+    assert results["model_score"].tolist() == [-123.367, -123.200, -75.926, -73.504, -70.407, -61.827, -63.228, -56.840]
     assert results["model_rank"].tolist() == [1, 2] * 4
     assert results.iloc[0]["model_path"] == str(model.relative_to(tmp_path))
 
@@ -456,7 +449,7 @@ def test_csv_paths_are_relative_to_cwd(
     fitted_model = session / "powerfit/run_001/protein/fit_1.pdb"
     fitted_model.parent.mkdir(parents=True)
     fitted_model.write_text("MODEL\nENDMDL\n")
-    model = run / "refinement/6_mdref/mdref_9.pdb.gz"
+    model = run / "refinement/6_mdref/mdref_8.pdb.gz"
     model.parent.mkdir()
     model.write_bytes(b"")
     cwd = {"parent": tmp_path, "session": session, "elsewhere": tmp_path / "elsewhere"}[cwd_location]
