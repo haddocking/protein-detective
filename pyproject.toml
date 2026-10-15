@@ -202,9 +202,6 @@ known-first-party = ["protein_detective"]
 [tool.jupysql.SqlMagic]
 displaylimit = 100
 
-[tool.uv.sources]
-protein-quest = { path = "../protein-quest", editable = true }
-
 [tool.pyrefly]
 preset = "strict"
 project-includes = [
