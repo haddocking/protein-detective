@@ -1,10 +1,12 @@
+import getpass
+import json
 import shlex
 from datetime import UTC, datetime
 from pathlib import Path
 
 from rocrate.metadata import BASENAME
-from rocrate.rocrate import ROCrate
 
+from protein_detective.__version__ import __version__
 from protein_detective.refine.haddock import (
     RefineOptions,
     generate_haddock3_config_body,
@@ -52,10 +54,11 @@ def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_p
         "--powerfit-run-id",
         "run_001",
     ]
+    start_time = datetime(2026, 10, 19, tzinfo=UTC)
     with cli_args(["refine", "run", str(session_with_powerfit_results), str(original), *invocation_options]):
         write_refinement_ro_crate(
             session_dir=session_with_powerfit_results,
-            start_time=datetime.now(tz=UTC),
+            start_time=start_time,
             session_fixed_structure=fixed_structure,
             fixed_structure=original,
             refined=[(fitted, refinement_run)],
@@ -65,28 +68,105 @@ def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_p
             powerfit_run_id="run_001",
         )
 
-    crate_bytes = (session_with_powerfit_results / BASENAME).read_bytes()
+    assert refine_run_arguments_from_rocrate(session_with_powerfit_results) == {
+        run_dir.name: (str(original), shlex.join(invocation_options)),
+    }
 
-    arguments = refine_run_arguments_from_rocrate(session_with_powerfit_results)
-
-    assert list(arguments) == [run_dir.name]
-
-    source, option_text = arguments[run_dir.name]
-
-    assert source == str(original)
-
-    tokens = shlex.split(option_text)
-
-    assert tokens == invocation_options
-    assert (session_with_powerfit_results / BASENAME).read_bytes() == crate_bytes
-
-    fixed_item = ROCrate(session_with_powerfit_results).get(
-        str(fixed_structure.relative_to(session_with_powerfit_results))
+    command = shlex.join(
+        ["protein-detective", "refine", "run", str(session_with_powerfit_results), str(original), *invocation_options]
     )
-
-    assert fixed_item is not None
-    assert str(original) in fixed_item["description"]
-    crate = ROCrate(session_with_powerfit_results)
-    assert crate.get(f"{refinement_run.relative_to(session_with_powerfit_results)}/") is not None
-    assert crate.get(str(complex_file.relative_to(session_with_powerfit_results))) is None
-    assert crate.get(str((baseline / "workflow.cfg").relative_to(session_with_powerfit_results))) is None
+    crate_bytes = (session_with_powerfit_results / BASENAME).read_bytes()
+    metadata = json.loads(crate_bytes)
+    end_time = metadata["@graph"][-1]["endTime"]
+    expected = {
+        "@context": ["https://w3id.org/ro/crate/1.1/context", "https://w3id.org/ro/terms/workflow-run/context"],
+        "@graph": [
+            {
+                "@id": "./",
+                "@type": "Dataset",
+                "conformsTo": {"@id": "https://w3id.org/ro/wfrun/process/0.5"},
+                "datePublished": end_time,
+                "description": "An RO-Crate recording the files and directories that were used as input or "
+                "output by protein-detective.",
+                "hasPart": [
+                    {"@id": "refine/refine_run_001/fixed_structure.pdb"},
+                    {"@id": "powerfit/run_001/same_structure/fit_1.pdb"},
+                    {"@id": "refine/refine_run_001/io.csv"},
+                    {"@id": "refine/refine_run_001/run_001/same_structure/fit_1.pdb/"},
+                ],
+                "license": "CC-BY-4.0",
+                "name": "Files used by protein-detective",
+            },
+            {
+                "@id": "ro-crate-metadata.json",
+                "@type": "CreativeWork",
+                "about": {"@id": "./"},
+                "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
+            },
+            {
+                "@id": "https://w3id.org/ro/wfrun/process/0.5",
+                "@type": "CreativeWork",
+                "name": "Process Run Crate",
+                "version": "0.5",
+            },
+            {
+                "@id": f"protein-detective@{__version__}",
+                "@type": "SoftwareApplication",
+                "description": "Detect proteins in EM density map",
+                "name": "protein-detective",
+                "version": __version__,
+            },
+            {
+                "@id": "refine/refine_run_001/fixed_structure.pdb",
+                "@type": "File",
+                "contentSize": 4,
+                "description": (
+                    f"Fixed structure prepared from {original.resolve()}; "
+                    "removed chains ['A']; renamed remaining chains to B."
+                ),
+                "encodingFormat": "chemical/x-pdb",
+                "name": "refine/refine_run_001/fixed_structure.pdb",
+            },
+            {
+                "@id": "powerfit/run_001/same_structure/fit_1.pdb",
+                "@type": "File",
+                "contentSize": 13,
+                "description": "Fitted model file.",
+                "encodingFormat": "chemical/x-pdb",
+                "name": "powerfit/run_001/same_structure/fit_1.pdb",
+            },
+            {
+                "@id": "refine/refine_run_001/io.csv",
+                "@type": "File",
+                "contentSize": 178,
+                "description": "CSV file containing fitted model path and refine run dir.",
+                "encodingFormat": "text/csv",
+                "name": "refine/refine_run_001/io.csv",
+            },
+            {
+                "@id": "refine/refine_run_001/run_001/same_structure/fit_1.pdb/",
+                "@type": "Dataset",
+                "description": "Baseline and refinement haddock3 results.",
+                "name": "refine/refine_run_001/run_001/same_structure/fit_1.pdb",
+            },
+            {"@id": getpass.getuser(), "@type": "Person", "name": getpass.getuser()},
+            {
+                "@id": command,
+                "@type": "CreateAction",
+                "agent": {"@id": getpass.getuser()},
+                "endTime": end_time,
+                "instrument": {"@id": f"protein-detective@{__version__}"},
+                "name": command,
+                "object": [
+                    {"@id": "refine/refine_run_001/fixed_structure.pdb"},
+                    {"@id": "powerfit/run_001/same_structure/fit_1.pdb"},
+                ],
+                "result": [
+                    {"@id": "refine/refine_run_001/io.csv"},
+                    {"@id": "refine/refine_run_001/run_001/same_structure/fit_1.pdb/"},
+                ],
+                "startTime": start_time.isoformat(),
+            },
+        ],
+    }
+    assert metadata == expected
