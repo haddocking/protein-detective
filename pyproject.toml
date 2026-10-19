@@ -94,6 +94,12 @@ docs = [
 requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/protein_detective"]
+
 [tool.hatch.version]
 path = "src/protein_detective/__version__.py"
 
