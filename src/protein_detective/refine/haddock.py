@@ -20,22 +20,22 @@ class RefineOptions:
     """Options for refining a structure with HADDOCK3.
 
     Attributes:
+        ncores: Number of CPU cores to use for a single fitted structure.
+            Use a large number such as 9999 to use all available CPU cores.
         rigidbody_sampling: Number of rigidbody samples.
-        fcc_clust_cutoff: Minimum fraction of common contacts (FCC) to be considered in a cluster.
         top_clusters: Number of top clusters to keep.
         top_models: Number of top models to keep.
         water_refinement_sampling_factor: Factor for determining the number of water refinement samples.
         water_refinement_solvent: Solvent used for water refinement.
-        ncores: Number of CPU cores to use for a single fitted structure.
-            Use a large number such as 9999 to use all available CPU cores.
+        fcc_clust_cutoff: Minimum fraction of common contacts (FCC) to be considered in a cluster.
     """
 
+    ncores: PositiveInt = 1
     rigidbody_sampling: PositiveInt = 1000
     top_clusters: PositiveInt = 10
     top_models: PositiveInt = 2
     water_refinement_sampling_factor: PositiveInt = 1
     water_refinement_solvent: Literal["water", "dmso", "none"] = "none"
-    ncores: PositiveInt = 1
     fcc_clust_cutoff: float = 0.60
 
 
