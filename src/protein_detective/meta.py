@@ -252,7 +252,6 @@ def refinements_io_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
 
     Args:
         session_dir: Session directory containing refinement runs.
-        refine_run_id: Run to select; when omitted, include all runs.
 
     Returns:
         SQL statements and bound parameters for creating refinements_io from
