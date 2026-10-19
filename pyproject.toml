@@ -29,9 +29,6 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "aiofiles>=24.1.0",
-    "aiohttp[speedups]>=3.13.4",
-    "aiohttp-retry>=2.9.1",
     "cyclopts>=4.16.1",
     "dask>=2025.5.1",
     "distributed>=2025.5.1",
@@ -41,13 +38,13 @@ dependencies = [
     "pandas>=2.3.0",
     "powerfit-em[opencl]>=5.0.0",
     "protein-quest>=1.7.0",
-    "psutil>=7.0.0",
     "pyopencl>=2025.2.5",
     "rich>=14.0.0",
-    "rich-argparse>=1.7.1",
     "rocrate-action-recorder>=0.5.3",
     "tqdm>=4.67.1",
     "rocrate>=0.15.0",
+    "haddock3>=2026.10.0",
+    "gemmi>=0.7.5",
 ]
 
 [project.urls]
@@ -66,7 +63,6 @@ cuda12 = ["powerfit-em[cuda12x]>=5.0.0"]
 [dependency-groups]
 type = [
     "pyrefly>=1.1.1",
-    "types-aiofiles>=24.1.0.20250326",
     "types-tqdm>=4.67.0.20250513",
 ]
 test = [
@@ -81,12 +77,10 @@ test = [
 dev = [{ include-group = "test" }, { include-group = "type" }]
 docs = [
     "cyclopts[mkdocs]>=4.5.4",
-    "duckdb-engine>=0.17.0",
     "gemmi>=0.7.3",
     "ipykernel>=6.31.0",
     "ipywidgets>=8.1.7",
     "jupysql>=0.11.1",
-    "matplotlib>=3.10.3",
     "mkdocs-autoapi>=0.4.1",
     "mkdocs-jupyter>=0.25.1",
     "mkdocs-materialx>=10.2.0",
@@ -191,6 +185,8 @@ ignore = [
     "PD901",
     # Allow suspicious-url-open-usage
     "S310",
+    # Allow asserts to check tutorial results
+    "S101",
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -213,8 +209,20 @@ enable-fallback-search-path = true
 
 [tool.pytest]
 minversion = "9.0"
-addopts = ["--import-mode=importlib"]
+addopts = ["--import-mode=importlib", "-m", "not manual"]
+markers = [
+    "manual: tests that only run when explicitly selected with '-m manual'",
+]
 
 [tool.coverage.run]
 source = ["src/protein_detective"]
 branch = true
+
+[tool.zorilla]
+include = ["tests/**/*.py"]
+exclude = ["**/fixtures/**", "**/cassettes/**"]
+
+
+[tool.zorilla.rules]
+ZR004 = { enabled = false }  # disabled as sometimes you need many asserts
+ZR005 = { enabled = false }  # disabled as sometimes you need absolute paths

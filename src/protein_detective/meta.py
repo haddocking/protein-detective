@@ -11,14 +11,16 @@ from rocrate.metadata import BASENAME
 
 from protein_detective.common_cli import rprint
 from protein_detective.powerfit.workflow import powerfit_solutions_query
+from protein_detective.refine import LAST_CAPRIEVAL_MODULE
+from protein_detective.refine.provenance import refine_run_arguments_from_rocrate
 
-DDLStatement = tuple[str, dict[str, str]]
+DDLStatement = tuple[str, dict[str, str | list[str]]]
 """SQL DDL statement and named parameters (use $ prefix in SQL) to be passed to DuckDB connection.execute()"""
 
 
 def rocrate_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     rocrate_path = session_dir / BASENAME
-    params = {"rocrate_path": str(rocrate_path)}
+    params: dict[str, str | list[str]] = {"rocrate_path": str(rocrate_path)}
     return [
         (
             """\
@@ -225,6 +227,54 @@ def _alphafold_retrieve_stats_csv_as_duckdb_ddl(
     ]
 
 
+def refinement_run_io_paths(session_dir: Path, refine_run_id: str | None = None) -> list[Path]:
+    """Find paths to refinement run IO mapping files.
+
+    Args:
+        session_dir: Session directory containing refinement runs.
+        refine_run_id: Run to select; when omitted, include all runs.
+
+    Returns:
+        Matching per-run IO indexes, ordered by path; empty if no runs exist.
+
+    """
+    indexes = sorted((session_dir / "refine").glob("*/io.csv"))
+    if refine_run_id is not None:
+        indexes = [p for p in indexes if p.parent.name == refine_run_id]
+        if not indexes:
+            msg = f"Unknown refinement run ID: {refine_run_id}"
+            raise ValueError(msg)
+    return indexes
+
+
+def refinements_io_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    """Build the statements that load refinement input/output mappings.
+
+    Args:
+        session_dir: Session directory containing refinement runs.
+
+    Returns:
+        SQL statements and bound parameters for creating refinements_io from
+        matching run indexes; empty if no indexes exist.
+
+    """
+    io_pattern = session_dir / "refine" / "*" / "io.csv"
+    has_io = any((session_dir / "refine").glob("*/io.csv"))
+    if not has_io:
+        return []
+    return [
+        (
+            """\
+            CREATE TABLE refinements_io AS
+            SELECT
+            *
+            FROM read_csv($indexes, all_varchar = true);
+            """,
+            {"indexes": str(io_pattern)},
+        ),
+    ]
+
+
 def _search_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     statements: list[DDLStatement] = []
     uniprot_txt = session_dir / "uniprot.txt"
@@ -286,6 +336,14 @@ def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     statements.extend(_retrieve_csv_as_duckdb_ddl(session_dir))
     statements.extend(_filter_csv_as_duckdb_ddl(session_dir))
 
+    statements.extend(powerfit_metadata_as_duckdb_ddl(session_dir))
+
+    return statements
+
+
+def powerfit_metadata_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    """Load existing fitting indexes for metadata joins and refinement reporting."""
+    statements: list[DDLStatement] = []
     fittable_structures_csv = session_dir / "powerfit" / "fittable_structures.csv"
     if fittable_structures_csv.exists():
         statements.extend(_fittable_structures_csv_as_duckdb_ddl(fittable_structures_csv))
@@ -300,6 +358,7 @@ def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
 def structure_files_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     cif_pattern = session_dir / "**" / "*.cif.gz"
     pdb_pattern = session_dir / "**" / "*.pdb"
+    pdbgz_pattern = session_dir / "**" / "*.pdb.gz"
     return [
         (
             """\
@@ -309,12 +368,15 @@ def structure_files_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
                 SELECT replace(file, $session_dir || '/', '') AS file FROM glob($cif_pattern)
                 UNION ALL
                 SELECT replace(file, $session_dir || '/', '') AS file FROM glob($pdb_pattern)
+                UNION ALL
+                SELECT replace(file, $session_dir || '/', '') AS file FROM glob($pdbgz_pattern)
             );
             """,
             {
                 "session_dir": str(session_dir),
                 "cif_pattern": str(cif_pattern),
                 "pdb_pattern": str(pdb_pattern),
+                "pdbgz_pattern": str(pdbgz_pattern),
             },
         ),
     ]
@@ -338,49 +400,224 @@ def solutions_as_duckdb_ddl(session_dir: Path, powerfit_run_id: str | None = Non
     ]
 
 
-def ddl(session_dir: Path, powerfit_run_id: str | None = None) -> list[DDLStatement]:
+def refinements_capri_ss_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    #  */*/*/* == refine_run_id / powerfit_run_id / unfitted structure / fitted structure
+    refine_dirs = session_dir / "refine" / "*" / "*" / "*" / "*"
+    capri_ss_pattern = refine_dirs / "refinement" / LAST_CAPRIEVAL_MODULE / "capri_ss.tsv"
+    has_ss = any(session_dir.glob(str(capri_ss_pattern.relative_to(session_dir))))
+    if not has_ss:
+        return []
+    # the clean = True in haddock3 config, causes pdb files to be gzipped,
+    # but tsv files are still pointing to the original filenames (model column)
+    # also path is relative to tsv make it relative to session_dir
+    # so ../6_mdref/mdref_3.pdb + filename -> refine_run_dir / 6_mdref/mdref_3.pdb.gz
+    # to make refined_structure_path
+    # Normalize names so `model-cluster_ranking` becomes `modelcluster_ranking`.
+    return [
+        (
+            """\
+            CREATE TABLE refinements_capri_ss AS
+            SELECT
+            *
+            ,replace(
+                parse_dirpath(parse_dirpath(filename)) || '/' || substring(model, 4) || '.gz',
+                $session_dir || '/',
+                ''
+            ) AS refined_structure_path
+            ,replace(parse_dirpath(parse_dirpath(parse_dirpath(filename))), $session_dir || '/', '') AS refine_run_dir
+            ,parse_path(filename)[-4] AS fitted_structure
+            ,parse_path(filename)[-5] AS unfitted_structure
+            ,parse_path(filename)[-6] AS powerfit_run_id
+            ,parse_path(filename)[-7] AS refine_run_id
+            FROM
+            read_csv(
+                $capri_ss_pattern, delim = '\t', header = true, nullstr = '-',
+                normalize_names = true, comment = '#', filename = true
+            )
+            """,
+            {
+                "session_dir": str(session_dir),
+                "capri_ss_pattern": str(capri_ss_pattern),
+            },
+        ),
+    ]
+
+
+def refinements_capri_clt_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    #  */*/*/* == refine_run_id / powerfit_run_id / unfitted structure / fitted structure
+    refine_dirs = session_dir / "refine" / "*" / "*" / "*" / "*"
+    capri_clt_pattern = refine_dirs / "refinement" / LAST_CAPRIEVAL_MODULE / "capri_clt.tsv"
+    has_clt = any(session_dir.glob(str(capri_clt_pattern.relative_to(session_dir))))
+    if not has_clt:
+        return []
+    return [
+        (
+            """\
+            CREATE TABLE refinements_capri_clt AS
+            SELECT
+            *
+            ,replace(parse_dirpath(parse_dirpath(parse_dirpath(filename))), $session_dir || '/', '') AS refine_run_dir
+            ,parse_path(filename)[-4] AS fitted_structure
+            ,parse_path(filename)[-5] AS unfitted_structure
+            ,parse_path(filename)[-6] AS powerfit_run_id
+            ,parse_path(filename)[-7] AS refine_run_id
+            FROM
+            read_csv($capri_clt_pattern, delim = '\t', header = true, nullstr = '-', comment = '#')
+            """,
+            {
+                "session_dir": str(session_dir),
+                "capri_clt_pattern": str(capri_clt_pattern),
+            },
+        ),
+    ]
+
+
+def refinements_baseline(session_dir: Path) -> list[DDLStatement]:
+    #  */*/*/* == refine_run_id / powerfit_run_id / unfitted structure / fitted structure
+    refine_dirs = session_dir / "refine" / "*" / "*" / "*" / "*"
+    baseline_pattern = refine_dirs / "baseline" / "2_caprieval" / "capri_ss.tsv"
+    has_baseline = any(session_dir.glob(str(baseline_pattern.relative_to(session_dir))))
+    if not has_baseline:
+        return []
+    return [
+        (
+            """\
+            CREATE TABLE refinements_baseline AS
+            SELECT
+            *
+            ,replace(parse_dirpath(parse_dirpath(parse_dirpath(filename))), $session_dir || '/', '') AS refine_run_dir
+            ,parse_path(filename)[-4] AS fitted_structure
+            ,parse_path(filename)[-5] AS unfitted_structure
+            ,parse_path(filename)[-6] AS powerfit_run_id
+            ,parse_path(filename)[-7] AS refine_run_id
+            FROM
+            read_csv($baseline_pattern, delim = '\t', header = true, nullstr = '-', comment = '#')
+            """,
+            {
+                "session_dir": str(session_dir),
+                "baseline_pattern": str(baseline_pattern),
+            },
+        ),
+    ]
+
+
+def refinements_runs_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    # parsing fixed structure from rocrate action id is too hard in duckdb,
+    # so we use Python shlex instead and use classical `CREATE TABLE` and `INSERT` statements.
+    runs = refine_run_arguments_from_rocrate(session_dir)
+    if not runs:
+        return []
+    statements: list[DDLStatement] = [
+        (
+            """\
+        CREATE TABLE refinements_runs (
+            refine_run_id TEXT,
+            run_dir TEXT,
+            fixed_structure TEXT,
+            processed_fixed_structure TEXT,
+            options TEXT
+        )
+        """,
+            {},
+        ),
+    ]
+    for refinement_run_id, (fixed_structure, options) in runs.items():
+        run_dir = Path("refine") / refinement_run_id
+        processed_fixed_structure = run_dir / "fixed_structure.pdb"
+        statements.append(
+            (
+                """\
+                INSERT INTO refinements_runs (
+                    refine_run_id, run_dir, fixed_structure, processed_fixed_structure, options
+                ) VALUES (
+                    $refine_run_id, $run_dir, $fixed_structure, $processed_fixed_structure, $options
+                )
+                """,
+                {
+                    "refine_run_id": refinement_run_id,
+                    "run_dir": str(run_dir),
+                    "fixed_structure": fixed_structure,
+                    "processed_fixed_structure": str(processed_fixed_structure),
+                    "options": options,
+                },
+            )
+        )
+    return statements
+
+
+def refinement_tables(session_dir: Path) -> list[DDLStatement]:
+    statements: list[DDLStatement] = []
+    statements.extend(refinements_capri_ss_as_duckdb_ddl(session_dir))
+    statements.extend(refinements_capri_clt_as_duckdb_ddl(session_dir))
+    statements.extend(refinements_baseline(session_dir))
+    statements.extend(refinements_io_as_duckdb_ddl(session_dir))
+    statements.extend(refinements_runs_as_duckdb_ddl(session_dir))
+    return statements
+
+
+def ddl(session_dir: Path) -> list[DDLStatement]:
     statements: list[DDLStatement] = []
     statements.extend(structure_files_as_duckdb_ddl(session_dir))
     statements.extend(rocrate_as_duckdb_ddl(session_dir))
     statements.extend(stats_csv_as_duckdb_ddl(session_dir))
-    statements.extend(solutions_as_duckdb_ddl(session_dir, powerfit_run_id=powerfit_run_id))
+    statements.extend(solutions_as_duckdb_ddl(session_dir))
+    statements.extend(refinement_tables(session_dir))
     return statements
 
 
-def _execute_ddl_statements(con: duckdb.DuckDBPyConnection, statements: list[DDLStatement]) -> None:
+class ExecuteError(Exception):
+    def __init__(self, statement_and_params: DDLStatement):
+        self.statement, self.params = statement_and_params
+        super().__init__(f"Error executing statement: `{self.statement}`\nWith params: {self.params}")
+
+
+def execute_ddl_statements(con: duckdb.DuckDBPyConnection, statements: list[DDLStatement]) -> None:
+    """Execute parameterized DDL statements in order.
+
+    Args:
+        con: DuckDB connection on which to execute the statements.
+        statements: SQL statements paired with their named parameters.
+
+    Raises:
+        ExecuteError: A statement fails; includes its SQL and parameters.
+    """
     for statement, params in statements:
-        con.execute(statement, params)
+        try:
+            con.execute(statement, params)
+        except duckdb.Error as e:
+            raise ExecuteError((statement, params)) from e
 
 
-def in_memory_duckdb_connection(session_dir: Path, powerfit_run_id: str | None = None):
-    statements = ddl(session_dir, powerfit_run_id=powerfit_run_id)
+def in_memory_duckdb_connection(
+    session_dir: Path,
+):
+    statements = ddl(session_dir)
     con = duckdb.connect(database=":memory:")
-    _execute_ddl_statements(con, statements)
+    execute_ddl_statements(con, statements)
     return con
 
 
-def create_meta_duckdb_file(session_dir: Path, duckdb_file: Path | None = None, powerfit_run_id: str | None = None):
-    statements = ddl(session_dir, powerfit_run_id=powerfit_run_id)
+def create_meta_duckdb_file(
+    session_dir: Path,
+    duckdb_file: Path | None = None,
+):
+    statements = ddl(session_dir)
     if duckdb_file is None:
         duckdb_file = session_dir / "meta.duckdb"
     con = duckdb.connect(database=str(duckdb_file))
-    _execute_ddl_statements(con, statements)
+    execute_ddl_statements(con, statements)
     con.close()
 
 
 def create_meta_duckdb(
     session_dir: Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=True, exists=True))],
-    /,
-    *,
-    powerfit_run_id: str | None = None,
 ) -> None:
     """Generate a DuckDB metadata database for a Protein Detective session.
 
     Args:
         session_dir: Session directory containing the files to include.
-        powerfit_run_id: Optional PowerFit run ID used to restrict solutions.
     """
-    create_meta_duckdb_file(session_dir, powerfit_run_id=powerfit_run_id)
+    create_meta_duckdb_file(session_dir)
     duckdb_file = session_dir / "meta.duckdb"
     rprint(
         f"[green]{duckdb_file} has been generated.[/green]\n"

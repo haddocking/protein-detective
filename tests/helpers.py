@@ -2,6 +2,8 @@
 
 import csv
 import sys
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +18,17 @@ from protein_detective.__version__ import __version__
 from protein_detective.cli import app
 
 
+@contextmanager
+def cli_args(tokens: list[str]) -> Generator[None]:
+    """Set process arguments for a CLI invocation and restore them afterward."""
+    old_argv = sys.argv
+    sys.argv = ["protein-detective", *tokens]
+    try:
+        yield
+    finally:
+        sys.argv = old_argv
+
+
 def cli(tokens: list[str]):
     """Invoke the CLI with the given tokens.
 
@@ -26,12 +39,8 @@ def cli(tokens: list[str]):
     Args:
         tokens: List of command line tokens to pass to the CLI.
     """
-    old_argv = sys.argv
-    sys.argv = ["protein-detective", *tokens]
-    try:
+    with cli_args(tokens):
         return app(tokens, result_action="return_value")
-    finally:
-        sys.argv = old_argv
 
 
 def fake_setup_retrieve(tmp_path: Path):
@@ -43,7 +52,7 @@ def fake_setup_retrieve(tmp_path: Path):
     pdbe_csv = session_dir / "pdbe.csv"
     pdbe_csv.write_text("pdb_id,uniprot_accession,uniprot_chains,chain\n2Y29,P05067,A=687-692,A\n")
 
-    argv = ["retrieve", str(session_dir), "--alphafold-db-version", "6"]
+    argv = ["candidates", "retrieve", str(session_dir), "--alphafold-db-version", "6"]
     return session_dir, argv
 
 
