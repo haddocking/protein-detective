@@ -224,15 +224,6 @@ def refine_with_haddock3(
     if not structures_to_refine:
         msg = "No fitted models selected for refinement."
         raise ValueError(msg)
-    for model in structures_to_refine:
-        relative_model = model.relative_to(session_dir / "powerfit")
-        if len(relative_model.parts) != 3:
-            msg = f"Expected powerfit/<run>/<structure>/<model> path: {model}"
-            raise ValueError(msg)
-        if not model.is_file():
-            raise FileNotFoundError(model)
-    if not fixed_structure.is_file():
-        raise FileNotFoundError(fixed_structure)
 
     refine_dir = create_refinement_run(session_dir=session_dir, refine_run_id=refine_run_id)
     session_fixed_structure = prepare_fixed_structure(

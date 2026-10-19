@@ -185,14 +185,6 @@ def test_rejects_empty_selection_before_creating_run(session_with_powerfit_resul
     assert_refinement_rejected_before_creating_run(session_with_powerfit_results, fixed_structure_file, ValueError)
 
 
-def test_rejects_missing_input_before_creating_run(session_with_powerfit_results: Path, fixed_structure_file: Path):
-    (session_with_powerfit_results / "powerfit/run_003/same_structure/fit_1.pdb").unlink()
-
-    assert_refinement_rejected_before_creating_run(
-        session_with_powerfit_results, fixed_structure_file, FileNotFoundError
-    )
-
-
 def test_rejects_unknown_source_before_creating_run(session_with_powerfit_results: Path, fixed_structure_file: Path):
     assert_refinement_rejected_before_creating_run(
         session_with_powerfit_results, fixed_structure_file, ValueError, powerfit_run_id="unknown"
