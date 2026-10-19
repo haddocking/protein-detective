@@ -157,7 +157,8 @@ Some tests are skipped
 
 - when CUDA or OpenCL is available or not.
 - when they take too long for CI, for example a haddock3 refinement run takes >2
-  minutes, they can be run with `uv run pytest -m manual`
+  minutes, they can be run with `uv run pytest -m manual` or all tests with
+  `uv run pytest -m ""`.
 
 ## Automated code quality checks on git commit
 

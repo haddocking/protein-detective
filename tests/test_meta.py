@@ -6,9 +6,11 @@ import duckdb
 import pytest
 
 from protein_detective.meta import (
-    capri_as_duckdb_ddl,
     ddl,
+    execute_ddl_statements,
     in_memory_duckdb_connection,
+    refinements_capri_clt_as_duckdb_ddl,
+    refinements_capri_ss_as_duckdb_ddl,
     refinements_io_as_duckdb_ddl,
     solutions_as_duckdb_ddl,
 )
@@ -53,6 +55,12 @@ def test_rocrate_columns_are_normalized(tmp_path: Path):
             {
                 "@context": ["https://w3id.org/ro/crate/1.1/context"],
                 "@graph": [
+                    {
+                        "@id": "ro-crate-metadata.json",
+                        "@type": "CreativeWork",
+                        "about": {"@id": "./"},
+                        "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
+                    },
                     {
                         "@id": "./",
                         "@type": "Dataset",
@@ -123,6 +131,12 @@ def test_solutions_is_created_as_select(tmp_path: Path):
                 "@context": ["https://w3id.org/ro/crate/1.1/context"],
                 "@graph": [
                     {
+                        "@id": "ro-crate-metadata.json",
+                        "@type": "CreativeWork",
+                        "about": {"@id": "./"},
+                        "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
+                    },
+                    {
                         "@id": "./",
                         "@type": "Dataset",
                         "description": "An RO-Crate session directory.",
@@ -191,6 +205,12 @@ def test_merge_structure_files_is_loaded_with_ctas(tmp_path: Path):
                 "@context": ["https://w3id.org/ro/crate/1.1/context"],
                 "@graph": [
                     {
+                        "@id": "ro-crate-metadata.json",
+                        "@type": "CreativeWork",
+                        "about": {"@id": "./"},
+                        "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
+                    },
+                    {
                         "@id": "./",
                         "@type": "Dataset",
                         "description": "An RO-Crate session directory.",
@@ -257,6 +277,12 @@ def test_combined_stats_is_loaded_with_ctas(tmp_path: Path):
                 "@context": ["https://w3id.org/ro/crate/1.1/context"],
                 "@graph": [
                     {
+                        "@id": "ro-crate-metadata.json",
+                        "@type": "CreativeWork",
+                        "about": {"@id": "./"},
+                        "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
+                    },
+                    {
                         "@id": "./",
                         "@type": "Dataset",
                         "description": "An RO-Crate session directory.",
@@ -316,6 +342,12 @@ def test_fitted_models_is_loaded_with_ctas(tmp_path: Path):
             {
                 "@context": ["https://w3id.org/ro/crate/1.1/context"],
                 "@graph": [
+                    {
+                        "@id": "ro-crate-metadata.json",
+                        "@type": "CreativeWork",
+                        "about": {"@id": "./"},
+                        "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
+                    },
                     {
                         "@id": "./",
                         "@type": "Dataset",
@@ -389,6 +421,12 @@ def test_fitted_models_table_is_absent_without_csv(tmp_path: Path):
                 "@context": ["https://w3id.org/ro/crate/1.1/context"],
                 "@graph": [
                     {
+                        "@id": "ro-crate-metadata.json",
+                        "@type": "CreativeWork",
+                        "about": {"@id": "./"},
+                        "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
+                    },
+                    {
                         "@id": "./",
                         "@type": "Dataset",
                         "description": "An RO-Crate session directory.",
@@ -441,11 +479,17 @@ def test_refine_io_is_loaded_with_ctas(tmp_path: Path):
     ]
 
 
+def copy_capri_tables(directory: Path, fixtures: dict[str, Path]):
+    directory.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(fixtures["models"], directory / "capri_ss.tsv")
+    shutil.copyfile(fixtures["clusters"], directory / "capri_clt.tsv")
+
+
 @pytest.fixture
-def capri_tables(tmp_path: Path, table: str, clustered_refinement_results_paths: dict[str, Path]):
+def capri_tables(tmp_path: Path, clustered_refinement_results_paths: dict[str, Path]):
     session_dir = tmp_path / "session with spaces"
     refine_dir = session_dir / "refine"
-    refine_dir.mkdir(parents=True)
+    refine_dir.mkdir(parents=True, exist_ok=True)
     run_dirs = [f"refine/refine_run_00{i}/run_001/structure.cif/fit_1.pdb" for i in (1, 2)]
     for i, run_dir in enumerate(run_dirs, 1):
         index = refine_dir / f"refine_run_00{i}" / "io.csv"
@@ -454,39 +498,30 @@ def capri_tables(tmp_path: Path, table: str, clustered_refinement_results_paths:
             "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
             f"refine_run_00{i},run_001,powerfit/run_001/structure.cif/fit_1.pdb,{run_dir}\n"
         )
-    fixture = clustered_refinement_results_paths["models" if table == "capri_ss" else "clusters"]
     for run_dir in run_dirs:
-        for step in ("2_caprieval", "8_caprieval"):
-            stage_dir = session_dir / run_dir / "refinement" / step
-            stage_dir.mkdir(parents=True)
-            shutil.copyfile(fixture, stage_dir / f"{table}.tsv")
+        refinement = session_dir / run_dir / "refinement"
+        copy_capri_tables(refinement / "2_caprieval", clustered_refinement_results_paths)
+        copy_capri_tables(refinement / "8_caprieval", clustered_refinement_results_paths)
         # Postprocessed copies must not duplicate the stage results.
-        analysis_dir = session_dir / run_dir / "refinement" / "analysis" / "8_caprieval_analysis"
-        analysis_dir.mkdir(parents=True)
-        shutil.copyfile(fixture, analysis_dir / f"{table}.tsv")
+        copy_capri_tables(refinement / "analysis/8_caprieval_analysis", clustered_refinement_results_paths)
 
     # Include results from runs not recorded in refinements_io.
-    orphan_dir = (
-        refine_dir / "refine_run_003" / "run_001" / "structure.cif" / "fit_1.pdb" / "refinement" / "8_caprieval"
-    )
-    orphan_dir.mkdir(parents=True)
-    shutil.copyfile(fixture, orphan_dir / f"{table}.tsv")
+    orphan_dir = refine_dir / "refine_run_003/run_001/structure.cif/fit_1.pdb/refinement/8_caprieval"
+    copy_capri_tables(orphan_dir, clustered_refinement_results_paths)
 
     with duckdb.connect(database=":memory:") as con:
-        for statement, params in ddl(session_dir):
-            if "CREATE TABLE refinements_io" in statement or f"CREATE TABLE refinements_{table}" in statement:
-                con.execute(statement, params)
+        execute_ddl_statements(con, refinements_io_as_duckdb_ddl(session_dir))
+        execute_ddl_statements(con, refinements_capri_ss_as_duckdb_ddl(session_dir))
+        execute_ddl_statements(con, refinements_capri_clt_as_duckdb_ddl(session_dir))
         yield con, run_dirs
 
 
-@pytest.mark.parametrize("table", ["capri_ss"])
 def test_capri_ss_joins_refinement_runs_and_only_loads_final_stage(
-    capri_tables: tuple[duckdb.DuckDBPyConnection, list[str]], table: str
+    capri_tables: tuple[duckdb.DuckDBPyConnection, list[str]],
 ):
     con, run_dirs = capri_tables
-    columns = [row[0] for row in con.execute(f"DESCRIBE refinements_{table}").fetchall()]
+    columns = [row[0] for row in con.execute("DESCRIBE refinements_capri_ss").fetchall()]
     expected_columns = [
-        "refine_run_dir",
         "model",
         "md5",
         "caprieval_rank",
@@ -528,19 +563,26 @@ def test_capri_ss_joins_refinement_runs_and_only_loads_final_stage(
         (run_dir, "../6_mdref/mdref_8.pdb", None, 1, -123.367, 1.0, 1367.51, -638.662, 2, 1, 1) for run_dir in run_dirs
     ]
     expected_count = 36
+    expected_columns += [
+        "filename",
+        "refine_run_dir",
+        "fitted_structure",
+        "unfitted_structure",
+        "powerfit_run_id",
+        "refine_run_id",
+    ]
+    expected_columns.insert(expected_columns.index("refine_run_dir"), "refined_structure_path")
     assert columns == expected_columns
     assert rows == expected_rows
-    assert con.table(f"refinements_{table}").count("*").fetchone() == (expected_count,)
+    assert con.table("refinements_capri_ss").count("*").fetchone() == (expected_count,)
 
 
-@pytest.mark.parametrize("table", ["capri_clt"])
 def test_capri_clt_joins_refinement_runs_and_only_loads_final_stage(
-    capri_tables: tuple[duckdb.DuckDBPyConnection, list[str]], table: str
+    capri_tables: tuple[duckdb.DuckDBPyConnection, list[str]],
 ):
     con, run_dirs = capri_tables
-    columns = [row[0] for row in con.execute(f"DESCRIBE refinements_{table}").fetchall()]
+    columns = [row[0] for row in con.execute("DESCRIBE refinements_capri_clt").fetchall()]
     expected_columns = [
-        "refine_run_dir",
         "cluster_rank",
         "cluster_id",
         "n",
@@ -589,29 +631,36 @@ def test_capri_clt_joins_refinement_runs_and_only_loads_final_stage(
         )
     ]
     expected_count = 12
+    expected_columns += [
+        "refine_run_dir",
+        "fitted_structure",
+        "unfitted_structure",
+        "powerfit_run_id",
+        "refine_run_id",
+    ]
     assert columns == expected_columns
     assert rows == expected_rows
-    assert con.table(f"refinements_{table}").count("*").fetchone() == (expected_count,)
+    assert con.table("refinements_capri_clt").count("*").fetchone() == (expected_count,)
 
 
 def test_capri_ddl_loads_without_refinement_io_and_skips_missing_tables(
     tmp_path: Path, clustered_refinement_results_paths: dict[str, Path]
 ):
-    assert capri_as_duckdb_ddl(tmp_path) == []
+    assert refinements_capri_ss_as_duckdb_ddl(tmp_path) == []
     stage_dir = (
         tmp_path / "refine" / "refine_run_001" / "run_001" / "structure" / "fit_1.pdb" / "refinement" / "8_caprieval"
     )
     stage_dir.mkdir(parents=True)
     results = stage_dir / "capri_ss.tsv"
     shutil.copyfile(clustered_refinement_results_paths["models"], results)
-    statements = capri_as_duckdb_ddl(tmp_path)
+    statements = refinements_capri_ss_as_duckdb_ddl(tmp_path)
     assert len(statements) == 1
     assert "CREATE TABLE refinements_capri_ss" in statements[0][0]
     with duckdb.connect(database=":memory:") as con:
         con.execute(*statements[0])
         assert con.table("refinements_capri_ss").count("*").fetchone() == (12,)
     results.unlink()
-    assert capri_as_duckdb_ddl(tmp_path) == []
+    assert refinements_capri_ss_as_duckdb_ddl(tmp_path) == []
 
 
 @pytest.fixture
@@ -628,7 +677,7 @@ def multiple_refinement_indexes(tmp_path: Path):
         stage.mkdir(parents=True)
         (stage / "capri_ss.tsv").write_text("model\tscore\tcaprieval_rank\tcluster_id\nx.pdb\t-10\t1\t-\n")
     with duckdb.connect() as con:
-        for statement, params in refinements_io_as_duckdb_ddl(tmp_path) + capri_as_duckdb_ddl(tmp_path):
+        for statement, params in refinements_io_as_duckdb_ddl(tmp_path) + refinements_capri_ss_as_duckdb_ddl(tmp_path):
             con.execute(statement, params)
         yield con
 

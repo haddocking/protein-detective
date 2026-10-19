@@ -118,11 +118,6 @@ def report(
         output: CSV output path; defaults to standard output.
     """
     results = refinement_report(session_dir, refine_run_id, top, group_by_structure=not no_group_by_structure)
-    cwd = Path.cwd()
-    for column in ("model_path", "fitted_model", "refine_run_dir"):
-        results[column] = results[column].map(
-            lambda path: str((session_dir / path).resolve().relative_to(cwd, walk_up=True))
-        )
     results["cluster_id"] = (
         results["cluster_id"].map(lambda cluster_id: f"{cluster_id:.0f}", na_action="ignore").fillna("-")
     )

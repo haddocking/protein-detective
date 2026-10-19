@@ -623,7 +623,14 @@ def test_meta_creates_duckdb_file(tmp_path: Path, capsys: pytest.CaptureFixture[
     (session_dir / "ro-crate-metadata.json").write_text(
         json.dumps(
             {
+                "@context": "https://w3id.org/ro/crate/1.1/context",
                 "@graph": [
+                    {
+                        "@id": "ro-crate-metadata.json",
+                        "@type": "CreativeWork",
+                        "about": {"@id": "./"},
+                        "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
+                    },
                     {
                         "@id": "create-action",
                         "@type": "CreateAction",
@@ -641,7 +648,7 @@ def test_meta_creates_duckdb_file(tmp_path: Path, capsys: pytest.CaptureFixture[
                         "description": "Protein Detective session",
                         "name": "session",
                     },
-                ]
+                ],
             }
         )
     )
