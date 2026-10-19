@@ -12,6 +12,7 @@ from protein_detective.refine.haddock import (
 )
 from protein_detective.refine.provenance import refine_run_arguments_from_rocrate, write_refinement_ro_crate
 from protein_detective.refine.run import create_refinement_run
+from tests.helpers import cli_args
 
 
 def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_powerfit_results: Path, tmp_path: Path):
@@ -43,17 +44,26 @@ def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_p
         f"{run_dir.name},run_001,{fitted.relative_to(session_with_powerfit_results)},{refinement_run.relative_to(session_with_powerfit_results)}\n"
     )
 
-    write_refinement_ro_crate(
-        session_dir=session_with_powerfit_results,
-        start_time=datetime.now(tz=UTC),
-        session_fixed_structure=fixed_structure,
-        fixed_structure=original,
-        refined=[(fitted, refinement_run)],
-        io_csv=io_csv,
-        options=options,
-        remove_fixed_chains={"A"},
-        powerfit_run_id="run_001",
-    )
+    invocation_options = [
+        "--rigidbody-sampling",
+        "10",
+        "--remove-fixed-chains",
+        "A",
+        "--powerfit-run-id",
+        "run_001",
+    ]
+    with cli_args(["refine", "run", str(session_with_powerfit_results), str(original), *invocation_options]):
+        write_refinement_ro_crate(
+            session_dir=session_with_powerfit_results,
+            start_time=datetime.now(tz=UTC),
+            session_fixed_structure=fixed_structure,
+            fixed_structure=original,
+            refined=[(fitted, refinement_run)],
+            io_csv=io_csv,
+            options=options,
+            remove_fixed_chains={"A"},
+            powerfit_run_id="run_001",
+        )
 
     crate_bytes = (session_with_powerfit_results / BASENAME).read_bytes()
 
@@ -67,11 +77,7 @@ def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_p
 
     tokens = shlex.split(option_text)
 
-    assert tokens[:2] == ["--refine-run-id", run_dir.name]
-    assert tokens[tokens.index("--rigidbody-sampling") + 1] == "10"
-    assert tokens[tokens.index("--remove-fixed-chains") + 1] == "A"
-    assert tokens[tokens.index("--powerfit-run-id") + 1] == "run_001"
-    assert str(session_with_powerfit_results) not in tokens
+    assert tokens == invocation_options
     assert (session_with_powerfit_results / BASENAME).read_bytes() == crate_bytes
 
     fixed_item = ROCrate(session_with_powerfit_results).get(

@@ -57,7 +57,6 @@ def write_ro_crate(
     command_name: str,
     command_description: str,
     ioargs: IOArgumentPaths,
-    argv: list[str] | None = None,
 ) -> None:
     """Write RO-Crate metadata for the command execution.
 
@@ -67,7 +66,6 @@ def write_ro_crate(
         command_name: Name of the command being executed.
         command_description: Description of the command being executed.
         ioargs: Input and output arguments for the command execution.
-        argv: Explicit invocation, including effective options; defaults to process arguments.
     """
     record(
         program=Program(
@@ -82,7 +80,6 @@ def write_ro_crate(
             },
         ),
         ioargs=ioargs,
-        argv=argv,
         dataset_license="CC-BY-4.0",
         start_time=start_time,
         crate_dir=session_dir,

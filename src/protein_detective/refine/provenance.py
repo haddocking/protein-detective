@@ -105,21 +105,6 @@ def write_refinement_ro_crate(
             )
         ],
     )
-    argv = [
-        "protein-detective",
-        "refine",
-        "run",
-        str(session_dir),
-        str(fixed_structure.resolve()),
-        "--refine-run-id",
-        io_csv.parent.name,
-    ]
-    for key, value in asdict(options).items():
-        argv.extend([f"--{key.replace('_', '-')}", str(value)])
-    for chain in sorted(remove_fixed_chains or []):
-        argv.extend(["--remove-fixed-chains", chain])
-    if powerfit_run_id is not None:
-        argv.extend(["--powerfit-run-id", powerfit_run_id])
     write_ro_crate(
         session_dir,
         start_time,
@@ -129,5 +114,4 @@ def write_refinement_ro_crate(
             f"options: {asdict(options)}; removed fixed chains: {sorted(remove_fixed_chains or [])}"
         ),
         ioargs=ioargs,
-        argv=argv,
     )
