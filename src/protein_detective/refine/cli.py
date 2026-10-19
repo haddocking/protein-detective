@@ -40,22 +40,23 @@ def run(
     Args:
         session_dir: Session directory containing fitted PowerFit results
         fixed_structure: Path to the fixed structure to refine against.
-            The fixed structure should be in the same coordinate system as the fitted structure.
+            The fixed structure should be in the same coordinate system as
+            the fitted structures from the session directory.
             The fixed structure should contain the known structures in the volume.
             Can be a PDB or mmCIF file either gzipped or not.
             It will be copied into session directory and
             converted into a structure file with all chains renamed to **B**.
             It will not be translated or rotated.
         refine_options: Refinement options for HADDOCK3.
-        remove_fixed_chains: Original chain identifiers to remove from the fixed structure before
+        remove_fixed_chains: Chain identifiers to remove from the given fixed structure before
             renaming the remaining chains to **B**. For mmCIF inputs, use author chain
-            identifiers (auth_asym_id). Use this to omit the modeled counterpart of the
+            identifiers (auth_asym_id). Use this to omit the fitted counterpart of the
             fitted unknown structure.
             To remove multiple chains, repeat the option:
             `--remove-fixed-chains A --remove-fixed-chains C`.
-        refine_run_id: Independent refinement run ID; defaults to refine_run_NNN above the existing maximum.
+        refine_run_id: Set refinement run ID; defaults to refine_run_NNN.
         powerfit_run_id: ID of the PowerFit run to refine.
-            If not provided, all fitted models of all runs will be refined.
+            If not provided, all fitted models of all powerfit runs will be refined.
         scheduler_address: Address of the Dask scheduler to connect to.
             If not provided, will create a local cluster.
             If set to `sequential` will run tasks sequentially.
@@ -110,8 +111,8 @@ def report(
 
     Args:
         session_dir: Session directory containing refinement results.
-        refine_run_id: Independent refinement run to select; defaults to all runs.
-        top: Positive number of best members per cluster, or overall when grouping is disabled.
+        refine_run_id: Refinement run to select; defaults to all runs.
+        top: Number of best members per cluster, or overall when grouping is disabled.
             This does not change the workflow's top_clusters or top_models options.
         no_group_by_structure: Select the best top models overall instead of per
             fitted input and cluster.
