@@ -45,6 +45,7 @@ dependencies = [
     "rocrate>=0.15.0",
     "haddock3>=2026.10.0",
     "gemmi>=0.7.5",
+    "aiohttp>=3.12",
 ]
 
 [project.urls]
