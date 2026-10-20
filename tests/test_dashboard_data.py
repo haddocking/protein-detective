@@ -99,10 +99,14 @@ def test_fitting_keeps_runs_and_unsaved_solutions_without_duplicate_models(sessi
     saved = next(row for row in rows if row["powerfit_run_id"] == "fit-a" and row["rank"] == 1)
     assert saved["viewer_available"]
     assert saved["density_path"] == "powerfit/fit-a/map.mrc"
+    assert saved["model_absolute_path"] == str(session / saved["model_path"])
+    assert saved["density_absolute_path"] == str(session / saved["density_path"])
     assert saved["relative_z"] == 1.0
     unsaved = next(row for row in rows if row["rank"] == 2)
     assert not unsaved["viewer_available"]
     assert unsaved["viewer_error"] == "Fitted structure not saved"
+    assert unsaved["model_absolute_path"] is None
+    assert unsaved["density_absolute_path"] == str(session / unsaved["density_path"])
 
 
 def test_refinement_joins_are_scoped_by_independent_run_and_input(session: Path):
@@ -110,6 +114,8 @@ def test_refinement_joins_are_scoped_by_independent_run_and_input(session: Path)
     assert len(rows) == 3
     first = next(row for row in rows if row["id"] == "refine/a.pdb.gz")
     second = next(row for row in rows if row["id"] == "refine/b.pdb.gz")
+    assert first["model_absolute_path"] == str(session / "refine/a.pdb.gz")
+    assert first["density_absolute_path"] == str(session / "powerfit/fit-a/map.mrc")
     assert first["fitted_rank"] == second["fitted_rank"] == 1
     assert first["powerfit_run_id"] == second["powerfit_run_id"] == "fit-a"
     assert first["refine_run_id"] != second["refine_run_id"]
@@ -131,6 +137,7 @@ def test_density_association_uses_provenance_not_directory_scan(session: Path):
     assert not row["viewer_available"]
     assert "map.mrc" in row["viewer_error"]
     assert row["density_path"] == "powerfit/fit-a/map.mrc"
+    assert row["density_absolute_path"] is None
 
 
 def test_ambiguous_density_disables_viewer(session: Path):
@@ -417,3 +424,30 @@ def test_search_candidates_combine_accessions_without_duplicating_chains_or_frag
     assert set(rows) == {"1ABC:A", "1ABC:B", "AF-P1-F1", "AF-P1-F2"}
     assert rows["1ABC:A"]["uniprot_accessions"] == "P1:P2"
     assert rows["1ABC:B"]["uniprot_accessions"] == "P1"
+
+
+@pytest.mark.parametrize("recorded_prefix", ["", "/old/location/"])
+def test_absolute_paths_follow_relocated_session(session: Path, recorded_prefix: str):
+    with duckdb.connect(str(session / "meta.duckdb")) as con:
+        con.execute("UPDATE fitted_models SET fitted_model_file = ? || fitted_model_file", [recorded_prefix])
+        con.execute("UPDATE powerfit_runs SET used_target = ? || used_target", [recorded_prefix])
+    relocated = session.with_name("relocated session")
+    session.rename(relocated)
+    row = next(row for row in DashboardData(relocated).fitting() if row["model_available"])
+    assert row["model_absolute_path"] == str(relocated / "powerfit/fit-a/a.cif.gz/fit_1.pdb")
+    assert row["density_absolute_path"] == str(relocated / "powerfit/fit-a/map.mrc")
+
+
+@pytest.mark.parametrize("template", ["fixed partner #1.pdb", "../fixed partner #1.pdb", "{root}/fixed partner #1.pdb"])
+def test_refinement_fixed_structure_link(session: Path, template: str):
+    recorded = template.format(root=session.parent)
+    fixed = (session / recorded).resolve()
+    fixed.write_text("example")
+    with duckdb.connect(str(session / "meta.duckdb")) as con:
+        con.execute("UPDATE refinements_runs SET fixed_structure = ?", [recorded])
+    rows = DashboardData(session).refinements()
+    assert all(row["fixed_structure_absolute_path"] == str(fixed) for row in rows)
+
+
+def test_missing_refinement_fixed_structure_has_no_link(session: Path):
+    assert all(row["fixed_structure_absolute_path"] is None for row in DashboardData(session).refinements())

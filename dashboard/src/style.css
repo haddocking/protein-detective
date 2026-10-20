@@ -377,6 +377,23 @@ aside {
   padding: 24px;
   overflow-wrap: anywhere;
 }
+.file-paths {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.file-paths button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.unavailable-file {
+  color: var(--muted);
+}
 .links {
   display: flex;
   flex-wrap: wrap;

@@ -1,6 +1,6 @@
 /** Read-only snapshot API. GETs return arrays except /summary (counts + available_tables + fitting_status).
  * Authentication: POST /api/auth {token}; all subsequent requests use the HttpOnly cookie.
- * Candidate identity is candidate_id/structure, never UniProt. Paths are session-relative.
+ * Candidate identity is candidate_id/structure, never UniProt. Viewer paths are session-relative.
  */
 export type Row = Record<string, unknown>;
 
@@ -178,6 +178,8 @@ export interface StructureResult extends Row {
   powerfit_run_id: string;
   model_path: string | null;
   density_path: string | null;
+  model_absolute_path: string | null;
+  density_absolute_path: string | null;
   model_available: boolean;
   density_available: boolean;
   viewer_available: boolean;
@@ -192,6 +194,7 @@ export interface FittingResult extends StructureResult {
 }
 
 export interface RefinementResult extends StructureResult {
+  fixed_structure_absolute_path: string | null;
   refine_run_id: string;
   refine_run_dir: string;
   fitted_model: string;

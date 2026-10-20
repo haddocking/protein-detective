@@ -51,7 +51,7 @@ export function useResults(kind: ResultKind) {
     navigate({
       selected: key(row),
       selection: "refinements",
-      tab: "details",
+      tab: row.viewer_available ? "viewer" : "details",
       top: included ? limit : "all",
       page: String(Math.floor(all.findIndex((r) => key(r) === key(row)) / pageSize) + 1),
     });

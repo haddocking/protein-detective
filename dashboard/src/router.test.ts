@@ -83,6 +83,8 @@ it("authenticates a direct provenance link and keeps its selected result across 
       cc: 0.8,
       viewer_available: true,
       model_path: "model-1.pdb",
+      model_absolute_path: "/session/model-1.pdb",
+      density_absolute_path: "/session/density.map",
       density_path: "density.map",
     },
     {
@@ -93,6 +95,8 @@ it("authenticates a direct provenance link and keeps its selected result across 
       cc: 0.7,
       viewer_available: true,
       model_path: "model-2.pdb",
+      model_absolute_path: "/session/model-2.pdb",
+      density_absolute_path: "/session/density.map",
       density_path: "density.map",
     },
   ];
@@ -102,10 +106,24 @@ it("authenticates a direct provenance link and keeps its selected result across 
     "/api/provenance": [],
     "/api/candidates": [{ candidate_id: "candidate-1", structure: "1abc", source: "PDB" }],
     "/api/fitting": fitting,
-    "/api/refinements": [],
+    "/api/refinements": [
+      {
+        ...fitting[0],
+        id: "refined-1",
+        refine_run_id: "refine-1",
+        fixed_structure_absolute_path: "/other files/fixed #1.pdb",
+      },
+    ],
   };
   const fetchMock = vi.fn(async (url: string) => new Response(JSON.stringify(responses[url])));
   vi.stubGlobal("fetch", fetchMock);
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal(
+    "navigator",
+    Object.create(navigator, {
+      clipboard: { value: { writeText } },
+    }),
+  );
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const router = createDashboardRouter(
     createMemoryHistory({
@@ -144,6 +162,12 @@ it("authenticates a direct provenance link and keeps its selected result across 
       });
       await vi.dynamicImportSettled();
     });
+    expect(container.querySelector<HTMLButtonElement>(".file-paths button")?.title).toBe(
+      "/session/model-1.pdb",
+    );
+    expect(container.querySelectorAll<HTMLButtonElement>(".file-paths button")[1]?.title).toBe(
+      "/session/density.map",
+    );
     const viewer = container.querySelector(".mock-viewer");
     expect(viewer?.textContent).toBe("/files/model-1.pdb");
     const panel = container.querySelector("aside")!;
@@ -172,6 +196,9 @@ it("authenticates a direct provenance link and keeps its selected result across 
     });
     expect(container.querySelector(".mock-viewer")).toBe(viewer);
     expect(viewer?.textContent).toBe("/files/model-2.pdb");
+    expect(container.querySelector<HTMLButtonElement>(".file-paths button")?.title).toBe(
+      "/session/model-2.pdb",
+    );
     expect(container.querySelector<HTMLElement>(".retained-viewer")?.hidden).toBe(false);
     expect(panel.style.width).toBe(`${Math.max(440, Math.round(window.innerWidth * 0.6))}px`);
     await act(async () => {
@@ -186,6 +213,45 @@ it("authenticates a direct provenance link and keeps its selected result across 
     });
     expect(container.querySelector(".mock-viewer")).toBeNull();
     expect(container.querySelector("aside h2")?.textContent).toBe("1abc");
+    await act(async () => {
+      await router.navigate({
+        to: "/refinements",
+        search: { selected: "refined-1", selection: "refinements", tab: "details" },
+      });
+    });
+    await act(async () => {
+      await router.navigate({
+        to: "/refinements",
+        search: { selected: "refined-1", selection: "refinements" },
+      });
+      await vi.dynamicImportSettled();
+    });
+    expect(container.querySelector<HTMLElement>(".retained-viewer")?.hidden).toBe(false);
+    // Selecting a related result also opens the viewer by default.
+    await act(async () => {
+      await router.navigate({
+        to: "/refinements",
+        search: { selected: "refined-1", selection: "refinements", tab: "details" },
+      });
+    });
+    await act(async () => container.querySelector<HTMLButtonElement>("button.related")!.click());
+    expect(router.state.location.search.tab).toBe("viewer");
+    await act(async () => {
+      await router.navigate({
+        to: "/refinements",
+        search: { selected: "refined-1", selection: "refinements", tab: "details" },
+      });
+    });
+    const copyButtons = container.querySelectorAll<HTMLButtonElement>(".file-paths button");
+    expect(copyButtons[2]?.title).toBe("/other files/fixed #1.pdb");
+    for (const button of copyButtons) {
+      await act(async () => button.click());
+      expect(writeText).toHaveBeenLastCalledWith(button.title);
+      expect(button.querySelector('[role="status"]')?.textContent).toBe("Copied");
+    }
+    writeText.mockRejectedValueOnce(new Error("Clipboard denied"));
+    await act(async () => copyButtons[0].click());
+    expect(copyButtons[0].querySelector('[role="status"]')?.textContent).toBe("Copy failed");
     expect(fetchMock.mock.calls.filter(([url]) => url === "/api/auth")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([url]) => url === "/api/summary")).toHaveLength(1);
   } finally {

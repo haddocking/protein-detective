@@ -21,13 +21,16 @@ credentials return HTTP 401; open the current launch URL to authenticate again.
 `GET /files/{session-relative-path}` serves an existing session file and
 supports HTTP range requests. Encode individual path segments, preserving `/`
 separators. Traversal and symlinks escaping the supplied session are rejected.
-Model/map paths in datasets are session-relative or null. Downloads occur only
-when the viewer opens. File responses use `Cache-Control: private, no-cache`:
-browser caches may store them, but reuse requires an authenticated server check.
-Unchanged files support ETag/Last-Modified validation with HTTP 304;
-unauthenticated conditional requests are rejected. Dataset and authentication
-responses use `Cache-Control: no-store`. The viewer retains the current density
-map when switching models from the same source map and keeps it through Details
+`model_path` and `density_path` in datasets are session-relative or null.
+`model_absolute_path` and `density_absolute_path` contain resolved absolute
+paths on the dashboard server for opening files in external applications. Each
+is null when its file is unavailable. Downloads occur only when the viewer
+opens. File responses use `Cache-Control: private, no-cache`: browser caches may
+store them, but reuse requires an authenticated server check. Unchanged files
+support ETag/Last-Modified validation with HTTP 304; unauthenticated conditional
+requests are rejected. Dataset and authentication responses use
+`Cache-Control: no-store`. The viewer retains the current density map when
+switching models from the same source map and keeps it through Details
 navigation until the panel closes. Browsing never generates a fitted model or
 modifies the session.
 
@@ -71,6 +74,12 @@ structures still support Details and CSV export.
 Fitting fields include `rank`, `cc`, `fishz`, and `relative_z`. Default grouping
 uses `(powerfit_run_id, candidate_id)`, retaining the lowest solution rank;
 default sorting uses CC descending. FishZ and relative Z are separate metrics.
+
+Refinements also include nullable `fixed_structure_absolute_path`, resolved from
+its recorded path relative to the session. The original fixed partner may be
+outside the session; this copyable path does not make it available through
+`/files/`. The dashboard shows compact buttons that copy absolute paths to the
+clipboard, with the full path in each tooltip.
 
 Refinement fields include `refine_run_id`, `refine_run_dir`, `fitted_model`,
 `fitted_rank`, `cluster_id`, `cluster_rank`, `member_rank`, `refined_score`,

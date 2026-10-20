@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { display, fileUrl } from "../data";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
 import { useDetailsPanel } from "../hooks/use-details-panel";
@@ -7,8 +7,47 @@ const StructureViewer = lazy(() =>
   import("../viewer").then((m) => ({ default: m.StructureViewer })),
 );
 
+function CopyPathButton({ path, label }: { path: string; label: string }) {
+  const [status, setStatus] = useState("");
+  useEffect(() => {
+    if (!status) return;
+    const timer = setTimeout(() => setStatus(""), 2000);
+    return () => clearTimeout(timer);
+  }, [status]);
+  return (
+    <button
+      type="button"
+      title={path}
+      aria-label={`Copy ${label.toLowerCase()} path`}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(path);
+          setStatus("Copied");
+        } catch {
+          setStatus("Copy failed");
+        }
+      }}
+    >
+      <svg
+        aria-hidden="true"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      >
+        <rect x="8" y="8" width="12" height="14" rx="2" />
+        <path d="M16 8V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" />
+      </svg>
+      {label}
+      <span role="status">{status}</span>
+    </button>
+  );
+}
+
 export function DetailsPanel() {
-  const { p, navigate, selectedId } = useDashboardNavigation();
+  const { navigate, selectedId } = useDashboardNavigation();
   const {
     selected,
     selectedKind,
@@ -21,7 +60,7 @@ export function DetailsPanel() {
   } = useDetailsPanel();
   if (!selectedId) return null;
   return (
-    <aside className={p.get("tab") === "viewer" ? "viewer-panel" : undefined} style={{ width }}>
+    <aside className={viewerVisible ? "viewer-panel" : undefined} style={{ width }}>
       <div
         className="resizer"
         role="separator"
@@ -58,20 +97,35 @@ export function DetailsPanel() {
         </button>
       </div>
       <div className="tabs">
-        <button
-          aria-pressed={p.get("tab") !== "viewer"}
-          onClick={() => navigate({ tab: "details" })}
-        >
+        <button aria-pressed={!viewerVisible} onClick={() => navigate({ tab: "details" })}>
           Details
         </button>
         <button
           disabled={!selected?.viewer_available}
-          aria-pressed={p.get("tab") === "viewer"}
+          aria-pressed={viewerVisible}
           onClick={() => navigate({ tab: "viewer" })}
         >
           3D viewer
         </button>
       </div>
+      {selected && selectedKind !== "candidates" && (
+        <section className="file-paths" aria-label="Local files">
+          {[
+            ["model", "Structure"],
+            ["density", "Density"],
+            ...(selectedKind === "refinements" ? [["fixed_structure", "Fixed structure"]] : []),
+          ].map(([kind, label]) => {
+            const path = selected[`${kind}_absolute_path`];
+            return typeof path === "string" ? (
+              <CopyPathButton key={`${kind}:${path}`} path={path} label={label} />
+            ) : (
+              <span key={kind} className="unavailable-file" title="File unavailable">
+                {label} unavailable
+              </span>
+            );
+          })}
+        </section>
+      )}
       {viewerSelection && (
         <div className="retained-viewer" hidden={!viewerVisible}>
           <Suspense fallback={<p>Loading 3D viewer…</p>}>

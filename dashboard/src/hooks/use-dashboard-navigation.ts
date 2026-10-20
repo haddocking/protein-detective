@@ -20,7 +20,7 @@ export function useDashboardNavigation() {
       },
     });
   }
-  function select(row: Row, type: Dataset, tab = "details") {
+  function select(row: Row, type: Dataset, tab = row.viewer_available ? "viewer" : "details") {
     navigate({ selected: key(row), selection: type, tab });
   }
   return { view, p, navigate, select, selectedId: p.get("selected") };

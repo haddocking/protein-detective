@@ -387,6 +387,10 @@ class DashboardData:
         row["model_available"] = self._exists(row["model_path"])
         row["density_path"] = self._path(row.get("used_target"))
         row["density_available"] = self._exists(row["density_path"])
+        for kind in ("model", "density"):
+            row[f"{kind}_absolute_path"] = (
+                str((self.session_dir / row[f"{kind}_path"]).resolve()) if row[f"{kind}_available"] else None
+            )
         row["viewer_available"] = row["model_available"] and row["density_available"]
         row["viewer_error"] = (
             ("Fitted structure not saved" if model is None else f"Structure file is missing or inaccessible: {model}")
@@ -439,6 +443,17 @@ class DashboardData:
         """
         with self._connect() as con:
             return self._fitting(con)
+
+    def _fixed_structure_path(self, recorded: Any) -> str | None:
+        # The original fixed partner can be outside the session. This path
+        # is only a local link; it does not grant access via /files/.
+        if not isinstance(recorded, str) or not recorded:
+            return None
+        try:
+            path = (self.session_dir / recorded).resolve()
+            return str(path) if path.is_file() else None
+        except (ValueError, OSError):
+            return None
 
     def _refinements(self, con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
         tables = self._tables(con)
@@ -494,6 +509,7 @@ class DashboardData:
             baseline = row.get("baseline_score")
             row["score_change"] = row["refined_score"] - baseline if baseline is not None else None
             self._viewer(row, row["refined_structure_path"])
+            row["fixed_structure_absolute_path"] = self._fixed_structure_path(row.get("fixed_structure"))
         return rows
 
     def refinements(self) -> list[dict[str, Any]]:
