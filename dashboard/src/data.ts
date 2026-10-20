@@ -3,7 +3,9 @@
  * Candidate identity is candidate_id/structure, never UniProt. Paths are session-relative.
  */
 export type Row = Record<string, unknown>;
+
 export type Dataset = "candidates" | "fitting" | "refinements" | "provenance";
+
 export const fittingColumns = [
   "structure",
   "uniprot_accessions",
@@ -15,6 +17,7 @@ export const fittingColumns = [
   "relative_z",
   "model_available",
 ];
+
 export const refinementColumns = [
   "structure",
   "refine_run_id",
@@ -26,6 +29,7 @@ export const refinementColumns = [
   "baseline_score",
   "score_change",
 ];
+
 export const labels: Record<string, string> = {
   filtering_status: "Filtering status",
   rejection_reason: "Rejection reason",
@@ -49,6 +53,7 @@ export const labels: Record<string, string> = {
   baseline_score: "Baseline score",
   score_change: "Score change",
 };
+
 export function display(v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
   if (typeof v === "number") return Number.isInteger(v) ? String(v) : v.toFixed(4);
@@ -56,9 +61,11 @@ export function display(v: unknown): string {
   if (typeof v === "object") return JSON.stringify(v);
   return typeof v === "string" ? v : typeof v === "boolean" ? (v ? "true" : "false") : "";
 }
+
 export function key(row: Row): string {
   return String(row.id ?? row.candidate_id ?? row.structure);
 }
+
 export function filterRows(rows: Row[], p: URLSearchParams): Row[] {
   const q = (p.get("q") || "").toLowerCase();
   return rows.filter(
@@ -72,6 +79,7 @@ export function filterRows(rows: Row[], p: URLSearchParams): Row[] {
       ),
   );
 }
+
 export function clusterKey(r: Row): string {
   return JSON.stringify([
     r.refine_run_id,
@@ -86,6 +94,7 @@ export function clusterKey(r: Row): string {
     r.cluster_id,
   ]);
 }
+
 export function grouped(rows: Row[], kind: string, n: string): Row[] {
   if (n === "all") return [...rows];
   const limit = Math.max(1, Number(n) || 1);
@@ -109,6 +118,7 @@ export function grouped(rows: Row[], kind: string, n: string): Row[] {
       .slice(0, limit),
   );
 }
+
 export function sorted(rows: Row[], column: string, desc: boolean): Row[] {
   return [...rows].sort((a, b) => {
     const x = a[column],
@@ -122,6 +132,7 @@ export function sorted(rows: Row[], column: string, desc: boolean): Row[] {
     );
   });
 }
+
 export function csv(rows: Row[], columns: string[]): string {
   const escape = (v: unknown) => '"' + display(v).replaceAll('"', '""') + '"';
   return [
@@ -129,9 +140,11 @@ export function csv(rows: Row[], columns: string[]): string {
     ...rows.map((r) => columns.map((k) => escape(r[k])).join(",")),
   ].join("\r\n");
 }
+
 export function fileUrl(path: unknown): string {
   return "/files/" + String(path).split("/").map(encodeURIComponent).join("/");
 }
+
 export function histogram(rows: Row[], metric: string) {
   const values = rows
     .map((r) => r[metric])
@@ -157,6 +170,7 @@ export interface Candidate extends Row {
   filtering_status: "passed" | "rejected" | "not recorded";
   rejection_reason: string | null;
 }
+
 export interface StructureResult extends Row {
   id: string;
   candidate_id: string;
@@ -169,12 +183,14 @@ export interface StructureResult extends Row {
   viewer_available: boolean;
   viewer_error: string | null;
 }
+
 export interface FittingResult extends StructureResult {
   rank: number;
   cc: number;
   fishz: number | null;
   relative_z: number | null;
 }
+
 export interface RefinementResult extends StructureResult {
   refine_run_id: string;
   refine_run_dir: string;
@@ -190,6 +206,7 @@ export interface RefinementResult extends StructureResult {
   cluster_score: number | null;
   cluster_score_std: number | null;
 }
+
 export interface ProvenanceAction extends Row {
   command: string;
   start_time: string | null;
@@ -207,14 +224,17 @@ export function datasetsForView(view: string, selection: string | null): Dataset
       if (!names.includes(name)) names.push(name);
   return names;
 }
+
 export function positivePage(value: string | null): number {
   const n = Number(value);
   return Number.isSafeInteger(n) && n > 0 ? n : 1;
 }
+
 export function tablePageSize(value: string | null): number {
   const n = Number(value);
   return [25, 50, 100].includes(n) ? n : 50;
 }
+
 export function topSelection(value: string | null): string {
   return value && ["1", "3", "5", "10", "all"].includes(value) ? value : "1";
 }

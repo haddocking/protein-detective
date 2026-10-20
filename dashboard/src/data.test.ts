@@ -1,6 +1,7 @@
 import { datasetsForView, positivePage, tablePageSize, topSelection } from "./data";
 import { describe, it, expect } from "vite-plus/test";
 import { csv, filterRows, grouped, histogram, sorted } from "./data";
+
 describe("snapshot result operations", () => {
   it("keeps structure identity and PowerFit runs separate", () => {
     const rows = [

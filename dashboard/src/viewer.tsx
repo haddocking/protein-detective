@@ -2,18 +2,22 @@ import { useEffect, useRef, useState } from "react";
 
 // This runtime is deliberately external: no Mol* code enters the application bundle.
 const CDN = "https://cdn.jsdelivr.net/npm/molstar@5.4.2/build/viewer/";
+
 const INTEGRITY = {
   js: "sha384-KPjE4DR+Gi9m+RcA+CPrlPL0J/Hm8WNAZCGeweLJXS+yN5QiHsUUA/9Xcy/KAHmX",
   css: "sha384-OIZzP2/tcSEcDPl+fLOn1/a8+WsnX1G56OLq90JfKyBEzfFHKojppLf/8rprUx6I",
 };
+
 // The pinned CDN runtime has its own dynamic plugin API. Keep that boundary here.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Runtime = any;
+
 declare global {
   interface Window {
     molstar?: Runtime;
   }
 }
+
 let runtimePromise: Promise<Runtime> | undefined;
 let stylesheetReady = false;
 
@@ -288,6 +292,7 @@ export function StructureViewer({
     const rep = reps.current[index];
     if (rep) viewerRef.current?.plugin.state.data.updateCellState(rep.ref, { isHidden: !visible });
   }
+
   function updateDensity(visible: boolean, alpha: number, level: number) {
     const cell = volume.current;
     const plugin = viewerRef.current?.plugin;

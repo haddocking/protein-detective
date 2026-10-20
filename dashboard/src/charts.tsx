@@ -5,6 +5,7 @@ import { scaleBand } from "@tanstack/charts/scales/band";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { histogram, type Row } from "./data";
+
 export function Histogram({ rows, metric }: { rows: Row[]; metric: string }) {
   const definition = useMemo(() => {
     const bins = histogram(rows, metric).map((b) => ({
@@ -28,6 +29,7 @@ export function Histogram({ rows, metric }: { rows: Row[]; metric: string }) {
     />
   );
 }
+
 export function Scatter({ rows, onSelect }: { rows: Row[]; onSelect: (r: Row) => void }) {
   const definition = useMemo(() => {
     const data = rows

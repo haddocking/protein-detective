@@ -21,9 +21,11 @@ import {
 } from "./data";
 import { Histogram, Scatter } from "./charts";
 import "./style.css";
+
 const StructureViewer = lazy(() =>
   import("./viewer").then((m) => ({ default: m.StructureViewer })),
 );
+
 const detailsFields = new Set([
   "structure",
   "structure_id",
@@ -48,17 +50,20 @@ const detailsFields = new Set([
   "cluster_score",
   "cluster_score_std",
 ]);
+
 const views = [
   ["overview", "Overview"],
   ["fitting", "Fitting results"],
   ["refinements", "Refinement results"],
   ["provenance", "Provenance"],
 ];
+
 function clusterLabel(r: Row | undefined) {
   return r
     ? `${display(r.refine_run_id)} / ${display(r.structure)} · fitted ${display(r.fitted_rank)} · cluster ${display(r.cluster_id)}`
     : "Unknown cluster";
 }
+
 function App() {
   const [url, setUrl] = useState(() => new URL(location.href));
   const [ready, setReady] = useState(false);
@@ -928,4 +933,5 @@ function App() {
     </>
   );
 }
+
 createRoot(document.getElementById("root")!).render(<App />);
