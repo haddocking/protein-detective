@@ -140,10 +140,18 @@ class DashboardData:
                 self._file_availability[path] = True
         return self._file_availability[path]
 
-    def _single_chain_candidates(self, con: duckdb.DuckDBPyConnection) -> dict[str, dict[str, Any]]:
-        tables = self._tables(con)
+    def _single_chain_candidates_query(self, tables: set[str]) -> str | None:
+        """Build a query linking original PDB chains to processed structures.
+
+        Args:
+            tables: Metadata tables available in the session.
+
+        Returns:
+            A SELECT retaining rejected chain extractions, or None when retrieval
+            or chain statistics are absent. Optional workflow joins are omitted.
+        """
         if not {"single_chain_stats", "pdbe_retrieve_stats"} <= tables:
-            return {}
+            return None
         joins = []
         input_file = "sc.input_file"
         output_file = "sc.output_file"
@@ -157,95 +165,185 @@ class DashboardData:
             joins.append("LEFT JOIN merge_structure_files m ON sc.output_file = m.source")
             output_file = "coalesce(m.target, sc.output_file)"
         if "pdbe" in tables:
-            joins.append(
-                "LEFT JOIN pdbe p ON upper(p.pdb_id) = upper(d.pdb_id) "
-                "AND CAST(p.chain AS VARCHAR) = CAST(sc.chain2keep AS VARCHAR)"
-            )
+            joins.append("LEFT JOIN pdbe p ON upper(p.pdb_id) = upper(d.pdb_id) AND p.chain = sc.chain2keep")
             search_fields = "p.* EXCLUDE (chain),"
             accession = "coalesce(p.uniprot_accession, '')"
-        rows = self._query(
-            con,
-            f"""\
+        return f"""\
             SELECT DISTINCT
                 {search_fields}
                 CASE WHEN nullif(sc.output_file, '') IS NOT NULL
                     THEN parse_filename({output_file})
-                    ELSE d.pdb_id || ':' || CAST(sc.chain2keep AS VARCHAR)
+                    ELSE d.pdb_id || ':' || sc.chain2keep
                 END AS structure,
-                structure AS candidate_id,
                 d.pdb_id AS structure_id,
-                CAST(sc.chain2keep AS VARCHAR) AS chain,
+                sc.chain2keep AS chain,
                 false AS is_alphafold,
                 {accession} AS uniprot_accessions,
                 sc.passed,
                 sc.discard_reason AS reason
             FROM single_chain_stats sc
             {" ".join(joins)}
-            """,  # noqa: S608 - SQL fragments are internal constants
+            """  # noqa: S608 - SQL fragments are internal constants
+
+    @staticmethod
+    def _candidate_source(con: duckdb.DuckDBPyConnection, table: str) -> str:
+        """Expose optional candidate fields as NULL without changing metadata tables.
+
+        Only dashboard identity/filtering fields need defaults. Existing quality
+        columns are retained as supplied by each workflow stage.
+        """
+        cursor = con.execute(f'SELECT * FROM "{table}" LIMIT 0')  # noqa: S608 - internal table
+        columns = {column[0] for column in (cursor.description or [])}
+        fields = (
+            "structure",
+            "structure_id",
+            "is_alphafold",
+            "chain",
+            "passed",
+            "reason",
+            "uniprot_accessions",
+            "uniprot_accession",
+            "input_file",
+            "structure_file",
         )
-        return {row["structure"]: row for row in rows}
+        missing = [
+            f'NULL::{"BOOLEAN" if field in {"is_alphafold", "passed"} else "VARCHAR"} AS "{field}"'
+            for field in fields
+            if field not in columns
+        ]
+        if not missing:
+            return f'"{table}"'
+        return f'(SELECT *, {", ".join(missing)} FROM "{table}")'  # noqa: S608 - internal identifiers
+
+    @staticmethod
+    def _merge_candidate_rows(source: str) -> str:
+        """Group candidate rows, keeping later non-null measurements and unique accessions."""
+        return f"""
+            SELECT structure,
+                first(COLUMNS(* EXCLUDE (structure, uniprot_accessions, _stage_priority))
+                    ORDER BY _stage_priority DESC)
+                    FILTER (WHERE COLUMNS(* EXCLUDE (
+                        structure, uniprot_accessions, _stage_priority
+                    )) IS NOT NULL),
+                coalesce(array_to_string(list_sort(list_distinct(flatten(
+                    list(string_split(nullif(uniprot_accessions, ''), ':'))
+                ))), ':'), '') AS uniprot_accessions
+            FROM {source}
+            GROUP BY structure
+        """  # noqa: S608 - internal CTE name
 
     def _candidates(self, con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
-        candidates = self._single_chain_candidates(con)
-        for table in ("combined_stats", "secondary_structure_stats", "fittable_structures"):
-            for row in self._rows(con, table):
-                path = row.get("structure") or row.get("input_file") or row.get("structure_file")
-                if not path:
-                    continue
-                structure = Path(str(path)).name
-                candidate = candidates.setdefault(structure, {"candidate_id": structure, "structure": structure})
-                candidate.update({key: value for key, value in row.items() if value is not None})
-                candidate["uniprot_accessions"] = (
-                    row.get("uniprot_accessions")
-                    or row.get("uniprot_accession")
-                    or candidate.get("uniprot_accessions", "")
+        """Assemble available stages and unmatched search hits using SQL CTEs."""
+        tables = self._tables(con)
+        stages = []
+        chain_query = self._single_chain_candidates_query(tables)
+        if chain_query:
+            stages.append(f"SELECT *, 0 AS _stage_priority FROM ({chain_query})")  # noqa: S608
+        for priority, table in enumerate(("combined_stats", "secondary_structure_stats", "fittable_structures"), 1):
+            if table not in tables:
+                continue
+            source = self._candidate_source(con, table)
+            stages.append(f"""
+                SELECT *, {priority} AS _stage_priority
+                FROM (
+                    SELECT * REPLACE (
+                        parse_filename(coalesce(
+                            nullif(structure, ''),
+                            nullif(input_file, ''),
+                            nullif(structure_file, '')
+                        )) AS structure,
+                        coalesce(nullif(uniprot_accessions, ''), uniprot_accession) AS uniprot_accessions
+                    )
+                    FROM {source}
                 )
-        # Match search hits by recorded source identity, retaining separate chains and fragments.
-        known_pdb = {
-            (str(row.get("structure_id", "")).upper(), str(row["chain"]))
-            for row in candidates.values()
-            if not row.get("is_alphafold") and row.get("chain") is not None
-        }
-        known_af = [row["structure"] for row in candidates.values() if row.get("is_alphafold")]
-        for table, id_key in (("alphafold", "af_id"), ("pdbe", "pdb_id")):
-            for row in self._rows(con, table):
-                identifier = str(row.get(id_key) or "")
-                accession = str(row.get("uniprot_accession") or "")
-                if not identifier:
-                    continue
-                chain = str(row.get("chain") or "")
-                # An accession-only AlphaFold search hit represents its F1 model.
-                af_model = identifier if identifier.startswith("AF-") else f"AF-{identifier}-F1"
-                known = (
-                    any(model == identifier or model.startswith((f"{af_model}-", f"{af_model}.")) for model in known_af)
-                    if table == "alphafold"
-                    else (identifier.upper(), chain) in known_pdb
-                )
-                if known:
-                    continue
-                structure = identifier if table == "alphafold" else f"{identifier}:{row.get('chain', '')}"
-                candidates.setdefault(
-                    structure,
-                    {
-                        **row,
-                        "candidate_id": structure,
-                        "structure": structure,
-                        "structure_id": identifier,
-                        "uniprot_accessions": accession,
-                        "is_alphafold": table == "alphafold",
-                    },
-                )
-        for candidate in candidates.values():
-            candidate["source"] = "AlphaFold" if candidate.get("is_alphafold") else "PDB"
-            candidate["filtering_status"] = (
-                "passed"
-                if candidate.get("passed") is True
-                else "rejected"
-                if candidate.get("passed") is False
-                else "not recorded"
+                WHERE structure IS NOT NULL AND structure <> ''
+            """)  # noqa: S608 - internal source and priority
+
+        ctes = []
+        candidates = []
+        if stages:
+            ctes.append("stage_rows AS (" + " UNION ALL BY NAME ".join(stages) + ")")
+            ctes.append("processed AS (" + self._merge_candidate_rows("stage_rows") + ")")
+            candidates.append("SELECT *, 0 AS _stage_priority FROM processed")
+
+        af_join = ""
+        af_model = "regexp_extract(c.structure, '^(AF-.+-F[0-9]+)(?:[-.]|$)', 1)"
+        if stages and "alphafold_retrieve_stats" in tables:
+            merge = (
+                "LEFT JOIN merge_structure_files m ON a.cif_file = m.source"
+                if "merge_structure_files" in tables
+                else ""
             )
-            candidate["rejection_reason"] = candidate.get("reason")
-        return sorted(candidates.values(), key=lambda row: row["structure"])
+            target = "coalesce(m.target, a.cif_file)" if merge else "a.cif_file"
+            ctes.append(f"""
+                af_sources AS (
+                    SELECT parse_filename({target}) AS structure,
+                        regexp_extract(parse_filename(a.cif_file), '^(AF-.+-F[0-9]+)(?:[-.]|$)', 1) AS model_id
+                    FROM alphafold_retrieve_stats a
+                    {merge}
+                )
+            """)  # noqa: S608 - internal source mapping
+            af_join = "LEFT JOIN af_sources a ON a.structure = c.structure"
+            af_model = f"coalesce(nullif(a.model_id, ''), {af_model})"
+
+        for table, identifier, is_af in (("alphafold", "af_id", True), ("pdbe", "pdb_id", False)):
+            if table not in tables:
+                continue
+            source = self._candidate_source(con, table)
+            structure = f"s.{identifier}" if is_af else "s.pdb_id || ':' || coalesce(s.chain, '')"
+            unmatched = (
+                """
+                    AND NOT EXISTS (
+                        SELECT 1 FROM processed c
+                        WHERE NOT coalesce(c.is_alphafold, false)
+                            AND upper(c.structure_id) = upper(s.pdb_id)
+                            AND c.chain = s.chain
+                    )
+                """
+                if stages and not is_af
+                else ""
+            )
+            if stages and is_af:
+                unmatched = f"""
+                    AND NOT EXISTS (
+                        SELECT 1 FROM processed c
+                        {af_join}
+                        WHERE c.is_alphafold AND (
+                            c.structure = s.af_id OR {af_model} =
+                                CASE WHEN starts_with(s.af_id, 'AF-') THEN s.af_id
+                                    ELSE 'AF-' || s.af_id || '-F1' END
+                        )
+                    )
+                """  # noqa: S608 - internal source mapping
+            candidates.append(f"""
+                SELECT s.* REPLACE (
+                    {structure} AS structure,
+                    s.{identifier} AS structure_id,
+                    {str(is_af).lower()} AS is_alphafold,
+                    coalesce(nullif(s.uniprot_accessions, ''), s.uniprot_accession) AS uniprot_accessions
+                ), 0 AS _stage_priority
+                FROM {source} s
+                WHERE nullif(s.{identifier}, '') IS NOT NULL
+                {unmatched}
+            """)  # noqa: S608 - internal source and identity expressions
+
+        if not candidates:
+            return []
+        ctes.append("candidate_rows AS (" + " UNION ALL BY NAME ".join(candidates) + ")")
+        ctes.append("candidates AS (" + self._merge_candidate_rows("candidate_rows") + ")")
+        return self._query(
+            con,
+            f"""
+            WITH {", ".join(ctes)}
+            SELECT *, structure AS candidate_id,
+                CASE WHEN is_alphafold THEN 'AlphaFold' ELSE 'PDB' END AS source,
+                CASE WHEN passed THEN 'passed' WHEN NOT passed THEN 'rejected'
+                    ELSE 'not recorded' END AS filtering_status,
+                reason AS rejection_reason
+            FROM candidates
+            ORDER BY structure
+        """,  # noqa: S608 - internal CTE definitions
+        )
 
     def candidates(self) -> list[dict[str, Any]]:
         """Return candidate structures, including rejected and unfitted candidates.

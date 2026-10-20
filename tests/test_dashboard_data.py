@@ -356,3 +356,64 @@ def test_legacy_metadata_without_runs_keeps_scores_and_disables_viewer(session: 
     assert len(data.fitting()) == len(data.refinements()) == 3
     assert all(not row["viewer_available"] for row in data.fitting())
     assert data.summary()["powerfit_runs"] == ["fit-a", "fit-b"]
+
+
+def test_candidates_merge_stage_measurements_without_losing_rejected_or_unfitted_rows(tmp_path: Path):
+    with duckdb.connect(str(tmp_path / "meta.duckdb")) as con:
+        con.execute("""
+            CREATE TABLE combined_stats AS SELECT * FROM (VALUES
+                ('combined_input/a.cif.gz', 'P1', true, NULL, 3.0),
+                ('combined_input/b.cif.gz', 'P2', false, 'Too short', 4.0)
+            ) t(input_file, uniprot_accession, passed, reason, resolution);
+            CREATE TABLE secondary_structure_stats AS SELECT 'secondary_structure/a.cif.gz' AS input_file,
+                false AS passed, 'Insufficient helices' AS reason, 0.2 AS helix_fraction;
+            CREATE TABLE fittable_structures AS SELECT 'c.cif.gz' AS structure,
+                'P3:P4' AS uniprot_accessions, true AS is_alphafold;
+        """)
+        before = con.execute("SHOW TABLES").fetchall()
+    rows = {row["candidate_id"]: row for row in DashboardData(tmp_path).candidates()}
+    assert set(rows) == {"a.cif.gz", "b.cif.gz", "c.cif.gz"}
+    assert rows["a.cif.gz"]["filtering_status"] == "rejected"
+    assert rows["a.cif.gz"]["rejection_reason"] == "Insufficient helices"
+    assert rows["a.cif.gz"]["resolution"] == 3.0
+    assert rows["a.cif.gz"]["helix_fraction"] == 0.2
+    assert rows["b.cif.gz"]["rejection_reason"] == "Too short"
+    assert rows["c.cif.gz"]["uniprot_accessions"] == "P3:P4"
+    assert rows["c.cif.gz"]["filtering_status"] == "not recorded"
+    with duckdb.connect(str(tmp_path / "meta.duckdb"), read_only=True) as con:
+        assert con.execute("SHOW TABLES").fetchall() == before
+
+
+def test_alphafold_retrieval_mapping_matches_renamed_output_without_conflating_fragments(tmp_path: Path):
+    with duckdb.connect(str(tmp_path / "meta.duckdb")) as con:
+        con.execute("""
+            CREATE TABLE alphafold AS SELECT * FROM (VALUES
+                ('P1', 'P1'), ('AF-P1-F2', 'P1')
+            ) t(af_id, uniprot_accession);
+            CREATE TABLE alphafold_retrieve_stats AS SELECT
+                'P1' AS uniprot_accession, 'downloads/AF-P1-F1-model_v6.cif.gz' AS cif_file;
+            CREATE TABLE merge_structure_files AS SELECT
+                'downloads/AF-P1-F1-model_v6.cif.gz' AS source, 'combined_input/renamed.cif.gz' AS target;
+            CREATE TABLE combined_stats AS SELECT 'combined_input/renamed.cif.gz' AS input_file,
+                'P1' AS uniprot_accession, true AS is_alphafold, false AS passed, 'Low confidence' AS reason;
+        """)
+    rows = {row["candidate_id"]: row for row in DashboardData(tmp_path).candidates()}
+    assert set(rows) == {"renamed.cif.gz", "AF-P1-F2"}
+    assert rows["renamed.cif.gz"]["rejection_reason"] == "Low confidence"
+    assert rows["AF-P1-F2"]["filtering_status"] == "not recorded"
+
+
+def test_search_candidates_combine_accessions_without_duplicating_chains_or_fragments(tmp_path: Path):
+    with duckdb.connect(str(tmp_path / "meta.duckdb")) as con:
+        con.execute("""
+            CREATE TABLE pdbe AS SELECT * FROM (VALUES
+                ('1ABC', 'A', 'P2'), ('1ABC', 'A', 'P1'), ('1ABC', 'A', 'P1'), ('1ABC', 'B', 'P1')
+            ) t(pdb_id, chain, uniprot_accession);
+            CREATE TABLE alphafold AS SELECT * FROM (VALUES
+                ('AF-P1-F1', 'P1'), ('AF-P1-F2', 'P1')
+            ) t(af_id, uniprot_accession);
+        """)
+    rows = {row["candidate_id"]: row for row in DashboardData(tmp_path).candidates()}
+    assert set(rows) == {"1ABC:A", "1ABC:B", "AF-P1-F1", "AF-P1-F2"}
+    assert rows["1ABC:A"]["uniprot_accessions"] == "P1:P2"
+    assert rows["1ABC:B"]["uniprot_accessions"] == "P1"
