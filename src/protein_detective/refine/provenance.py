@@ -1,7 +1,7 @@
 """Record refinement provenance and read invocation arguments from RO-Crate."""
 
 import shlex
-from dataclasses import asdict
+from dataclasses import asdict, fields
 from datetime import datetime
 from pathlib import Path
 
@@ -10,6 +10,7 @@ from rocrate.rocrate import ROCrate
 from rocrate_action_recorder import IOArgumentPath, IOArgumentPaths
 
 from protein_detective.common_cli import write_ro_crate
+from protein_detective.provenance import command_arguments
 from protein_detective.refine.haddock import RefineOptions
 
 
@@ -36,20 +37,26 @@ def refine_run_arguments_from_rocrate(
     crate = ROCrate(session_dir)
     runs = {}
     for action in crate.get_by_type("CreateAction"):
-        command = "protein-detective refine run"
-        if command not in action.id:
+        option_arity = {
+            "--" + field.name.replace("_", "-"): not isinstance(field.default, bool) for field in fields(RefineOptions)
+        }
+        option_arity.update(
+            dict.fromkeys(
+                ("--remove-fixed-chains", "--refine-run-id", "--powerfit-run-id", "--scheduler-address"), True
+            )
+        )
+        option_arity.update(dict.fromkeys(("--verbose", "--quiet", "-v", "-q"), False))
+        parsed = command_arguments(action.id, ("protein-detective", "refine", "run"), option_arity)
+        if parsed is None or len(parsed[0]) != 2:
             continue
-        arguments = shlex.split(action.id.split(command, 1)[1])
-        if len(arguments) < 2:
-            continue
-        fixed_structure = arguments[1]
+        (recorded_session_arg, fixed_structure), rest = parsed
         if session_relative:
-            recorded_session = Path(arguments[0])
+            recorded_session = Path(recorded_session_arg)
             fixed_path = Path(fixed_structure)
             # Paired paths share the original invocation's coordinate system.
             base = recorded_session if recorded_session.is_absolute() == fixed_path.is_absolute() else session_dir
             fixed_structure = str(fixed_path.resolve().relative_to(base.resolve(), walk_up=True))
-        options = shlex.join(arguments[2:])
+        options = shlex.join(rest)
         for result in action.get("result", []):
             parts = Path(result.id).parts
             if len(parts) >= 2 and parts[0] == "refine":

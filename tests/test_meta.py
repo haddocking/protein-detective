@@ -746,8 +746,9 @@ def test_generated_path_columns_are_session_relative(
 @pytest.mark.parametrize(
     "fixed_kind", ["absolute_internal", "absolute_external", "relative_internal", "relative_external"]
 )
+@pytest.mark.parametrize("options_first", [False, True])
 def test_refinement_fixed_structure_is_relative_to_session(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fixed_kind: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fixed_kind: str, options_first: bool
 ):
     monkeypatch.chdir(tmp_path)
     session = tmp_path / "session with spaces"
@@ -757,7 +758,9 @@ def test_refinement_fixed_structure_is_relative_to_session(
     fixed.write_text("END\n")
     argument = str(fixed if fixed_kind.startswith("absolute") else fixed.relative_to(tmp_path))
     options = "--refine-run-id example"
-    command = f"protein-detective refine run {shlex.quote(session.name)} {shlex.quote(argument)} {options}"
+    positionals = f"{shlex.quote(session.name)} {shlex.quote(argument)}"
+    arguments = f"{options} {positionals}" if options_first else f"{positionals} {options}"
+    command = f"protein-detective refine run {arguments}"
     crate = ROCrate()
     result = crate.add_file(fixed, dest_path="refine/example/fixed_structure.pdb")
     crate.add(ContextEntity(crate, command, properties={"@type": "CreateAction", "result": [result]}))
