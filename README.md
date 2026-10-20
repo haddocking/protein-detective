@@ -401,16 +401,16 @@ Browse candidates, fitting and refinement scores, saved structures with density,
 and recorded workflow provenance in a local dashboard:
 
 ```shell
-protein-detective dashboard mysession --port 8765 --no-browser
+protein-detective dashboard mysession --host localhost --port 8765
 ```
 
-Omit `--no-browser` to open the browser automatically. Open the printed launch
-URL to authenticate. **Do not modify the session directory while the dashboard
-is running.** Missing metadata is generated with a warning before startup;
-existing metadata is read as supplied. The installed package includes the
-frontend, so no Node.js installation is needed. The on-demand Mol\* 3D viewer
-requires internet access; other dashboard views work offline. See
-[dashboard usage and development](docs/dashboard.md).
+The command prints a launch URL by default. Add `--browser` to open the browser
+automatically. Open the printed launch URL to authenticate. **Do not modify the
+session directory while the dashboard is running.** Missing metadata is
+generated with a warning before startup; existing metadata is read as supplied.
+The installed package includes the frontend, so no Node.js installation is
+needed. The on-demand Mol\* 3D viewer requires internet access; other dashboard
+views work offline. See [dashboard usage and development](docs/dashboard.md).
 
 ## Contributing
 

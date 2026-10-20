@@ -29,7 +29,7 @@ Reading `meta.duckdb` read-only does not prevent future action endpoints. A late
 ### Local access token
 
 - Generate a new launch token in Python with `secrets.token_urlsafe(32)` on every server start; keep it in memory.
-- Open and print a URL such as `http://127.0.0.1:PORT/#token=TOKEN`, including with `--no-browser`. The fragment stays in the browser and is not sent in the initial HTTP request. See [URI fragments](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Fragment).
+- Print a URL such as `http://127.0.0.1:PORT/#token=TOKEN`, and open it automatically only with `--browser`. The fragment stays in the browser and is not sent in the initial HTTP request. See [URI fragments](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Fragment).
 - React reads the fragment and submits the token as JSON to `POST /api/auth`. Validate its type and length and compare it with `secrets.compare_digest()`; reject missing or invalid tokens. See [Python secrets](https://docs.python.org/3/library/secrets.html).
 - After successful verification, set the same launch token in an `HttpOnly`, `SameSite=Strict`, host-only session cookie with path `/`, and remove the fragment with `history.replaceState()`. Reloads use the cookie; restarting the server generates a new token and requires the new launch URL. Use aiohttp's cookie support directly; no separate session credentials, registry, or session package is needed.
 - Protect every dataset and session-file endpoint with authentication middleware that validates the cookie token against the in-memory launch token using `secrets.compare_digest()`. Reject missing or invalid cookie tokens. Only the frontend shell/assets and the token verification endpoint are accessible before authentication. The cookie lets same-origin Mol* model/map requests authenticate without putting tokens in file URLs.
@@ -42,7 +42,7 @@ Reading `meta.duckdb` read-only does not prevent future action endpoints. A late
 uv run protein-detective dashboard /home/verhoes/git/protein-detective/protein-detective/docs/tutorial-6j5w
 ```
 
-Once implemented, the command will start a local web server and open the dashboard in a web browser.
+The command starts a local web server and prints the launch URL. Add `--browser` to open the dashboard in a web browser automatically.
 
 ## Example session
 
@@ -67,8 +67,8 @@ The metadata generator now produces the refinement tables in this example databa
 - Validate the session directory. If `meta.duckdb` is missing, warn and run the existing metadata generator in place before starting the server. Stop and report any generation failure. If an existing database is unreadable, raise an error; do not replace or regenerate it automatically. Use a readable existing database as supplied.
 - Print the notice that no changes should be made to the session directory while the dashboard is running.
 - Add a direct `aiohttp` dependency and start its local server bound to `127.0.0.1`.
-- Generate the launch token and open the browser with the fragment-bearing URL once the server is ready.
-- Support `--port` and `--no-browser`.
+- Generate the launch token and print the fragment-bearing URL once the server is ready. Open the browser only when `--browser` is supplied.
+- Support `--host`, `--port`, and the opt-in `--browser` flag.
 - Print the dashboard URL and stop cleanly with Ctrl+C.
 
 ### 2. Build a read-only data API
@@ -191,7 +191,7 @@ Use React, TypeScript, and Vite+ (`vp`) for frontend tooling. Prioritize desktop
 - Verify Mol* is fetched only when opening the viewer, uses pinned CDN URLs with valid integrity hashes, and can load authenticated local model/map files. Verify a failed or blocked CDN download shows a useful error while other views still work.
 - Verify browser interactions against the tutorial session, including selecting models and loading density maps.
 - Verify refined files show both partners once, visibility toggles work independently, and density controls/reset camera work. Confirm unsaved fitting solutions and missing density do not enable 3D viewing.
-- Confirm the target command opens and authenticates a working dashboard, `--no-browser` prints a usable launch URL, and Ctrl+C shuts down the server.
+- Confirm the target command prints a usable launch URL without opening a browser by default, `--browser` opens and authenticates a working dashboard, and Ctrl+C shuts down the server.
 - Run the repository checks:
 
   ```bash
@@ -204,6 +204,6 @@ Use React, TypeScript, and Vite+ (`vp`) for frontend tooling. Prioritize desktop
 
 ## Completion criteria
 
-The target command opens a usable dashboard for the tutorial session and authenticates through the token in the launch URL fragment. Session data and files require authentication. Users can browse and filter fitting results, inspect candidates and refinement scores, view structures with density maps, and inspect workflow provenance. The dashboard handles partial sessions gracefully and runs from the packaged Python application without a frontend toolchain at runtime. The compiled webapp ships in the wheel; Mol* is fetched from a pinned internet URL on demand, with a clear error when unavailable.
+The target command prints the launch URL for a usable dashboard for the tutorial session, opens a browser only with `--browser`, and authenticates through the token in the launch URL fragment. Session data and files require authentication. Users can browse and filter fitting results, inspect candidates and refinement scores, view structures with density maps, and inspect workflow provenance. The dashboard handles partial sessions gracefully and runs from the packaged Python application without a frontend toolchain at runtime. The compiled webapp ships in the wheel; Mol* is fetched from a pinned internet URL on demand, with a clear error when unavailable.
 
 The refinement metadata foundation is implemented in `src/protein_detective/meta.py` and covered by `tests/test_meta.py`; no separate refinement metadata prerequisite remains for this plan.

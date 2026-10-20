@@ -1,10 +1,10 @@
 # Dashboard snapshot API
 
-The frontend and Python server share one loopback origin. Each dataset is stable
-for one server lifetime. There is no refresh or workflow mutation endpoint.
-React fetches each needed dataset once and performs filtering, grouping,
-sorting, pagination, charts, and CSV export locally. Types live in
-`src/data.ts`.
+The frontend and Python server share one configured origin (loopback by
+default). Each dataset is stable for one server lifetime. There is no refresh or
+workflow mutation endpoint. React fetches each needed dataset once and performs
+filtering, grouping, sorting, pagination, charts, and CSV export locally. Types
+live in `src/data.ts`.
 
 ## Authentication and files
 
@@ -14,7 +14,7 @@ success the server returns `{"authenticated":true}` and sets the launch token in
 an HttpOnly, SameSite=Strict, host-only session cookie with path `/`. React
 removes `#token=...` after successful authentication. All subsequent requests,
 including model/map downloads, use that cookie. Foreign Host and Origin values
-are rejected; use the exact loopback origin printed at startup. The public
+are rejected; use the exact configured origin printed at startup. The public
 shell, assets, and token endpoint are the only public resources. Invalid
 credentials return HTTP 401; open the current launch URL to authenticate again.
 
@@ -22,8 +22,14 @@ credentials return HTTP 401; open the current launch URL to authenticate again.
 supports HTTP range requests. Encode individual path segments, preserving `/`
 separators. Traversal and symlinks escaping the supplied session are rejected.
 Model/map paths in datasets are session-relative or null. Downloads occur only
-when the viewer opens. Browsing never generates a fitted model or modifies the
-session.
+when the viewer opens. File responses use `Cache-Control: private, no-cache`:
+browser caches may store them, but reuse requires an authenticated server check.
+Unchanged files support ETag/Last-Modified validation with HTTP 304;
+unauthenticated conditional requests are rejected. Dataset and authentication
+responses use `Cache-Control: no-store`. The viewer retains the current density
+map when switching models from the same source map and keeps it through Details
+navigation until the panel closes. Browsing never generates a fitted model or
+modifies the session.
 
 ## Dataset endpoints
 

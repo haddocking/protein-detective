@@ -4,16 +4,22 @@ Install the published Python package, then start the local dashboard:
 
 ```shell
 protein-detective dashboard mysession
-# Choose a port and print the launch URL without opening a browser:
-protein-detective dashboard mysession --port 8765 --no-browser
+# Open a browser automatically:
+protein-detective dashboard mysession --browser
+# Choose a host and port (add --browser to open a browser):
+protein-detective dashboard mysession --host localhost --port 8765
 ```
 
 The installed package includes the built interface. Node.js and a frontend build
-are not required to launch it. The server binds to `127.0.0.1`; open the exact
-URL printed in the terminal. Its fragment authenticates this browser and is
-removed from the address bar once authentication succeeds. Reloads use an
-HttpOnly, SameSite=Strict cookie. Each server launch creates a new token, so
-after a restart open the newly printed URL. Stop the server with Ctrl+C.
+are not required to launch it. The command prints a launch URL without opening a
+browser by default; add `--browser` to open it automatically. The server binds
+to `127.0.0.1` by default. Use `--host HOST` to select another IP address or
+hostname for the binding and launch URL; IPv6 addresses such as `--host ::1` are
+supported. Open the exact URL printed in the terminal. Its fragment
+authenticates this browser and is removed from the address bar once
+authentication succeeds. Reloads use an HttpOnly, SameSite=Strict cookie. Each
+server launch creates a new token, so after a restart open the newly printed
+URL. Stop the server with Ctrl+C.
 
 **Do not modify the session directory while the dashboard is running.** The
 dashboard treats it as a stable snapshot. It reads an existing `meta.duckdb`
@@ -36,6 +42,14 @@ available for inspection and export; save structures with
 `protein-detective powerfit fit-models` before viewing them. Missing density
 maps or ambiguous provenance associations must be repaired before 3D viewing.
 
+The viewer retains its Mol\* instance and the current density map while the
+result panel remains open, including when switching to Details. Viewing another
+model from the same source map replaces only the structure and preserves density
+visibility, opacity, and contour settings. Selecting a different source map
+replaces the loaded map; closing the panel releases the viewer. Structure and
+map responses use private browser caching with authenticated revalidation, so
+unchanged files can return HTTP 304 without transferring their contents again.
+
 The 3D viewer downloads Mol\* 5.4.2 JavaScript and CSS from jsDelivr only when
 it is opened. Both assets use pinned SHA-384 Subresource Integrity hashes and
 anonymous CORS. **Internet access is required for the first 3D viewer
@@ -55,17 +69,17 @@ Node.js installed:
 cd dashboard
 npm ci
 npm run dev  # vp build --watch
+npm run format
 npx vp check
 npx vp test run
 npx vp build
 ```
 
 Keep `npm run dev` running in one terminal, then launch
-`uv run protein-detective dashboard SESSION_DIR --no-browser` in another and
-open its printed launch URL. The watcher rebuilds assets; manually reload the
-browser after frontend changes. This keeps authentication and local file loading
-on the exact Python server origin. Do not modify session files during
-development.
+`uv run protein-detective dashboard SESSION_DIR` in another and open its printed
+launch URL. The watcher rebuilds assets; manually reload the browser after
+frontend changes. This keeps authentication and local file loading on the exact
+Python server origin. Do not modify session files during development.
 
 After the frontend build, run `uv build` from the repository root. Hatchling
 includes `dashboard/dist/` at `protein_detective/dashboard/static/` in the wheel
