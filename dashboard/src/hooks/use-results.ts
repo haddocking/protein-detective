@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   csv,
   filterRows,
@@ -20,7 +20,7 @@ export function useResults(kind: ResultKind) {
   const { p, navigate } = useDashboardNavigation();
   const [notice, setNotice] = useState("");
   const rows = data[kind] ?? [];
-  const filtered = useMemo(() => filterRows(rows, p), [rows, p]);
+  const filtered = filterRows(rows, p);
   const columns = kind === "fitting" ? fittingColumns : refinementColumns;
   const sort = columns.includes(p.get("sort") ?? "")
     ? p.get("sort")!
@@ -29,10 +29,7 @@ export function useResults(kind: ResultKind) {
       : "refined_score";
   const desc = p.get("dir") ? p.get("dir") === "desc" : kind === "fitting";
   const limit = topSelection(p.get("top"));
-  const selectedRows = useMemo(
-    () => sorted(grouped(filtered, kind, limit), sort, desc),
-    [filtered, kind, limit, sort, desc],
-  );
+  const selectedRows = sorted(grouped(filtered, kind, limit), sort, desc);
   const pageSize = tablePageSize(p.get("size"));
   const page = Math.min(
     positivePage(p.get("page")),

@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { key, type Dataset, type Row } from "../data";
 import { views, type View } from "../navigation";
@@ -7,7 +6,7 @@ export function useDashboardNavigation() {
   const location = useLocation();
   const routerNavigate = useNavigate();
   const view: View = views.find(([id]) => location.pathname === `/${id}`)?.[0] ?? "overview";
-  const p = useMemo(() => new URLSearchParams(location.searchStr), [location.searchStr]);
+  const p = new URLSearchParams(location.searchStr);
   function navigate(changes: Record<string, string | null>, nextView: View = view) {
     void routerNavigate({
       to: `/${nextView}`,

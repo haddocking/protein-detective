@@ -6,6 +6,11 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { createDashboardRouter } from "./router";
 import { clusterKey } from "./data";
 
+vi.mock("./viewer", () => ({
+  StructureViewer: ({ structureUrl }: { structureUrl: string }) =>
+    createElement("div", { className: "mock-viewer" }, structureUrl),
+}));
+
 describe("dashboard routing", () => {
   it("restores result filters and panel selection from existing URLs", async () => {
     const cluster = clusterKey({ refine_run_id: "run 1", structure: "001", cluster_id: 2 });
@@ -70,7 +75,26 @@ describe("dashboard routing", () => {
 
 it("authenticates a direct provenance link and keeps its selected result across pages", async () => {
   const fitting = [
-    { id: "fit-1", candidate_id: "candidate-1", structure: "1abc", rank: 1, cc: 0.8 },
+    {
+      id: "fit-1",
+      candidate_id: "candidate-1",
+      structure: "1abc",
+      rank: 1,
+      cc: 0.8,
+      viewer_available: true,
+      model_path: "model-1.pdb",
+      density_path: "density.map",
+    },
+    {
+      id: "fit-2",
+      candidate_id: "candidate-1",
+      structure: "1abc",
+      rank: 2,
+      cc: 0.7,
+      viewer_available: true,
+      model_path: "model-2.pdb",
+      density_path: "density.map",
+    },
   ];
   const responses: Record<string, unknown> = {
     "/api/auth": {},
@@ -112,6 +136,58 @@ it("authenticates a direct provenance link and keeps its selected result across 
     expect(container.querySelector("h1")?.textContent).toBe("Overview");
     expect(container.querySelector("aside h2")?.textContent).toBe("1abc");
     expect(fetchMock.mock.calls.filter(([url]) => url === "/api/fitting")).toHaveLength(1);
+
+    await act(async () => {
+      await router.navigate({
+        to: "/overview",
+        search: (previous) => ({ ...previous, tab: "viewer" }),
+      });
+      await vi.dynamicImportSettled();
+    });
+    const viewer = container.querySelector(".mock-viewer");
+    expect(viewer?.textContent).toBe("/files/model-1.pdb");
+    const panel = container.querySelector("aside")!;
+    expect(panel.style.width).toBe(`${Math.max(440, Math.round(window.innerWidth * 0.6))}px`);
+    // Resizing stays under user control until the next entry into the viewer tab.
+    await act(async () => {
+      container
+        .querySelector('[role="separator"]')!
+        .dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    });
+    const resizedWidth = panel.style.width;
+    await act(async () => {
+      await router.navigate({
+        to: "/overview",
+        search: (previous) => ({ ...previous, tab: "details" }),
+      });
+    });
+    expect(container.querySelector(".mock-viewer")).toBe(viewer);
+    expect(container.querySelector<HTMLElement>(".retained-viewer")?.hidden).toBe(true);
+    expect(panel.style.width).toBe(resizedWidth);
+    await act(async () => {
+      await router.navigate({
+        to: "/overview",
+        search: (previous) => ({ ...previous, selected: "fit-2", tab: "viewer" }),
+      });
+    });
+    expect(container.querySelector(".mock-viewer")).toBe(viewer);
+    expect(viewer?.textContent).toBe("/files/model-2.pdb");
+    expect(container.querySelector<HTMLElement>(".retained-viewer")?.hidden).toBe(false);
+    expect(panel.style.width).toBe(`${Math.max(440, Math.round(window.innerWidth * 0.6))}px`);
+    await act(async () => {
+      await router.navigate({ to: "/overview", search: {} });
+    });
+    expect(container.querySelector("aside")).toBeNull();
+    await act(async () => {
+      await router.navigate({
+        to: "/overview",
+        search: { selected: "fit-1", selection: "fitting", tab: "details" },
+      });
+    });
+    expect(container.querySelector(".mock-viewer")).toBeNull();
+    expect(container.querySelector("aside h2")?.textContent).toBe("1abc");
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/api/auth")).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/api/summary")).toHaveLength(1);
   } finally {
     await act(async () => root.unmount());
     container.remove();

@@ -1,7 +1,8 @@
 import { Link, Outlet } from "@tanstack/react-router";
 import { views } from "./navigation";
 import { useDashboardNavigation } from "./hooks/use-dashboard-navigation";
-import { SessionProvider, useSession } from "./hooks/use-session-data";
+import { useSession } from "./hooks/use-session-data";
+import { SessionProvider } from "./components/session-provider";
 import { DetailsPanel } from "./components/details-panel";
 
 function SessionLayout() {
