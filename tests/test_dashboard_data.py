@@ -8,7 +8,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from protein_detective.dashboard.data import DashboardData, normalize_json, resolve_session_file
+from protein_detective.dashboard.data import DashboardData, _normalize_json, _resolve_session_file
 
 
 @pytest.fixture
@@ -171,24 +171,24 @@ def test_solutions_without_saved_models(session: Path):
 def test_file_paths_resolve_after_relocation_and_reject_escapes(session: Path, tmp_path: Path):
     path = "powerfit/fit-a/map.mrc"
     expected = session / path
-    assert resolve_session_file(session, path) == expected
-    assert resolve_session_file(session, f"/old/location/session/{path}") == expected
-    assert resolve_session_file(session, f"docs/session/{path}") == expected
+    assert _resolve_session_file(session, path) == expected
+    assert _resolve_session_file(session, f"/old/location/session/{path}") == expected
+    assert _resolve_session_file(session, f"docs/session/{path}") == expected
     with pytest.raises(ValueError):
-        resolve_session_file(session, "../outside")
+        _resolve_session_file(session, "../outside")
     with pytest.raises(ValueError):
-        resolve_session_file(session, "/etc/passwd")
+        _resolve_session_file(session, "/etc/passwd")
     outside = tmp_path / "outside"
     outside.write_text("private")
     (session / "escape").symlink_to(outside)
     with pytest.raises(ValueError):
-        resolve_session_file(session, "escape")
+        _resolve_session_file(session, "escape")
     with pytest.raises(FileNotFoundError):
-        resolve_session_file(session, "missing.pdb")
+        _resolve_session_file(session, "missing.pdb")
 
 
 def test_json_normalization_is_strict():
-    value = normalize_json(
+    value = _normalize_json(
         {
             "nan": float("nan"),
             "inf": float("inf"),
@@ -253,8 +253,8 @@ def test_recorded_paths_resolve_in_renamed_session(tmp_path: Path, stage: str, p
     expected = session / relative
     expected.parent.mkdir(parents=True)
     expected.write_bytes(b"model")
-    assert resolve_session_file(session, f"{prefix}/{relative}") == expected
-    assert resolve_session_file(session, relative) == expected
+    assert _resolve_session_file(session, f"{prefix}/{relative}") == expected
+    assert _resolve_session_file(session, relative) == expected
 
 
 def test_renamed_session_rebasing_preserves_file_boundaries(tmp_path: Path):
@@ -265,8 +265,8 @@ def test_renamed_session_rebasing_preserves_file_boundaries(tmp_path: Path):
     (outside / "private.pdb").write_bytes(b"private")
     (session / "powerfit").symlink_to(outside, target_is_directory=True)
     with pytest.raises(ValueError, match="outside"):
-        resolve_session_file(session, "/old/tutorial-6j5w/powerfit/private.pdb")
+        _resolve_session_file(session, "/old/tutorial-6j5w/powerfit/private.pdb")
     with pytest.raises(ValueError, match="Invalid"):
-        resolve_session_file(session, "docs/tutorial-6j5w/powerfit/../../outside/private.pdb")
+        _resolve_session_file(session, "docs/tutorial-6j5w/powerfit/../../outside/private.pdb")
     with pytest.raises(ValueError, match="outside"):
-        resolve_session_file(session, str(outside / "private.pdb"))
+        _resolve_session_file(session, str(outside / "private.pdb"))

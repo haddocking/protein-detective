@@ -1,7 +1,7 @@
-"""Read-only dashboard datasets over the existing session metadata schema.
+"""Read-only datasets for the dashboard API.
 
-Every public dataset call owns its DuckDB connection. Paths in responses are
-session-relative; file existence and density provenance determine viewer availability.
+Each dataset call opens its own DuckDB connection. Missing workflow stages
+produce empty results; recorded file paths are resolved against the session.
 """
 
 from __future__ import annotations
@@ -15,16 +15,15 @@ from typing import Any
 import duckdb
 
 
-def normalize_json(value: Any) -> Any:
-    """Convert DuckDB scalar/container values to strict JSON-compatible values."""
+def _normalize_json(value: Any) -> Any:
     if isinstance(value, dict):
-        return {str(key): normalize_json(item) for key, item in value.items()}
+        return {str(key): _normalize_json(item) for key, item in value.items()}
     if isinstance(value, (tuple, list)):
-        return [normalize_json(item) for item in value]
+        return [_normalize_json(item) for item in value]
     if isinstance(value, (datetime, date)):
         return value.isoformat()
     if isinstance(value, Decimal):
-        return normalize_json(float(value))
+        return _normalize_json(float(value))
     if isinstance(value, float) and not math.isfinite(value):
         return None
     if isinstance(value, Path):
@@ -70,8 +69,7 @@ def _relative_path(session_dir: Path, recorded_path: str) -> Path:
     return path
 
 
-def resolve_session_file(session_dir: Path, recorded_path: str) -> Path:
-    """Resolve a recorded session path, rejecting traversal and escaping symlinks."""
+def _resolve_session_file(session_dir: Path, recorded_path: str) -> Path:
     root = session_dir.resolve()
     resolved = (root / _relative_path(root, recorded_path)).resolve()
     if not resolved.is_relative_to(root):
@@ -84,9 +82,21 @@ def resolve_session_file(session_dir: Path, recorded_path: str) -> Path:
 
 
 class DashboardData:
-    """Small, fixed datasets for a stable session snapshot."""
+    """Read session metadata without modifying the database or generating files.
+
+    Keep the session unchanged while browsing. Database errors propagate to callers.
+
+    Attributes:
+        session_dir: Resolved session root.
+        database: Path to the session's meta.duckdb.
+    """
 
     def __init__(self, session_dir: Path):
+        """Store the session location without opening its database.
+
+        Args:
+            session_dir: Directory containing existing metadata and workflow files.
+        """
         self.session_dir = session_dir.resolve()
         self.database = self.session_dir / "meta.duckdb"
         self._file_availability: dict[str, bool] = {}
@@ -102,7 +112,7 @@ class DashboardData:
     def _query(con: duckdb.DuckDBPyConnection, sql: str) -> list[dict[str, Any]]:
         cursor = con.execute(sql)
         names = [column[0] for column in (cursor.description or [])]
-        return [dict(zip(names, normalize_json(row), strict=True)) for row in cursor.fetchall()]
+        return [dict(zip(names, _normalize_json(row), strict=True)) for row in cursor.fetchall()]
 
     def _rows(self, con: duckdb.DuckDBPyConnection, table: str) -> list[dict[str, Any]]:
         if table not in self._tables(con):
@@ -123,7 +133,7 @@ class DashboardData:
             return False
         if path not in self._file_availability:
             try:
-                resolve_session_file(self.session_dir, path)
+                _resolve_session_file(self.session_dir, path)
             except (ValueError, OSError):
                 self._file_availability[path] = False
             else:
@@ -204,6 +214,13 @@ class DashboardData:
         return sorted(candidates.values(), key=lambda row: row["structure"])
 
     def candidates(self) -> list[dict[str, Any]]:
+        """Return candidate structures, including rejected and unfitted candidates.
+
+        Returns:
+            Rows ordered by structure, with identifiers, UniProt accessions, source,
+                filtering outcomes, and available quality measurements. Missing tables
+                yield an empty list.
+        """
         with self._connect() as con:
             return self._candidates(con)
 
@@ -225,6 +242,11 @@ class DashboardData:
         return sorted(actions, key=lambda row: (row.get("start_time") or "", row["id"]))
 
     def provenance(self) -> list[dict[str, Any]]:
+        """Return recorded workflow commands with their inputs and outputs.
+
+        Returns:
+            Actions ordered by start time and ID, or an empty list when none are recorded.
+        """
         with self._connect() as con:
             return self._provenance(con)
 
@@ -293,6 +315,13 @@ class DashboardData:
         return rows
 
     def fitting(self) -> list[dict[str, Any]]:
+        """Return all fitting solutions, including solutions without saved structures.
+
+        Returns:
+            Rows ordered by CC descending, with run/structure/rank identity, scores,
+                and viewer availability. Group top solutions by (powerfit_run_id,
+                structure). Returns an empty list when solutions are absent.
+        """
         with self._connect() as con:
             return self._fitting(con)
 
@@ -351,10 +380,24 @@ class DashboardData:
         return rows
 
     def refinements(self) -> list[dict[str, Any]]:
+        """Return final refinement members across independent refinement runs.
+
+        Returns:
+            Rows ordered by individual score, with cluster scores kept separate.
+                Score change is refined minus baseline; negative means improvement.
+                Group members by refinement run, fitted input, and cluster. Returns
+                an empty list when refinement results are absent.
+        """
         with self._connect() as con:
             return self._refinements(con)
 
     def summary(self) -> dict[str, Any]:
+        """Return session counts and fitting progress.
+
+        Returns:
+            Candidate and workflow counts, available tables, PowerFit runs, and fitting
+                status. Counts for absent workflow stages are omitted.
+        """
         with self._connect() as con:
             tables = self._tables(con)
             candidates = self._candidates(con)
