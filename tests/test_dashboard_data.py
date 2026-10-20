@@ -23,6 +23,9 @@ def session(tmp_path: Path):
             ) t(input_file, structure_id, uniprot_accession, passed, reason, is_alphafold);
             CREATE TABLE fittable_structures AS SELECT 'a.cif.gz' AS structure,
                 'A' AS structure_id, 'P12345' AS uniprot_accessions, false AS is_alphafold;
+            CREATE TABLE powerfit_runs AS SELECT * FROM (VALUES
+                ('fit-a', 'powerfit/fit-a/map.mrc'), ('fit-b', NULL)
+            ) t(powerfit_run_id, used_target);
             CREATE TABLE solutions AS SELECT * FROM (VALUES
                 ('fit-a','a.cif.gz',1,0.8,0.9,1.0,'P12345',false),
                 ('fit-a','a.cif.gz',2,0.7,0.8,0.9,'P12345',false),
@@ -132,7 +135,7 @@ def test_density_association_uses_provenance_not_directory_scan(session: Path):
 
 def test_ambiguous_density_disables_viewer(session: Path):
     with duckdb.connect(str(session / "meta.duckdb")) as con:
-        con.execute("INSERT INTO rocrate_objects VALUES ('action', 'powerfit/fit-a/other.mrc')")
+        con.execute("UPDATE powerfit_runs SET used_target = NULL WHERE powerfit_run_id = 'fit-a'")
     row = next(row for row in DashboardData(session).fitting() if row["model_available"])
     assert not row["viewer_available"]
     assert "ambiguous" in row["viewer_error"]
@@ -156,6 +159,10 @@ def test_empty_and_search_only_sessions(tmp_path: Path):
     assert data.fitting() == data.refinements() == data.provenance() == []
     assert "fitting_solutions" not in data.summary()
     (tmp_path / "powerfit/run").mkdir(parents=True)
+    # Browsing uses recorded metadata, without scanning newly created directories.
+    assert data.summary()["fitting_status"] == "not_started"
+    with duckdb.connect(str(tmp_path / "meta.duckdb")) as con:
+        con.execute("CREATE TABLE powerfit_runs AS SELECT 'run' AS powerfit_run_id")
     assert data.summary()["fitting_status"] == "incomplete"
 
 
@@ -340,3 +347,12 @@ def test_accession_only_alphafold_search_does_not_match_another_fragment(tmp_pat
         "AF-P1-F2-model_v6.cif.gz",
         "AF-P1-F1-model_v6.cif.gz",
     }
+
+
+def test_legacy_metadata_without_runs_keeps_scores_and_disables_viewer(session: Path):
+    with duckdb.connect(str(session / "meta.duckdb")) as con:
+        con.execute("DROP TABLE powerfit_runs")
+    data = DashboardData(session)
+    assert len(data.fitting()) == len(data.refinements()) == 3
+    assert all(not row["viewer_available"] for row in data.fitting())
+    assert data.summary()["powerfit_runs"] == ["fit-a", "fit-b"]

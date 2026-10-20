@@ -12,6 +12,7 @@ from protein_detective.meta import (
     ddl,
     execute_ddl_statements,
     in_memory_duckdb_connection,
+    powerfit_runs_as_duckdb_ddl,
     refinement_tables,
     refinements_capri_clt_as_duckdb_ddl,
     refinements_capri_ss_as_duckdb_ddl,
@@ -816,3 +817,71 @@ def test_single_chain_stats_is_loaded_with_paths_and_rejected_rows(tmp_path: Pat
 
 def test_missing_single_chain_stats_is_optional(tmp_path: Path):
     assert stats_csv_as_duckdb_ddl(tmp_path) == []
+
+
+@pytest.mark.parametrize("executable", ["protein-detective", "'/old path/bin/protein-detective'"])
+@pytest.mark.parametrize("target_count", [0, 1, 2])
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        "../target.mrc 3.7 . --angle 10",
+        "--angle=10 ../target.mrc --no-resampling 3.7 .",
+        "--unknown ../target.mrc 3.7 .",
+        "'../target with spaces.mrc' 3.7 . --angle 10",
+    ],
+)
+def test_powerfit_runs_use_explicit_target_provenance_without_solutions(
+    tmp_path: Path, target_count: int, arguments: str, executable: str
+):
+    session = tmp_path / "session"
+    run_dir = session / "powerfit/example"
+    run_dir.mkdir(parents=True)
+    (session / "powerfit/interrupted").mkdir()
+    target = tmp_path / "target.mrc"
+    target.write_text("density")
+    crate = ROCrate()
+    result = crate.add_dataset(run_dir, dest_path="powerfit/example")
+    objects = [
+        crate.add_file(
+            target,
+            dest_path=f"powerfit/example/target{i}.mrc",
+            properties={
+                "description": f"Density map used for fitting. Copied from {target.resolve()}."
+                if i == 0
+                else "Density map used for fitting."
+            },
+        )
+        for i in range(target_count)
+    ]
+    objects.append(
+        crate.add_file(
+            target, dest_path="powerfit/example/lcc.mrc", properties={"description": "Local cross correlation."}
+        )
+    )
+    command = executable + " powerfit run " + arguments
+    crate.add(
+        ContextEntity(crate, command, properties={"@type": "CreateAction", "object": objects, "result": [result]})
+    )
+    crate.write(session)
+    with duckdb.connect() as con:
+        execute_ddl_statements(con, powerfit_runs_as_duckdb_ddl(session))
+        assert con.execute("SELECT * FROM powerfit_runs ORDER BY powerfit_run_id").fetchall() == [
+            (
+                "example",
+                "powerfit/example",
+                "powerfit/example/target0.mrc" if target_count == 1 else None,
+                shlex.join(shlex.split(arguments)),
+                command,
+            ),
+            ("interrupted", "powerfit/interrupted", None, None, None),
+        ]
+
+
+def test_powerfit_runs_absent_stage_and_unrecorded_directory(tmp_path: Path):
+    assert powerfit_runs_as_duckdb_ddl(tmp_path) == []
+    (tmp_path / "powerfit/incomplete").mkdir(parents=True)
+    with duckdb.connect() as con:
+        execute_ddl_statements(con, powerfit_runs_as_duckdb_ddl(tmp_path))
+        assert con.execute("SELECT * FROM powerfit_runs").fetchall() == [
+            ("incomplete", "powerfit/incomplete", None, None, None)
+        ]

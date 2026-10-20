@@ -139,6 +139,17 @@ erDiagram
     }
     "rocrate_create_actions" ||--o{ "rocrate_results" : has
     "rocrate_inodes" ||--o{ "rocrate_results" : has
+    "powerfit_runs" {
+      VARCHAR powerfit_run_id PK
+      VARCHAR powerfit_run_dir
+      VARCHAR used_target
+      VARCHAR options
+      VARCHAR action_id FK
+    }
+    "rocrate_create_actions" |o--o{ "powerfit_runs" : "id = action_id"
+    "powerfit_runs" ||--o{ "solutions" : "powerfit_run_id"
+    "powerfit_runs" ||--o{ "fitted_models" : "powerfit_run_id"
+    "powerfit_runs" ||--o{ "refinements_io" : "powerfit_run_id"
     "solutions" {
       VARCHAR powerfit_run_id
       VARCHAR structure FK

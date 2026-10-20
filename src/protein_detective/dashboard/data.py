@@ -284,29 +284,10 @@ class DashboardData:
         with self._connect() as con:
             return self._provenance(con)
 
-    def _density(self, con: duckdb.DuckDBPyConnection) -> dict[str, list[str]]:
-        maps: dict[str, set[str]] = {}
-        for action in self._provenance(con):
-            if "powerfit run " not in str(action.get("command", "")):
-                continue
-            paths = [self._path(value) for value in action["inputs"] + action["outputs"]]
-            for path in paths:
-                if path is None:
-                    continue
-                parts = Path(path).parts
-                if (
-                    len(parts) >= 3
-                    and parts[0] == "powerfit"
-                    and path.lower().endswith((".mrc", ".map", ".ccp4", ".mrc.gz", ".map.gz"))
-                ):
-                    maps.setdefault(parts[1], set()).add(path)
-        return {run: sorted(paths) for run, paths in maps.items()}
-
-    def _viewer(self, row: dict[str, Any], maps: dict[str, list[str]], model: Any) -> None:
+    def _viewer(self, row: dict[str, Any], model: Any) -> None:
         row["model_path"] = self._path(model)
         row["model_available"] = self._exists(row["model_path"])
-        density = maps.get(str(row.get("powerfit_run_id")), [])
-        row["density_path"] = density[0] if len(density) == 1 else None
+        row["density_path"] = self._path(row.get("used_target"))
         row["density_available"] = self._exists(row["density_path"])
         row["viewer_available"] = row["model_available"] and row["density_available"]
         row["viewer_error"] = (
@@ -314,8 +295,8 @@ class DashboardData:
             if not row["model_available"]
             else (
                 "Source density association is missing or ambiguous"
-                if len(density) != 1
-                else f"Source density file is missing or inaccessible: {density[0]}"
+                if row["density_path"] is None
+                else f"Source density file is missing or inaccessible: {row['density_path']}"
             )
             if not row["density_available"]
             else None
@@ -331,12 +312,14 @@ class DashboardData:
             else ""
         )
         model_column = "fm.fitted_model_file" if join else "NULL"
+        target_join = "LEFT JOIN powerfit_runs pr USING (powerfit_run_id)" if "powerfit_runs" in tables else ""
+        target_column = "pr.used_target" if target_join else "NULL"
         rows = self._query(
             con,
-            f"SELECT s.*, {model_column} AS fitted_model_file FROM solutions s {join} "  # noqa: S608
+            f"SELECT s.*, {model_column} AS fitted_model_file, {target_column} AS used_target "  # noqa: S608
+            f"FROM solutions s {join} {target_join} "
             "ORDER BY cc DESC, powerfit_run_id, structure, rank",
         )
-        maps = self._density(con)
         for row in rows:
             # Browsing never uses transform matrices to regenerate models.
             row.pop("rotation", None)
@@ -345,7 +328,7 @@ class DashboardData:
             row["candidate_id"] = row["structure"]
             row["source"] = "AlphaFold" if row.get("is_alphafold") else "PDB"
             row["relative_z"] = row.get("relz")
-            self._viewer(row, maps, row.get("fitted_model_file"))
+            self._viewer(row, row.get("fitted_model_file"))
         return rows
 
     def fitting(self) -> list[dict[str, Any]]:
@@ -395,6 +378,9 @@ class DashboardData:
         if "refinements_baseline" in tables:
             joins.append("LEFT JOIN refinements_baseline b ON m.refine_run_dir = b.refine_run_dir")
             fields.append("b.score AS baseline_score")
+        if "powerfit_runs" in tables:
+            joins.append("LEFT JOIN powerfit_runs pr ON m.powerfit_run_id = pr.powerfit_run_id")
+            fields.append("pr.used_target")
         if "refinements_runs" in tables:
             joins.append("LEFT JOIN refinements_runs r ON m.refine_run_id = r.refine_run_id")
             fields += ["r.options AS refinement_options", "r.fixed_structure"]
@@ -403,14 +389,13 @@ class DashboardData:
             f"SELECT {', '.join(fields)} FROM refinements_capri_ss m {' '.join(joins)} "  # noqa: S608
             "WHERE m.score IS NOT NULL ORDER BY m.score, m.refined_structure_path",
         )
-        maps = self._density(con)
         for row in rows:
             row["candidate_id"] = row["structure"]
             row["id"] = row["refined_structure_path"]
             row["source"] = "AlphaFold" if row.get("is_alphafold") else "PDB"
             baseline = row.get("baseline_score")
             row["score_change"] = row["refined_score"] - baseline if baseline is not None else None
-            self._viewer(row, maps, row["refined_structure_path"])
+            self._viewer(row, row["refined_structure_path"])
         return rows
 
     def refinements(self) -> list[dict[str, Any]]:
@@ -450,13 +435,18 @@ class DashboardData:
             if "combined_stats" in tables:
                 counts["filtering_passed"] = sum(row.get("passed") is True for row in candidates)
                 counts["filtering_rejected"] = sum(row.get("passed") is False for row in candidates)
-            maps = self._density(con)
-            runs = (
-                {path.name for path in (self.session_dir / "powerfit").iterdir() if path.is_dir()}
-                if (self.session_dir / "powerfit").is_dir()
-                else set()
+            run_table = "powerfit_runs" if "powerfit_runs" in tables else "solutions" if "solutions" in tables else None
+            runs: list[str] = (
+                [
+                    row[0]
+                    for row in con.execute(
+                        f"SELECT DISTINCT powerfit_run_id FROM {run_table} ORDER BY powerfit_run_id"  # noqa: S608
+                    ).fetchall()
+                ]
+                if run_table
+                else []
             )
-            status = "complete" if counts.get("fitting_solutions") else "incomplete" if runs or maps else "not_started"
+            status = "complete" if counts.get("fitting_solutions") else "incomplete" if runs else "not_started"
             if status == "complete" and not counts.get("fitted_structures"):
                 status = "structures_not_saved"
             return {
@@ -473,5 +463,5 @@ class DashboardData:
                 **counts,
                 "available_tables": sorted(tables),
                 "fitting_status": status,
-                "powerfit_runs": sorted(runs | set(maps)),
+                "powerfit_runs": runs,
             }

@@ -10,11 +10,15 @@ from cyclopts import Parameter, validators
 from rocrate.metadata import BASENAME
 
 from protein_detective.common_cli import rprint
+from protein_detective.powerfit.provenance import powerfit_run_arguments_from_rocrate
 from protein_detective.powerfit.workflow import powerfit_solutions_query
 from protein_detective.refine import LAST_CAPRIEVAL_MODULE
 from protein_detective.refine.provenance import refine_run_arguments_from_rocrate
 
-DDLStatement = tuple[str, dict[str, str | list[str]]]
+type DDLParameters = dict[str, str | list[str] | None]
+"""Named DuckDB parameters; None binds as SQL NULL."""
+
+DDLStatement = tuple[str, DDLParameters]
 """SQL DDL statement and named parameters (use $ prefix in SQL) to be passed to DuckDB connection.execute()"""
 
 
@@ -30,7 +34,7 @@ CREATE OR REPLACE TEMP MACRO refinement_run_directory(path, session_root) AS
 
 def rocrate_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     rocrate_path = session_dir / BASENAME
-    params: dict[str, str | list[str]] = {"rocrate_path": str(rocrate_path)}
+    params: DDLParameters = {"rocrate_path": str(rocrate_path)}
     return [
         (
             """\
@@ -363,6 +367,7 @@ def stats_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     statements.extend(_filter_csv_as_duckdb_ddl(session_dir))
 
     statements.extend(powerfit_metadata_as_duckdb_ddl(session_dir))
+    statements.extend(powerfit_runs_as_duckdb_ddl(session_dir))
 
     return statements
 
@@ -378,6 +383,59 @@ def powerfit_metadata_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     if fitted_models_csv.exists():
         statements.extend(_fitted_models_csv_as_duckdb_ddl(fitted_models_csv))
 
+    return statements
+
+
+def powerfit_runs_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    """Load fitting run identities, explicit provenance targets and options.
+
+    Args:
+        session_dir: Session directory containing workflow files and provenance.
+
+    Returns:
+        Statements creating and populating ``powerfit_runs`` from recorded runs
+        and existing run directories. Unrecorded directories have null provenance
+        fields. Returns an empty list when neither recorded runs nor run
+        directories exist.
+    """
+    runs = powerfit_run_arguments_from_rocrate(session_dir)
+    for path in (session_dir / "powerfit").glob("*"):
+        if path.is_dir():
+            runs.setdefault(path.name, {"used_target": None, "options": None, "action_id": None})
+    if not runs:
+        return []
+    statements: list[DDLStatement] = [
+        (
+            """
+        CREATE TABLE powerfit_runs (
+            powerfit_run_id VARCHAR PRIMARY KEY,
+            powerfit_run_dir VARCHAR,
+            used_target VARCHAR,
+            options VARCHAR,
+            action_id VARCHAR
+        )
+        """,
+            {},
+        )
+    ]
+    for run_id, record in sorted(runs.items()):
+        fields: DDLParameters = {
+            "powerfit_run_id": run_id,
+            "powerfit_run_dir": str(Path("powerfit") / run_id),
+            "used_target": record["used_target"],
+            "options": record["options"],
+            "action_id": record["action_id"],
+        }
+        statements.append(
+            (
+                """
+            INSERT INTO powerfit_runs VALUES (
+                $powerfit_run_id, $powerfit_run_dir, $used_target, $options, $action_id
+            )
+            """,
+                fields,
+            )
+        )
     return statements
 
 
