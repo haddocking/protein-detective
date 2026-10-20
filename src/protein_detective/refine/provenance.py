@@ -13,16 +13,23 @@ from protein_detective.common_cli import write_ro_crate
 from protein_detective.refine.haddock import RefineOptions
 
 
-def refine_run_arguments_from_rocrate(session_dir: Path) -> dict[str, tuple[str, str]]:
+def refine_run_arguments_from_rocrate(
+    session_dir: Path, *, session_relative: bool = False
+) -> dict[str, tuple[str, str]]:
     """Extract fixed structure paths and options from recorded invocations.
 
     Args:
         session_dir: Session directory containing RO-Crate metadata.
+        session_relative: Express fixed structure paths relative to the session.
+            Paired relative invocation arguments use their recorded relationship,
+            independently of the current working directory. When only the fixed
+            argument is relative, its original working directory is unknown;
+            metadata generation must run from the original working directory.
 
     Returns:
-        Refinement run IDs mapped to the original fixed structure path and
-        command options, excluding positional arguments; empty when the session
-        has no RO-Crate metadata.
+        Refinement run IDs mapped to fixed structure paths and command options,
+        excluding positional arguments. Paths retain the original argument unless
+        session_relative is set. Empty when the session has no RO-Crate metadata.
     """
     if not (session_dir / BASENAME).is_file():
         return {}
@@ -36,6 +43,12 @@ def refine_run_arguments_from_rocrate(session_dir: Path) -> dict[str, tuple[str,
         if len(arguments) < 2:
             continue
         fixed_structure = arguments[1]
+        if session_relative:
+            recorded_session = Path(arguments[0])
+            fixed_path = Path(fixed_structure)
+            # Paired paths share the original invocation's coordinate system.
+            base = recorded_session if recorded_session.is_absolute() == fixed_path.is_absolute() else session_dir
+            fixed_structure = str(fixed_path.resolve().relative_to(base.resolve(), walk_up=True))
         options = shlex.join(arguments[2:])
         for result in action.get("result", []):
             parts = Path(result.id).parts

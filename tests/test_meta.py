@@ -1,18 +1,24 @@
 import json
+import shlex
 import shutil
 from pathlib import Path
 
 import duckdb
 import pytest
+from rocrate.model.contextentity import ContextEntity
+from rocrate.rocrate import ROCrate
 
 from protein_detective.meta import (
     ddl,
     execute_ddl_statements,
     in_memory_duckdb_connection,
+    refinement_tables,
     refinements_capri_clt_as_duckdb_ddl,
     refinements_capri_ss_as_duckdb_ddl,
     refinements_io_as_duckdb_ddl,
+    refinements_runs_as_duckdb_ddl,
     solutions_as_duckdb_ddl,
+    structure_files_as_duckdb_ddl,
 )
 
 
@@ -691,3 +697,100 @@ def test_multiple_refinement_indexes_load_together(multiple_refinement_indexes: 
         ("refine_run_001",),
         ("refine_run_003",),
     ]
+
+
+@pytest.mark.parametrize("session_argument", ["absolute", "relative", "current"])
+def test_generated_path_columns_are_session_relative(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, session_argument: str
+):
+    # A repeated session path inside the artifact path must not be removed.
+    session = tmp_path / "session with spaces"
+    repeated_directory = Path(*session.parts[1:])
+    run_dir = Path("refine/refine_run_001/run_001/structure/fit_1.pdb")
+    stage = session / run_dir / "refinement/8_caprieval"
+    stage.mkdir(parents=True)
+    (stage / "capri_ss.tsv").write_text("model\tscore\n../6_mdref/mdref_1.pdb\t-10\n")
+    baseline = session / run_dir / "baseline/2_caprieval"
+    baseline.mkdir(parents=True)
+    (baseline / "capri_ss.tsv").write_text("model\tscore\n../1_emscoring/emscoring_1.pdb\t-5\n")
+    (stage / "capri_clt.tsv").write_text("cluster_id\tscore\n1\t-10\n")
+    artifact = repeated_directory / "test.pdb"
+    (session / artifact).parent.mkdir(parents=True)
+    (session / artifact).write_text("END\n")
+
+    monkeypatch.chdir(tmp_path if session_argument != "current" else session)
+    session_dir = {"absolute": session, "relative": Path(session.name), "current": Path()}[session_argument]
+
+    with duckdb.connect() as con:
+        execute_ddl_statements(con, structure_files_as_duckdb_ddl(session_dir) + refinement_tables(session_dir))
+        assert con.execute("SELECT file, parent_dir, filename FROM structure_files").fetchall() == [
+            (str(artifact), str(artifact.parent), artifact.name)
+        ]
+        assert con.execute(
+            "SELECT filename, refine_run_dir, refined_structure_path, model FROM refinements_capri_ss"
+        ).fetchall() == [
+            (
+                str(run_dir / "refinement/8_caprieval/capri_ss.tsv"),
+                str(run_dir),
+                str(run_dir / "refinement/6_mdref/mdref_1.pdb.gz"),
+                "../6_mdref/mdref_1.pdb",
+            )
+        ]
+        assert con.execute("SELECT refine_run_dir FROM refinements_capri_clt").fetchall() == [(str(run_dir),)]
+        assert con.execute("SELECT refine_run_dir, model FROM refinements_baseline").fetchall() == [
+            (str(run_dir), "../1_emscoring/emscoring_1.pdb")
+        ]
+
+
+@pytest.mark.parametrize(
+    "fixed_kind", ["absolute_internal", "absolute_external", "relative_internal", "relative_external"]
+)
+def test_refinement_fixed_structure_is_relative_to_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fixed_kind: str
+):
+    monkeypatch.chdir(tmp_path)
+    session = tmp_path / "session with spaces"
+    session.mkdir()
+    internal = fixed_kind.endswith("internal")
+    fixed = session / "fixed partner.pdb" if internal else tmp_path / "external partner.pdb"
+    fixed.write_text("END\n")
+    argument = str(fixed if fixed_kind.startswith("absolute") else fixed.relative_to(tmp_path))
+    options = "--refine-run-id example"
+    command = f"protein-detective refine run {shlex.quote(session.name)} {shlex.quote(argument)} {options}"
+    crate = ROCrate()
+    result = crate.add_file(fixed, dest_path="refine/example/fixed_structure.pdb")
+    crate.add(ContextEntity(crate, command, properties={"@type": "CreateAction", "result": [result]}))
+    crate.write(session)
+    crate_bytes = (session / "ro-crate-metadata.json").read_bytes()
+
+    # Generate metadata from inside the session, independently of invocation cwd.
+    monkeypatch.chdir(session)
+    with duckdb.connect() as con:
+        execute_ddl_statements(con, refinements_runs_as_duckdb_ddl(Path()))
+        assert con.execute("SELECT fixed_structure, options FROM refinements_runs").fetchall() == [
+            ("fixed partner.pdb" if internal else "../external partner.pdb", options)
+        ]
+    assert (session / "ro-crate-metadata.json").read_bytes() == crate_bytes
+
+
+def test_recorded_parent_relative_paths_do_not_depend_on_generation_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    session = tmp_path / "session"
+    session.mkdir()
+    external = tmp_path / "external.pdb"
+    external.write_text("END\n")
+    crate = ROCrate()
+    result = crate.add_file(external, dest_path="refine/example/fixed_structure.pdb")
+    crate.add(
+        ContextEntity(
+            crate,
+            "protein-detective refine run ../session ../external.pdb --refine-run-id example",
+            properties={"@type": "CreateAction", "result": [result]},
+        )
+    )
+    crate.write(session)
+    monkeypatch.chdir(session)
+    with duckdb.connect() as con:
+        execute_ddl_statements(con, refinements_runs_as_duckdb_ddl(Path()))
+        assert con.execute("SELECT fixed_structure FROM refinements_runs").fetchall() == [("../external.pdb",)]

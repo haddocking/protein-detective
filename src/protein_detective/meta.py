@@ -18,6 +18,16 @@ DDLStatement = tuple[str, dict[str, str | list[str]]]
 """SQL DDL statement and named parameters (use $ prefix in SQL) to be passed to DuckDB connection.execute()"""
 
 
+# Temporary macros keep each generated statement executable on a fresh connection
+# without persisting session-specific helpers in the metadata database.
+_PATH_MACROS = """\
+CREATE OR REPLACE TEMP MACRO session_relative_path(path, session_root) AS
+    substring(path, length(session_root) + 2);
+CREATE OR REPLACE TEMP MACRO refinement_run_directory(path, session_root) AS
+    session_relative_path(parse_dirpath(parse_dirpath(parse_dirpath(path))), session_root);
+"""
+
+
 def rocrate_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     rocrate_path = session_dir / BASENAME
     params: dict[str, str | list[str]] = {"rocrate_path": str(rocrate_path)}
@@ -356,20 +366,21 @@ def powerfit_metadata_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
 
 
 def structure_files_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    session_dir = session_dir.absolute()
     cif_pattern = session_dir / "**" / "*.cif.gz"
     pdb_pattern = session_dir / "**" / "*.pdb"
     pdbgz_pattern = session_dir / "**" / "*.pdb.gz"
     return [
         (
-            """\
+            _PATH_MACROS  # noqa: S608 - concatenating only constant SQL
+            + """\
             CREATE TABLE structure_files AS
             SELECT file, parse_dirpath(file) AS parent_dir, parse_filename(file) AS filename FROM (
-                -- TODO replace only works on unixy systems
-                SELECT replace(file, $session_dir || '/', '') AS file FROM glob($cif_pattern)
+                SELECT session_relative_path(file, $session_dir) AS file FROM glob($cif_pattern)
                 UNION ALL
-                SELECT replace(file, $session_dir || '/', '') AS file FROM glob($pdb_pattern)
+                SELECT session_relative_path(file, $session_dir) AS file FROM glob($pdb_pattern)
                 UNION ALL
-                SELECT replace(file, $session_dir || '/', '') AS file FROM glob($pdbgz_pattern)
+                SELECT session_relative_path(file, $session_dir) AS file FROM glob($pdbgz_pattern)
             );
             """,
             {
@@ -401,6 +412,7 @@ def solutions_as_duckdb_ddl(session_dir: Path, powerfit_run_id: str | None = Non
 
 
 def refinements_capri_ss_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    session_dir = session_dir.absolute()
     #  */*/*/* == refine_run_id / powerfit_run_id / unfitted structure / fitted structure
     refine_dirs = session_dir / "refine" / "*" / "*" / "*" / "*"
     capri_ss_pattern = refine_dirs / "refinement" / LAST_CAPRIEVAL_MODULE / "capri_ss.tsv"
@@ -415,16 +427,15 @@ def refinements_capri_ss_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     # Normalize names so `model-cluster_ranking` becomes `modelcluster_ranking`.
     return [
         (
-            """\
+            _PATH_MACROS
+            + """\
             CREATE TABLE refinements_capri_ss AS
             SELECT
-            *
-            ,replace(
-                parse_dirpath(parse_dirpath(filename)) || '/' || substring(model, 4) || '.gz',
-                $session_dir || '/',
-                ''
+            * REPLACE (session_relative_path(filename, $session_dir) AS filename)
+            ,session_relative_path(
+                parse_dirpath(parse_dirpath(filename)) || '/' || substring(model, 4) || '.gz', $session_dir
             ) AS refined_structure_path
-            ,replace(parse_dirpath(parse_dirpath(parse_dirpath(filename))), $session_dir || '/', '') AS refine_run_dir
+            ,refinement_run_directory(filename, $session_dir) AS refine_run_dir
             ,parse_path(filename)[-4] AS fitted_structure
             ,parse_path(filename)[-5] AS unfitted_structure
             ,parse_path(filename)[-6] AS powerfit_run_id
@@ -444,6 +455,7 @@ def refinements_capri_ss_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
 
 
 def refinements_capri_clt_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    session_dir = session_dir.absolute()
     #  */*/*/* == refine_run_id / powerfit_run_id / unfitted structure / fitted structure
     refine_dirs = session_dir / "refine" / "*" / "*" / "*" / "*"
     capri_clt_pattern = refine_dirs / "refinement" / LAST_CAPRIEVAL_MODULE / "capri_clt.tsv"
@@ -452,11 +464,12 @@ def refinements_capri_clt_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]
         return []
     return [
         (
-            """\
+            _PATH_MACROS
+            + """\
             CREATE TABLE refinements_capri_clt AS
             SELECT
             *
-            ,replace(parse_dirpath(parse_dirpath(parse_dirpath(filename))), $session_dir || '/', '') AS refine_run_dir
+            ,refinement_run_directory(filename, $session_dir) AS refine_run_dir
             ,parse_path(filename)[-4] AS fitted_structure
             ,parse_path(filename)[-5] AS unfitted_structure
             ,parse_path(filename)[-6] AS powerfit_run_id
@@ -473,6 +486,7 @@ def refinements_capri_clt_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]
 
 
 def refinements_baseline(session_dir: Path) -> list[DDLStatement]:
+    session_dir = session_dir.absolute()
     #  */*/*/* == refine_run_id / powerfit_run_id / unfitted structure / fitted structure
     refine_dirs = session_dir / "refine" / "*" / "*" / "*" / "*"
     baseline_pattern = refine_dirs / "baseline" / "2_caprieval" / "capri_ss.tsv"
@@ -481,11 +495,12 @@ def refinements_baseline(session_dir: Path) -> list[DDLStatement]:
         return []
     return [
         (
-            """\
+            _PATH_MACROS
+            + """\
             CREATE TABLE refinements_baseline AS
             SELECT
             *
-            ,replace(parse_dirpath(parse_dirpath(parse_dirpath(filename))), $session_dir || '/', '') AS refine_run_dir
+            ,refinement_run_directory(filename, $session_dir) AS refine_run_dir
             ,parse_path(filename)[-4] AS fitted_structure
             ,parse_path(filename)[-5] AS unfitted_structure
             ,parse_path(filename)[-6] AS powerfit_run_id
@@ -504,7 +519,7 @@ def refinements_baseline(session_dir: Path) -> list[DDLStatement]:
 def refinements_runs_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     # parsing fixed structure from rocrate action id is too hard in duckdb,
     # so we use Python shlex instead and use classical `CREATE TABLE` and `INSERT` statements.
-    runs = refine_run_arguments_from_rocrate(session_dir)
+    runs = refine_run_arguments_from_rocrate(session_dir, session_relative=True)
     if not runs:
         return []
     statements: list[DDLStatement] = [
@@ -613,6 +628,10 @@ def create_meta_duckdb(
     session_dir: Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=True, exists=True))],
 ) -> None:
     """Generate a DuckDB metadata database for a Protein Detective session.
+
+    Filesystem paths are relative to the session directory. Raw CAPRI ``model``
+    values retain their source meaning; use ``refined_structure_path`` instead.
+    Recorded commands and other provenance text retain their original values.
 
     Args:
         session_dir: Session directory containing the files to include.
