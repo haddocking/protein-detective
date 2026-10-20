@@ -31,13 +31,11 @@ jobs:
         run: uv pip install pocl-binary-distribution==3.0
       - name: Run tests
         run: uv run pytest --cov
-  build:
-    name: build
+  dashboard-build:
+    name: dashboard build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
       - name: Install Node.js
         uses: actions/setup-node@v6
         with:
@@ -47,13 +45,46 @@ jobs:
         run: npm ci
       - name: Build dashboard
         working-directory: dashboard
-        run: npx vp build
+        run: npm run build
+      - name: Upload dashboard assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-dist
+          path: dashboard/dist/
+          if-no-files-found: error
+  dashboard-check:
+    name: dashboard check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Install dashboard toolchain and locked dependencies
+        run: npm ci
       - name: Check dashboard
-        working-directory: dashboard
-        run: npx vp check
+        run: npm run check
+      - name: Check dashboard formatting
+        run: npm run format:check
       - name: Test dashboard
-        working-directory: dashboard
-        run: npx vp test run
+        run: npm test
+  build:
+    name: build
+    needs: dashboard-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+      - name: Download dashboard assets
+        uses: actions/download-artifact@v4
+        with:
+          name: dashboard-dist
+          path: dashboard/dist/
       - name: Build the project
         run: uv build
   lint:
