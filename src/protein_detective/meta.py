@@ -156,6 +156,18 @@ def _merge_structure_files_csv_as_duckdb_ddl(
     ]
 
 
+def _single_chain_stats_csv_as_duckdb_ddl(single_chain_stats_csv: Path) -> list[DDLStatement]:
+    return [
+        (
+            """\
+            CREATE TABLE single_chain_stats AS
+            SELECT * FROM read_csv($single_chain_stats_csv);
+            """,
+            {"single_chain_stats_csv": str(single_chain_stats_csv)},
+        ),
+    ]
+
+
 def _combined_stats_csv_as_duckdb_ddl(combined_stats_csv: Path) -> list[DDLStatement]:
     return [
         (
@@ -319,6 +331,10 @@ def _retrieve_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
 
 def _filter_csv_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     statements: list[DDLStatement] = []
+
+    single_chain_stats_csv = session_dir / "single_chain_stats.csv"
+    if single_chain_stats_csv.exists():
+        statements.extend(_single_chain_stats_csv_as_duckdb_ddl(single_chain_stats_csv))
 
     uniprots_verified_stats_csv = session_dir / "uniprots_verified_stats.csv"
     if uniprots_verified_stats_csv.exists():

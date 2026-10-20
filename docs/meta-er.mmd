@@ -72,7 +72,19 @@ erDiagram
     }
     "pdbe" ||--o{ "pdbe_retrieve_stats" : has
     "structure_files" ||--o{ "pdbe_retrieve_stats" : "file = output_file"
-    "pdbe_retrieve_stats" ||--o{ "merge_structure_files" : "pdb_id-derived source"
+    "pdbe_retrieve_stats" ||--o{ "uniprots_verified_stats" : "output_file = input_file"
+    "single_chain_stats" {
+      VARCHAR input_file FK
+      VARCHAR chain2keep
+      VARCHAR output_chain
+      BOOLEAN passed
+      VARCHAR discard_reason
+      VARCHAR output_file FK
+    }
+    "uniprots_verified_stats" ||--o{ "single_chain_stats" : "output_file = input_file"
+    "single_chain_stats" ||--o{ "merge_structure_files" : "output_file = source"
+    "structure_files" ||--o{ "single_chain_stats" : "file = input_file"
+    "structure_files" ||--o{ "single_chain_stats" : "file = output_file"
     "rocrate_create_actions" {
       VARCHAR id FK,PK
       VARCHAR type

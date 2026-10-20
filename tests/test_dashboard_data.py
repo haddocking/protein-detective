@@ -213,11 +213,24 @@ def test_search_structures_sharing_pdb_or_uniprot_are_independent(tmp_path: Path
     with duckdb.connect(str(tmp_path / "meta.duckdb")) as con:
         con.execute("""
             CREATE TABLE fittable_structures AS SELECT * FROM (VALUES
-                ('1abc_updated_A2A.cif.gz', '1ABC', false, 'P1'),
+                ('renamed-chain.cif.gz', '1ABC', false, 'P1'),
                 ('AF-P1-F1-model_v6.cif.gz', 'AF-P1-F1', true, 'P1')
             ) t(structure, structure_id, is_alphafold, uniprot_accessions);
+            CREATE TABLE pdbe_retrieve_stats AS SELECT '1abc' AS pdb_id, 'downloads/renamed.cif.gz' AS output_file;
+            CREATE TABLE uniprots_verified_stats AS SELECT
+                'downloads/renamed.cif.gz' AS input_file, 'uniprots_verified/renamed.cif.gz' AS output_file;
+            CREATE TABLE single_chain_stats AS SELECT * FROM (VALUES
+                ('uniprots_verified/renamed.cif.gz', 'A', 'A', true, NULL, 'single_chain/arbitrary.cif.gz'),
+                ('uniprots_verified/renamed.cif.gz', 'B', 'A', true, NULL, 'single_chain/other.cif.gz')
+            ) t(input_file, chain2keep, output_chain, passed, discard_reason, output_file);
+            CREATE TABLE merge_structure_files AS SELECT * FROM (VALUES
+                ('single_chain/arbitrary.cif.gz', 'combined_input/renamed-chain.cif.gz'),
+                ('single_chain/other.cif.gz', 'combined_input/rejected-chain.cif.gz')
+            ) t(source, target);
+            CREATE TABLE combined_stats AS SELECT 'combined_input/rejected-chain.cif.gz' AS input_file,
+                '1ABC' AS structure_id, false AS is_alphafold, false AS passed, 'Too short' AS reason;
             CREATE TABLE pdbe AS SELECT * FROM (VALUES
-                ('1ABC','P1','A'), ('1ABC','P1','B')
+                ('1ABC','P1','A'), ('1ABC','P1','B'), ('1ABC','P1','C')
             ) t(pdb_id, uniprot_accession, chain);
             CREATE TABLE alphafold AS SELECT * FROM (VALUES
                 ('AF-P1-F1','P1'), ('AF-P1-F2','P1')
@@ -225,11 +238,16 @@ def test_search_structures_sharing_pdb_or_uniprot_are_independent(tmp_path: Path
         """)
     candidates = DashboardData(tmp_path).candidates()
     assert {row["candidate_id"] for row in candidates} == {
-        "1abc_updated_A2A.cif.gz",
-        "1ABC:B",
+        "renamed-chain.cif.gz",
+        "rejected-chain.cif.gz",
+        "1ABC:C",
         "AF-P1-F1-model_v6.cif.gz",
         "AF-P1-F2",
     }
+    rejected = next(row for row in candidates if row["candidate_id"] == "rejected-chain.cif.gz")
+    assert rejected["chain"] == "B"
+    assert rejected["filtering_status"] == "rejected"
+    assert rejected["rejection_reason"] == "Too short"
 
 
 @pytest.mark.parametrize(
@@ -270,3 +288,55 @@ def test_renamed_session_rebasing_preserves_file_boundaries(tmp_path: Path):
         _resolve_session_file(session, "docs/tutorial-6j5w/powerfit/../../outside/private.pdb")
     with pytest.raises(ValueError, match="outside"):
         _resolve_session_file(session, str(outside / "private.pdb"))
+
+
+def test_single_chain_candidates_retain_rejected_and_unfiltered_chains(tmp_path: Path):
+    with duckdb.connect(str(tmp_path / "meta.duckdb")) as con:
+        con.execute("""
+            CREATE TABLE pdbe_retrieve_stats AS SELECT '1ABC' AS pdb_id, 'downloads/input.cif.gz' AS output_file;
+            CREATE TABLE single_chain_stats AS SELECT * FROM (VALUES
+                ('downloads/input.cif.gz', 'A', 'A', true, NULL, 'single_chain/renamed.cif.gz'),
+                ('downloads/input.cif.gz', 'B', 'A', false, 'Missing chain', NULL)
+            ) t(input_file, chain2keep, output_chain, passed, discard_reason, output_file);
+            CREATE TABLE pdbe AS SELECT * FROM (VALUES
+                ('1ABC','P1','A'), ('1ABC','P2','B'), ('1ABC','P3','C')
+            ) t(pdb_id, uniprot_accession, chain);
+        """)
+    candidates = {row["candidate_id"]: row for row in DashboardData(tmp_path).candidates()}
+    assert set(candidates) == {"renamed.cif.gz", "1ABC:B", "1ABC:C"}
+    assert candidates["renamed.cif.gz"]["chain"] == "A"
+    assert candidates["renamed.cif.gz"]["uniprot_accessions"] == "P1"
+    assert candidates["1ABC:B"]["rejection_reason"] == "Missing chain"
+    assert candidates["1ABC:B"]["filtering_status"] == "rejected"
+    assert candidates["1ABC:C"]["filtering_status"] == "not recorded"
+
+
+def test_candidates_without_chain_mapping_do_not_guess_chain_from_filename(tmp_path: Path):
+    with duckdb.connect(str(tmp_path / "meta.duckdb")) as con:
+        con.execute("""
+            CREATE TABLE fittable_structures AS SELECT '1abc_updated_A2A.cif.gz' AS structure,
+                '1ABC' AS structure_id, false AS is_alphafold;
+            CREATE TABLE pdbe AS SELECT '1ABC' AS pdb_id, 'P1' AS uniprot_accession, 'A' AS chain;
+        """)
+    assert {row["candidate_id"] for row in DashboardData(tmp_path).candidates()} == {
+        "1abc_updated_A2A.cif.gz",
+        "1ABC:A",
+    }
+
+
+@pytest.mark.parametrize("structure_id", ["P1", "AF-P1-F2"])
+def test_accession_only_alphafold_search_does_not_match_another_fragment(tmp_path: Path, structure_id: str):
+    with duckdb.connect(str(tmp_path / "meta.duckdb")) as con:
+        con.execute(
+            "CREATE TABLE fittable_structures AS SELECT 'AF-P1-F2-model_v6.cif.gz' AS structure, "
+            "$structure_id AS structure_id, true AS is_alphafold",
+            {"structure_id": structure_id},
+        )
+        con.execute("CREATE TABLE alphafold AS SELECT 'P1' AS af_id, 'P1' AS uniprot_accession")
+    assert {row["candidate_id"] for row in DashboardData(tmp_path).candidates()} == {"AF-P1-F2-model_v6.cif.gz", "P1"}
+    with duckdb.connect(str(tmp_path / "meta.duckdb")) as con:
+        con.execute("INSERT INTO fittable_structures VALUES ('AF-P1-F1-model_v6.cif.gz', 'P1', true)")
+    assert {row["candidate_id"] for row in DashboardData(tmp_path).candidates()} == {
+        "AF-P1-F2-model_v6.cif.gz",
+        "AF-P1-F1-model_v6.cif.gz",
+    }

@@ -18,6 +18,7 @@ from protein_detective.meta import (
     refinements_io_as_duckdb_ddl,
     refinements_runs_as_duckdb_ddl,
     solutions_as_duckdb_ddl,
+    stats_csv_as_duckdb_ddl,
     structure_files_as_duckdb_ddl,
 )
 
@@ -794,3 +795,21 @@ def test_recorded_parent_relative_paths_do_not_depend_on_generation_cwd(
     with duckdb.connect() as con:
         execute_ddl_statements(con, refinements_runs_as_duckdb_ddl(Path()))
         assert con.execute("SELECT fixed_structure FROM refinements_runs").fetchall() == [("../external.pdb",)]
+
+
+def test_single_chain_stats_is_loaded_with_paths_and_rejected_rows(tmp_path: Path):
+    (tmp_path / "single_chain_stats.csv").write_text(
+        "input_file,chain2keep,output_chain,passed,discard_reason,output_file\n"
+        "uniprots_verified/input.cif.gz,C,A,True,,single_chain/renamed.cif.gz\n"
+        "uniprots_verified/input.cif.gz,D,A,False,Missing chain,\n"
+    )
+    with duckdb.connect() as con:
+        execute_ddl_statements(con, stats_csv_as_duckdb_ddl(tmp_path))
+        assert con.execute("SELECT * FROM single_chain_stats ORDER BY chain2keep").fetchall() == [
+            ("uniprots_verified/input.cif.gz", "C", "A", True, None, "single_chain/renamed.cif.gz"),
+            ("uniprots_verified/input.cif.gz", "D", "A", False, "Missing chain", None),
+        ]
+
+
+def test_missing_single_chain_stats_is_optional(tmp_path: Path):
+    assert stats_csv_as_duckdb_ddl(tmp_path) == []

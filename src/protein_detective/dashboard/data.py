@@ -140,8 +140,53 @@ class DashboardData:
                 self._file_availability[path] = True
         return self._file_availability[path]
 
+    def _single_chain_candidates(self, con: duckdb.DuckDBPyConnection) -> dict[str, dict[str, Any]]:
+        tables = self._tables(con)
+        if not {"single_chain_stats", "pdbe_retrieve_stats"} <= tables:
+            return {}
+        joins = []
+        input_file = "sc.input_file"
+        output_file = "sc.output_file"
+        search_fields = ""
+        accession = "''"
+        if "uniprots_verified_stats" in tables:
+            joins.append("LEFT JOIN uniprots_verified_stats v ON sc.input_file = v.output_file")
+            input_file = "coalesce(v.input_file, sc.input_file)"
+        joins.append(f"JOIN pdbe_retrieve_stats d ON d.output_file = {input_file}")
+        if "merge_structure_files" in tables:
+            joins.append("LEFT JOIN merge_structure_files m ON sc.output_file = m.source")
+            output_file = "coalesce(m.target, sc.output_file)"
+        if "pdbe" in tables:
+            joins.append(
+                "LEFT JOIN pdbe p ON upper(p.pdb_id) = upper(d.pdb_id) "
+                "AND CAST(p.chain AS VARCHAR) = CAST(sc.chain2keep AS VARCHAR)"
+            )
+            search_fields = "p.* EXCLUDE (chain),"
+            accession = "coalesce(p.uniprot_accession, '')"
+        rows = self._query(
+            con,
+            f"""\
+            SELECT DISTINCT
+                {search_fields}
+                CASE WHEN nullif(sc.output_file, '') IS NOT NULL
+                    THEN parse_filename({output_file})
+                    ELSE d.pdb_id || ':' || CAST(sc.chain2keep AS VARCHAR)
+                END AS structure,
+                structure AS candidate_id,
+                d.pdb_id AS structure_id,
+                CAST(sc.chain2keep AS VARCHAR) AS chain,
+                false AS is_alphafold,
+                {accession} AS uniprot_accessions,
+                sc.passed,
+                sc.discard_reason AS reason
+            FROM single_chain_stats sc
+            {" ".join(joins)}
+            """,  # noqa: S608 - SQL fragments are internal constants
+        )
+        return {row["structure"]: row for row in rows}
+
     def _candidates(self, con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
-        candidates: dict[str, dict[str, Any]] = {}
+        candidates = self._single_chain_candidates(con)
         for table in ("combined_stats", "secondary_structure_stats", "fittable_structures"):
             for row in self._rows(con, table):
                 path = row.get("structure") or row.get("input_file") or row.get("structure_file")
@@ -155,7 +200,13 @@ class DashboardData:
                     or row.get("uniprot_accession")
                     or candidate.get("uniprot_accessions", "")
                 )
-        # Search-only sessions have no filtering or fitting index yet.
+        # Match search hits by recorded source identity, retaining separate chains and fragments.
+        known_pdb = {
+            (str(row.get("structure_id", "")).upper(), str(row["chain"]))
+            for row in candidates.values()
+            if not row.get("is_alphafold") and row.get("chain") is not None
+        }
+        known_af = [row["structure"] for row in candidates.values() if row.get("is_alphafold")]
         for table, id_key in (("alphafold", "af_id"), ("pdbe", "pdb_id")):
             for row in self._rows(con, table):
                 identifier = str(row.get(id_key) or "")
@@ -163,29 +214,12 @@ class DashboardData:
                 if not identifier:
                     continue
                 chain = str(row.get("chain") or "")
-                # AlphaFold's search CSV often records the accession as af_id.
-                # That represents its F1 model, not every model sharing the accession.
+                # An accession-only AlphaFold search hit represents its F1 model.
                 af_model = identifier if identifier.startswith("AF-") else f"AF-{identifier}-F1"
-                known = any(
-                    (
-                        table == "alphafold"
-                        and candidate.get("is_alphafold")
-                        and (
-                            candidate["structure"] == identifier
-                            or candidate["structure"].startswith(f"{af_model}-")
-                            or candidate["structure"].startswith(f"{af_model}.")
-                        )
-                    )
-                    or (
-                        table == "pdbe"
-                        and str(candidate.get("structure_id", "")).upper() == identifier.upper()
-                        and (
-                            candidate.get("chain") == chain
-                            or f"_{chain}2" in candidate["structure"]
-                            or candidate["structure"] == f"{identifier}:{chain}"
-                        )
-                    )
-                    for candidate in candidates.values()
+                known = (
+                    any(model == identifier or model.startswith((f"{af_model}-", f"{af_model}.")) for model in known_af)
+                    if table == "alphafold"
+                    else (identifier.upper(), chain) in known_pdb
                 )
                 if known:
                     continue
