@@ -8,8 +8,10 @@ import pytest
 import pytest_asyncio
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
+from cyclopts import ValidationError
 from yarl import URL
 
+from protein_detective.cli import app
 from protein_detective.dashboard import server
 from protein_detective.meta import ExecuteError
 
@@ -22,7 +24,7 @@ async def client(tmp_path: Path):
     session = tmp_path / "session"
     session.mkdir()
     (session / "model.pdb").write_bytes(b"MODEL contents")
-    app = server.create_app(session, origin="http://127.0.0.1:1", token="a" * 43, assets=assets)
+    app = server._create_app(session, origin="http://127.0.0.1:1", token="a" * 43, assets=assets)
     async with TestClient(TestServer(app)) as client:
         app[server.CONFIG].origin = str(client.make_url("")).rstrip("/")
         yield client
@@ -82,7 +84,7 @@ async def test_file_boundaries_and_missing_routes(client: TestClient[web.Request
     outside.write_text("secret")
     (client.app[server.CONFIG].session_dir / "escape").symlink_to(outside)
     headers = {"Cookie": f"{server.COOKIE_NAME}={'a' * 43}"}
-    assert (await client.get("/files/escape", headers=headers)).status == 403
+    assert (await client.get("/files/escape", headers=headers)).status == 404
     assert (await client.get(URL("/files/%2e%2e/secret.txt", encoded=True), headers=headers)).status in {403, 404}
     assert (await client.get("/files/missing.pdb", headers=headers)).status == 404
     assert (await client.get("/api/unknown", headers=headers)).status == 404
@@ -114,11 +116,11 @@ def test_missing_metadata_generated_once(tmp_path: Path, capsys: pytest.CaptureF
     ]
     crate = tmp_path / "ro-crate-metadata.json"
     crate.write_text(json.dumps({"@context": "https://w3id.org/ro/crate/1.1/context", "@graph": graph}))
-    assert server.prepare_session(tmp_path) == tmp_path
+    assert server._prepare_session(tmp_path) == tmp_path
     database = tmp_path / "meta.duckdb"
     before = database.stat().st_mtime_ns
     crate.unlink()
-    server.prepare_session(tmp_path)
+    server._prepare_session(tmp_path)
     assert database.stat().st_mtime_ns == before
     assert "generating meta.duckdb" in capsys.readouterr().err
 
@@ -127,23 +129,19 @@ def test_existing_invalid_database_not_regenerated(tmp_path: Path):
     database = tmp_path / "meta.duckdb"
     database.write_text("invalid")
     with pytest.raises(duckdb.Error, match="not a valid DuckDB database"):
-        server.prepare_session(tmp_path)
+        server._prepare_session(tmp_path)
     assert database.read_text() == "invalid"
 
 
 def test_generation_failure_propagates(tmp_path: Path):
     # Without a RO-Crate, real metadata generation must fail and stop startup.
     with pytest.raises(ExecuteError):
-        server.prepare_session(tmp_path)
+        server._prepare_session(tmp_path)
 
 
-def test_session_and_asset_validation(tmp_path: Path):
-    with pytest.raises(ValueError, match="does not exist"):
-        server.prepare_session(tmp_path / "missing")
+def test_asset_validation(tmp_path: Path):
     with pytest.raises(FileNotFoundError, match="assets are missing"):
-        server.create_app(tmp_path, origin="http://127.0.0.1:8080", assets=tmp_path)
-    with pytest.raises(ValueError, match="Port must"):
-        server.dashboard(tmp_path, port=65536)
+        server._create_app(tmp_path, origin="http://127.0.0.1:8080", assets=tmp_path)
 
 
 def test_broken_database_symlink_is_not_regenerated(tmp_path: Path):
@@ -151,6 +149,153 @@ def test_broken_database_symlink_is_not_regenerated(tmp_path: Path):
     database = tmp_path / "meta.duckdb"
     database.symlink_to(target)
     with pytest.raises(duckdb.Error):
-        server.prepare_session(tmp_path)
+        server._prepare_session(tmp_path)
     assert database.is_symlink()
     assert not target.exists()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("host", ["localhost", "127.0.0.2", "::1"])
+async def test_configured_host_origin_authentication(client: TestClient[web.Request, web.Application], host: str):
+    origin = server._dashboard_origin(host, 8765)
+    client.app[server.CONFIG].origin = origin
+    headers = {"Host": origin.removeprefix("http://"), "Origin": origin}
+    assert (await client.get("/", headers=headers)).status == 200
+    response = await client.post("/api/auth", json={"token": "a" * 43}, headers=headers)
+    assert response.status == 200
+    assert (await client.get("/", headers={"Host": "127.0.0.1:8765"})).status == 403
+    assert (await client.get("/", headers={**headers, "Origin": "http://127.0.0.1:8765"})).status == 403
+
+
+@pytest.mark.parametrize("port", [-1, 65536])
+def test_dashboard_cli_rejects_out_of_range_port(tmp_path: Path, port: int):
+    with pytest.raises(ValidationError, match="Must be"):
+        app.parse_args(
+            ["dashboard", str(tmp_path), "--port", str(port)],
+            exit_on_error=False,
+            print_error=False,
+        )
+
+
+@pytest.mark.parametrize("port", [0, 65535])
+def test_dashboard_cli_accepts_port_boundaries(tmp_path: Path, port: int):
+    _, bound, _ = app.parse_args(
+        ["dashboard", str(tmp_path), "--port", str(port)],
+        exit_on_error=False,
+        print_error=False,
+    )
+    assert bound.arguments["port"] == port
+
+
+def test_dashboard_cli_rejects_missing_session_path(tmp_path: Path):
+    with pytest.raises(ValidationError):
+        app.parse_args(
+            ["dashboard", str(tmp_path / "missing")],
+            exit_on_error=False,
+            print_error=False,
+        )
+
+
+def test_dashboard_cli_rejects_session_file(tmp_path: Path):
+    session_path = tmp_path / "session"
+    session_path.write_text("not a directory")
+    with pytest.raises(ValidationError):
+        app.parse_args(
+            ["dashboard", str(session_path)],
+            exit_on_error=False,
+            print_error=False,
+        )
+
+
+@pytest.mark.parametrize(("options", "expected"), [([], False), (["--browser"], True)])
+def test_dashboard_cli_browser_is_opt_in(tmp_path: Path, options: list[str], expected: bool):
+    _, bound, _ = app.parse_args(
+        ["dashboard", str(tmp_path), *options],
+        exit_on_error=False,
+        print_error=False,
+    )
+    bound.apply_defaults()
+    assert bound.arguments["browser"] is expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("validator", ["If-None-Match", "If-Modified-Since"])
+async def test_files_revalidate_authenticated_private_cache(
+    client: TestClient[web.Request, web.Application], validator: str
+):
+    headers = {"Cookie": f"{server.COOKIE_NAME}={'a' * 43}"}
+    original = await client.get("/files/model.pdb", headers=headers)
+    assert original.status == 200
+    assert await original.read() == b"MODEL contents"
+    assert original.headers["Cache-Control"] == "private, no-cache"
+    assert original.headers["ETag"]
+    assert original.headers["Last-Modified"]
+    value = original.headers["ETag" if validator == "If-None-Match" else "Last-Modified"]
+    conditional = await client.get("/files/model.pdb", headers={**headers, validator: value})
+    assert conditional.status == 304
+    assert await conditional.read() == b""
+    assert conditional.headers["Cache-Control"] == "private, no-cache"
+    assert conditional.headers["ETag"] == original.headers["ETag"]
+    assert conditional.headers["Last-Modified"] == original.headers["Last-Modified"]
+    assert conditional.headers["X-Content-Type-Options"] == "nosniff"
+
+    # Knowing validators never bypasses the launch-cookie check.
+    unauthenticated = await client.get("/files/model.pdb", headers={validator: value})
+    assert unauthenticated.status == 401
+    client.app[server.CONFIG].token = "b" * 43
+    expired = await client.get("/files/model.pdb", headers={**headers, validator: value})
+    assert expired.status == 401
+
+
+@pytest.mark.asyncio
+async def test_files_keep_range_and_if_range_semantics_with_private_cache(
+    client: TestClient[web.Request, web.Application],
+):
+    headers = {"Cookie": f"{server.COOKIE_NAME}={'a' * 43}"}
+    original = await client.get("/files/model.pdb", headers=headers)
+    await original.read()
+    partial = await client.get(
+        "/files/model.pdb",
+        headers={**headers, "Range": "bytes=0-4", "If-Range": original.headers["Last-Modified"]},
+    )
+    assert partial.status == 206
+    assert await partial.read() == b"MODEL"
+    assert partial.headers["Cache-Control"] == "private, no-cache"
+    assert partial.headers["Accept-Ranges"] == "bytes"
+    assert partial.headers["Content-Range"] == "bytes 0-4/14"
+    assert partial.headers["ETag"] == original.headers["ETag"]
+    assert partial.headers["Last-Modified"] == original.headers["Last-Modified"]
+
+
+@pytest.mark.asyncio
+async def test_api_returns_uncached_uncompressed_datasets(client: TestClient[web.Request, web.Application]):
+    response = await login(client)
+    assert response.headers["Cache-Control"] == "no-store"
+    with duckdb.connect(str(client.app[server.CONFIG].session_dir / "meta.duckdb")):
+        pass
+    response = await client.get(
+        "/api/summary",
+        headers={"Cookie": f"{server.COOKIE_NAME}={'a' * 43}", "Accept-Encoding": "gzip, deflate"},
+    )
+    assert response.status == 200
+    assert response.headers["Cache-Control"] == "no-store"
+    assert "Content-Encoding" not in response.headers
+    assert (await response.json())["candidate_structures"] == 0
+
+
+@pytest.mark.asyncio
+async def test_static_session_files_allow_internal_symlinks_without_directory_listings(
+    client: TestClient[web.Request, web.Application],
+):
+    root = client.app[server.CONFIG].session_dir
+    (root / "alias.pdb").symlink_to(root / "model.pdb")
+    headers = {"Cookie": f"{server.COOKIE_NAME}={'a' * 43}"}
+    response = await client.get("/files/alias.pdb", headers=headers)
+    assert response.status == 200
+    assert await response.read() == b"MODEL contents"
+    assert (await client.get("/files")).status == 401
+    assert (await client.get("/files/")).status == 401
+    assert (await client.get("/files", headers=headers)).status == 403
+    directory = await client.get("/files/", headers=headers)
+    assert directory.status == 403
+    assert "model.pdb" not in await directory.text()
