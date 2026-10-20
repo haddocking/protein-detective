@@ -67,6 +67,7 @@ function App() {
   const [summary, setSummary] = useState<Row>({});
   const requested = useRef(new Set<Dataset>());
   const [notice, setNotice] = useState("");
+  const [viewerSelection, setViewerSelection] = useState<{ row: Row; kind: string } | null>(null);
   const [width, setWidth] = useState(() =>
     new URLSearchParams(location.search).get("tab") === "viewer"
       ? Math.max(440, Math.round(window.innerWidth * 0.6))
@@ -183,6 +184,11 @@ function App() {
         String(c.candidate_id ?? c.structure) ===
         String(selected.candidate_id ?? selected.structure),
     );
+  const viewerVisible = p.get("tab") === "viewer" && Boolean(selected?.viewer_available);
+  useEffect(() => {
+    if (!selectedId) setViewerSelection(null);
+    else if (viewerVisible && selected) setViewerSelection({ row: selected, kind: selectedKind });
+  }, [selectedId, selected, selectedKind, viewerVisible]);
   const accessionValue = selected?.uniprot_accessions ?? candidate?.uniprot_accessions;
   const accessions =
     typeof accessionValue === "string" ? accessionValue.split(/[,:;\s]+/).filter(Boolean) : [];
@@ -763,18 +769,21 @@ function App() {
                   3D viewer
                 </button>
               </div>
+              {viewerSelection && (
+                <div className="retained-viewer" hidden={!viewerVisible}>
+                  <Suspense fallback={<p>Loading 3D viewer…</p>}>
+                    <StructureViewer
+                      structureUrl={fileUrl(viewerSelection.row.model_path)}
+                      densityUrl={fileUrl(viewerSelection.row.density_path)}
+                      refined={viewerSelection.kind === "refinements"}
+                      label={display(viewerSelection.row.structure)}
+                    />
+                  </Suspense>
+                </div>
+              )}
               {!selected ? (
                 <p className="empty">Loading selected result…</p>
-              ) : p.get("tab") === "viewer" && selected.viewer_available ? (
-                <Suspense fallback={<p>Loading 3D viewer…</p>}>
-                  <StructureViewer
-                    structureUrl={fileUrl(selected.model_path)}
-                    densityUrl={fileUrl(selected.density_path)}
-                    refined={selectedKind === "refinements"}
-                    label={display(selected.structure)}
-                  />
-                </Suspense>
-              ) : (
+              ) : viewerVisible ? null : (
                 <div className="details-content">
                   <p className="eyebrow">
                     {selectedKind === "candidates"

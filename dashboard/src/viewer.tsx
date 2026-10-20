@@ -106,6 +106,14 @@ export function StructureViewer({
 }: StructureViewerProps) {
   const target = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Runtime>(null);
+  const sessionRef = useRef<{
+    disposed: boolean;
+    viewer: Promise<Runtime>;
+    queue: Promise<void>;
+    modelRoots: string[];
+    densityRoots: string[];
+    densityUrl: string | null;
+  } | null>(null);
   const reps = useRef<Runtime[]>([]);
   const volume = useRef<Runtime>(null);
   const [attempt, setAttempt] = useState(0);
@@ -118,50 +126,85 @@ export function StructureViewer({
   const [opacity, setOpacity] = useState(0.25);
   const [contour, setContour] = useState(1.5);
 
+  // The plugin belongs to this panel, rather than to an individual selection.
   useEffect(() => {
-    let disposed = false;
     let viewer: Runtime;
-    const observer = new ResizeObserver(() => viewer?.plugin.handleResize());
+    const observer = new ResizeObserver((entries) => {
+      if (entries.some((entry) => entry.contentRect.width && entry.contentRect.height))
+        viewer?.plugin.handleResize();
+    });
     if (target.current) observer.observe(target.current);
+    const session = {
+      disposed: false,
+      viewer: Promise.resolve(null) as Promise<Runtime>,
+      queue: Promise.resolve(),
+      modelRoots: [] as string[],
+      densityRoots: [] as string[],
+      densityUrl: null as string | null,
+    };
+    session.viewer = (async () => {
+      const runtime = await loadRuntime();
+      if (session.disposed || !target.current) return null;
+      viewer = await runtime.Viewer.create(target.current, {
+        layoutIsExpanded: false,
+        layoutShowControls: false,
+        layoutShowSequence: false,
+        layoutShowLog: false,
+        layoutShowLeftPanel: false,
+        layoutShowRemoteState: false,
+        viewportShowExpand: true,
+        volumeStreamingDisabled: true,
+        extensions: [],
+      });
+      if (session.disposed) {
+        viewer.plugin.dispose();
+        return null;
+      }
+      viewerRef.current = viewer;
+      return viewer;
+    })();
+    sessionRef.current = session;
+    return () => {
+      session.disposed = true;
+      observer.disconnect();
+      viewerRef.current = null;
+      viewer?.plugin.dispose();
+    };
+  }, [attempt]);
+
+  useEffect(() => {
+    const session = sessionRef.current;
+    if (!session) return;
     const controller = new AbortController();
+    const obsolete = () => session.disposed || controller.signal.aborted;
     setReady(false);
     setError("");
-    setStatus("Loading Mol* viewer…");
+    setStatus("Loading structure…");
     setCandidate(true);
     setPartner(true);
-    setDensity(true);
-    setOpacity(0.25);
-    setContour(1.5);
-    reps.current = [];
-    volume.current = null;
-    async function initialize() {
+    // Queue plugin mutations so quick selections cannot mix old and new scenes.
+    session.queue = session.queue.then(async () => {
       try {
+        const viewer = await session.viewer;
+        if (obsolete() || !viewer) return;
         if (!structureUrl || !densityUrl)
           throw new Error("The structure or its source density map is unavailable.");
         if (new URL(densityUrl, location.href).origin !== location.origin)
           throw new Error("Density files must use the dashboard origin.");
-        const runtime = await loadRuntime();
-        if (disposed || !target.current) return;
-        viewer = await runtime.Viewer.create(target.current, {
-          layoutIsExpanded: false,
-          layoutShowControls: false,
-          layoutShowSequence: false,
-          layoutShowLog: false,
-          layoutShowLeftPanel: false,
-          layoutShowRemoteState: false,
-          viewportShowExpand: true,
-          volumeStreamingDisabled: true,
-          extensions: [],
-        });
-        if (disposed) {
-          viewer.plugin.dispose();
-          return;
-        }
-        viewerRef.current = viewer;
+        const plugin = viewer.plugin;
+        const removeRoots = async (roots: string[]) => {
+          if (!roots.length) return;
+          const update = plugin.build();
+          for (const ref of roots) update.delete(ref);
+          await update.commit();
+          roots.length = 0;
+        };
         setStatus("Loading authenticated structure…");
         const text = await modelText(structureUrl, controller.signal);
-        if (disposed) return;
-        const plugin = viewer.plugin;
+        if (obsolete()) return;
+        await removeRoots(session.modelRoots);
+        reps.current = [];
+        if (obsolete()) return;
         const parts = refined
           ? [
               { chain: "A", name: "Candidate (chain A)", color: 0x2c7fb8 },
@@ -178,47 +221,67 @@ export function StructureViewer({
           if (part.chain && !pdb.includes("ATOM"))
             throw new Error(`Refined structure is missing ${part.name}.`);
           const data = await plugin.builders.data.rawData({ data: pdb, label: part.name });
+          session.modelRoots.push(data.ref);
+          if (obsolete()) return;
           const trajectory = await plugin.builders.structure.parseTrajectory(data, "pdb");
+          if (obsolete()) return;
           const model = await plugin.builders.structure.createModel(trajectory);
+          if (obsolete()) return;
           const structure = await plugin.builders.structure.createStructure(model);
+          if (obsolete()) return;
           const component = await plugin.builders.structure.tryCreateComponentStatic(
             structure,
             "all",
           );
+          if (obsolete()) return;
           const rep = await plugin.builders.structure.representation.addRepresentation(component, {
             type: "cartoon",
             color: "uniform",
             colorParams: { value: part.color },
           });
           reps.current.push(rep);
-          if (disposed) return;
+          if (obsolete()) return;
         }
-        setStatus("Loading source density map…");
-        await viewer.loadVolumeFromUrl({ url: densityUrl, format: "ccp4", isBinary: true }, [
-          { type: "relative", value: 1.5, color: 0x8294a7, alpha: 0.25 },
-        ]);
-        if (disposed) return;
-        for (const cell of plugin.state.data.cells.values()) {
-          if (cell.params?.values?.type?.name === "isosurface") volume.current = cell;
+        if (session.densityUrl !== densityUrl) {
+          await removeRoots(session.densityRoots);
+          session.densityUrl = null;
+          volume.current = null;
+          if (obsolete()) return;
+          setStatus("Loading source density map…");
+          setDensity(true);
+          setOpacity(0.25);
+          setContour(1.5);
+          const before = new Set<string>(plugin.state.data.cells.keys());
+          try {
+            await viewer.loadVolumeFromUrl({ url: densityUrl, format: "ccp4", isBinary: true }, [
+              { type: "relative", value: 1.5, color: 0x8294a7, alpha: 0.25 },
+            ]);
+            session.densityUrl = densityUrl;
+          } finally {
+            // Track the new top-level subtree, including a partially failed load.
+            for (const cell of plugin.state.data.cells.values()) {
+              if (!before.has(cell.transform.ref) && before.has(cell.transform.parent))
+                session.densityRoots.push(cell.transform.ref);
+              if (
+                !before.has(cell.transform.ref) &&
+                cell.params?.values?.type?.name === "isosurface"
+              )
+                volume.current = cell;
+            }
+          }
         }
+        if (obsolete()) return;
         plugin.managers.camera.reset();
         setReady(true);
         setStatus("");
       } catch (cause) {
-        if (!disposed) {
+        if (!obsolete()) {
           setError(cause instanceof Error ? cause.message : String(cause));
           setStatus("");
         }
       }
-    }
-    void initialize();
-    return () => {
-      disposed = true;
-      controller.abort();
-      observer.disconnect();
-      viewerRef.current = null;
-      viewer?.plugin.dispose();
-    };
+    });
+    return () => controller.abort();
   }, [structureUrl, densityUrl, refined, label, attempt]);
 
   function visibility(index: number, visible: boolean) {

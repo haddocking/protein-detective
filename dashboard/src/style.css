@@ -627,3 +627,10 @@ aside.viewer-panel {
     max-width: none;
   }
 }
+
+.retained-viewer:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
