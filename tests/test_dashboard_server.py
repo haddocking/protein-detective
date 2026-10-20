@@ -1,12 +1,14 @@
 """Security and startup regressions for the local dashboard."""
 
 import json
+import re
+import tempfile
 from pathlib import Path
 
 import duckdb
 import pytest
 import pytest_asyncio
-from aiohttp import web
+from aiohttp import ClientConnectorError, ClientSession, web
 from aiohttp.test_utils import TestClient, TestServer
 from cyclopts import ValidationError
 from yarl import URL
@@ -142,6 +144,84 @@ def test_generation_failure_propagates(tmp_path: Path):
 def test_asset_validation(tmp_path: Path):
     with pytest.raises(FileNotFoundError, match="assets are missing"):
         server._create_app(tmp_path, origin="http://127.0.0.1:8080", assets=tmp_path)
+
+
+@pytest.mark.asyncio
+async def test_dev_api_needs_no_built_assets(tmp_path: Path):
+    app = server._create_app(tmp_path, origin="http://127.0.0.1:1", assets=tmp_path, dev=True)
+    async with TestClient(TestServer(app)) as client:
+        app[server.CONFIG].origin = str(client.make_url("")).rstrip("/")
+        assert (await client.get("/api/summary")).status == 401
+        assert (await client.get("/")).status == 404
+
+
+@pytest.mark.parametrize(("options", "expected"), [([], False), (["--dev"], True)])
+def test_dashboard_cli_dev_is_opt_in(tmp_path: Path, options: list[str], expected: bool):
+    _, bound, _ = app.parse_args(["dashboard", str(tmp_path), *options], exit_on_error=False)
+    bound.apply_defaults()
+    assert bound.arguments["dev"] is expected
+
+
+def test_dev_requires_node(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("PATH", "")
+    with pytest.raises(FileNotFoundError, match="npm ci"):
+        server._dev_command()
+
+
+@pytest.fixture
+def dev_module():
+    try:
+        _, source = server._dev_command()
+    except FileNotFoundError:
+        pytest.skip("Requires Node.js and dashboard npm ci")
+    with tempfile.TemporaryDirectory(prefix="hmr-test-", dir=source) as directory:
+        module = Path(directory) / "main.ts"
+        module.write_text("export const value = 1; if (import.meta.hot) import.meta.hot.accept();")
+        yield module, f"/{module.relative_to(source).as_posix()}"
+
+
+@pytest.mark.asyncio
+async def test_vite_proxy_hmr_and_cleanup(tmp_path: Path, dev_module: tuple[Path, str]):
+    """Exercise real Vite without touching the developer's frontend source files."""
+    module, module_url = dev_module
+    session = tmp_path / "session"
+    session.mkdir()
+    (session / "model.pdb").write_text("MODEL")
+    app = server._create_app(session, origin="http://127.0.0.1:1", dev=True)
+    async with TestServer(app) as backend:
+        async with server._dev_frontend("127.0.0.1", 0, str(backend.make_url(""))) as (port, process):
+            origin = server._dashboard_origin("127.0.0.1", port)
+            app[server.CONFIG].origin = origin
+            async with ClientSession() as client:
+                assert (await client.get(f"{origin}/")).status == 200
+                component = await client.get(f"{origin}/src/pages/overview-page.tsx")
+                assert component.status == 200
+                assert "$RefreshReg$" in await component.text()
+                assert (await client.get(f"{origin}/files/model.pdb")).status == 401
+                response = await client.post(
+                    f"{origin}/api/auth", json={"token": app[server.CONFIG].token}, headers={"Origin": origin}
+                )
+                assert response.status == 200
+                headers = {"Cookie": f"{server.COOKIE_NAME}={app[server.CONFIG].token}"}
+                response = await client.get(f"{origin}/files/model.pdb", headers={**headers, "Range": "bytes=0-2"})
+                assert response.status == 206
+                assert await response.text() == "MOD"
+                assert (await client.get(f"{origin}/api/summary", headers={**headers, "Origin": "null"})).status == 403
+                response = await client.get(f"{origin}/@vite/client")
+                script = await response.text()
+                token = re.search(r'const wsToken = "([^"]+)"', script)
+                assert token is not None
+                async with client.ws_connect(f"{origin}/?token={token[1]}", protocols=["vite-hmr"]) as ws:
+                    assert (await ws.receive_json(timeout=10))["type"] == "connected"
+                    assert (await client.get(f"{origin}{module_url}")).status == 200
+                    module.write_text("export const value = 2; if (import.meta.hot) import.meta.hot.accept();")
+                    update = await ws.receive_json(timeout=10)
+                    assert update["type"] == "update"
+                    assert update["updates"][0]["path"] == module_url
+        assert process.returncode is not None
+        async with ClientSession() as client:
+            with pytest.raises(ClientConnectorError):
+                await client.get(f"{origin}/")
 
 
 def test_broken_database_symlink_is_not_regenerated(tmp_path: Path):

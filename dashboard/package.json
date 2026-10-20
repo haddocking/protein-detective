@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vp build --watch",
+    "dev": "vp dev",
     "build": "vp build",
     "check": "vp check",
     "test": "vp test run",

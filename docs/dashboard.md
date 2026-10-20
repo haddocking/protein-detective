@@ -68,18 +68,34 @@ Node.js installed:
 ```shell
 cd dashboard
 npm ci
-npm run dev  # vp build --watch
 npm run format
 npx vp check
 npx vp test run
 npx vp build
 ```
 
-Keep `npm run dev` running in one terminal, then launch
-`uv run protein-detective dashboard SESSION_DIR` in another and open its printed
-launch URL. The watcher rebuilds assets; manually reload the browser after
-frontend changes. This keeps authentication and local file loading on the exact
-Python server origin. Do not modify session files during development.
+From the repository root, launch the frontend and Python API together:
+
+```shell
+uv run protein-detective dashboard SESSION_DIR --dev
+# Choose a port and open the browser automatically:
+uv run protein-detective dashboard SESSION_DIR --dev --port 8765 --browser
+```
+
+Open the printed launch URL. Vite serves frontend source directly, with React
+Fast Refresh and hot module replacement (HMR): saving a component such as
+`dashboard/src/pages/overview-page.tsx` updates the browser without a production
+build or manual reload. Vite proxies API and session-file requests to a private
+Python server, preserving the launch-token authentication and same-origin
+cookies. `--host`, `--port` (including `0`), and `--browser` work as usual.
+Ctrl+C stops both servers; a Vite startup failure also stops the Python server.
+Python code changes still require restarting the command. Do not modify session
+files during development.
+
+Dev mode requires a source checkout, Node.js, and `npm ci` in `dashboard/`.
+`npm run dev` starts only the standalone Vite frontend; use the Python command
+above to include the authenticated API. The default command without `--dev`
+continues to serve compiled assets and requires no Node.js runtime.
 
 After the frontend build, run `uv build` from the repository root. Hatchling
 includes `dashboard/dist/` at `protein_detective/dashboard/static/` in the wheel
