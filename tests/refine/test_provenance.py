@@ -17,27 +17,30 @@ from protein_detective.refine.run import create_refinement_run
 from tests.helpers import cli_args
 
 
-def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_powerfit_results: Path, tmp_path: Path):
+def test_recorded_refinement_arguments_and_known_structure_origin(session_with_powerfit_results: Path, tmp_path: Path):
     assert refine_run_arguments_from_rocrate(session_with_powerfit_results) == {}
 
     run_dir = create_refinement_run(session_with_powerfit_results)
-    original = tmp_path / "original fixed.pdb"
+    original = tmp_path / "original known.pdb"
     original.write_text("END\n")
-    fixed_structure = run_dir / "fixed_structure.pdb"
-    fixed_structure.write_text("END\n")
+    known_structure = run_dir / "known_structure.pdb"
+    known_structure.write_text("END\n")
     fitted = session_with_powerfit_results / "powerfit/run_001/same_structure/fit_1.pdb"
     refinement_run = run_dir / "run_001/same_structure/fit_1.pdb"
     refinement_run.mkdir(parents=True)
     (refinement_run / "refinement").mkdir()
     baseline = refinement_run / "baseline"
     baseline.mkdir()
-    complex_file = baseline / "fitted-and-fixed.pdb"
+    complex_file = baseline / "fitted-and-known.pdb"
     complex_file.write_text("END\n")
     (baseline / "workflow.cfg").write_text(generate_unrefined_config_body(baseline, complex_file, 1))
     options = RefineOptions(rigidbody_sampling=10)
     (refinement_run / "refinement/workflow.cfg").write_text(
         generate_haddock3_config_body(
-            run_dir=refinement_run / "refinement", fitted_model=fitted, fixed_structure=fixed_structure, options=options
+            run_dir=refinement_run / "refinement",
+            fitted_model=fitted,
+            processed_known_structure=known_structure,
+            options=options,
         )
     )
     io_csv = run_dir / "io.csv"
@@ -49,7 +52,7 @@ def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_p
     invocation_options = [
         "--rigidbody-sampling",
         "10",
-        "--remove-fixed-chains",
+        "--remove-known-chains",
         "A",
         "--powerfit-run-id",
         "run_001",
@@ -59,17 +62,17 @@ def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_p
         write_refinement_ro_crate(
             session_dir=session_with_powerfit_results,
             start_time=start_time,
-            session_fixed_structure=fixed_structure,
-            fixed_structure=original,
+            processed_known_structure=known_structure,
+            input_known_structure=original,
             refined=[(fitted, refinement_run)],
             io_csv=io_csv,
             options=options,
-            remove_fixed_chains={"A"},
+            remove_known_chains={"A"},
             powerfit_run_id="run_001",
         )
 
     assert refine_run_arguments_from_rocrate(session_with_powerfit_results) == {
-        run_dir.name: (str(original), shlex.join(invocation_options)),
+        run_dir.name: shlex.join(invocation_options),
     }
 
     command = shlex.join(
@@ -77,7 +80,9 @@ def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_p
     )
     crate_bytes = (session_with_powerfit_results / BASENAME).read_bytes()
     metadata = json.loads(crate_bytes)
-    end_time = metadata["@graph"][-1]["endTime"]
+    action = next(item for item in metadata["@graph"] if item["@id"] == command)
+    end_time = action["endTime"]
+    pwd_id = action["environment"][0]["@id"]
     expected = {
         "@context": ["https://w3id.org/ro/crate/1.1/context", "https://w3id.org/ro/terms/workflow-run/context"],
         "@graph": [
@@ -89,7 +94,7 @@ def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_p
                 "description": "An RO-Crate recording the files and directories that were used as input or "
                 "output by protein-detective.",
                 "hasPart": [
-                    {"@id": "refine/refine_run_001/fixed_structure.pdb"},
+                    {"@id": "refine/refine_run_001/known_structure.pdb"},
                     {"@id": "powerfit/run_001/same_structure/fit_1.pdb"},
                     {"@id": "refine/refine_run_001/io.csv"},
                     {"@id": "refine/refine_run_001/run_001/same_structure/fit_1.pdb/"},
@@ -117,15 +122,15 @@ def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_p
                 "version": __version__,
             },
             {
-                "@id": "refine/refine_run_001/fixed_structure.pdb",
+                "@id": "refine/refine_run_001/known_structure.pdb",
                 "@type": "File",
                 "contentSize": 4,
                 "description": (
-                    f"Fixed structure prepared from {original.resolve()}; "
+                    f"Known structure prepared from {original.resolve()}; "
                     "removed chains ['A']; renamed remaining chains to B."
                 ),
                 "encodingFormat": "chemical/x-pdb",
-                "name": "refine/refine_run_001/fixed_structure.pdb",
+                "name": "refine/refine_run_001/known_structure.pdb",
             },
             {
                 "@id": "powerfit/run_001/same_structure/fit_1.pdb",
@@ -155,10 +160,11 @@ def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_p
                 "@type": "CreateAction",
                 "agent": {"@id": getpass.getuser()},
                 "endTime": end_time,
+                "environment": [{"@id": pwd_id}],
                 "instrument": {"@id": f"protein-detective@{__version__}"},
                 "name": command,
                 "object": [
-                    {"@id": "refine/refine_run_001/fixed_structure.pdb"},
+                    {"@id": "refine/refine_run_001/known_structure.pdb"},
                     {"@id": "powerfit/run_001/same_structure/fit_1.pdb"},
                 ],
                 "result": [
@@ -167,6 +173,8 @@ def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_p
                 ],
                 "startTime": start_time.isoformat(),
             },
+            {"@id": pwd_id, "@type": "PropertyValue", "name": "PWD", "value": str(Path.cwd())},
         ],
     }
-    assert metadata == expected
+    assert metadata["@context"] == expected["@context"]
+    assert {item["@id"]: item for item in metadata["@graph"]} == {item["@id"]: item for item in expected["@graph"]}

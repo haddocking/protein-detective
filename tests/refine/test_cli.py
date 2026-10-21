@@ -11,34 +11,34 @@ from tests.helpers import cli, read_csv
 
 
 @pytest.mark.parametrize("ncores", [-2, -1, 0])
-def test_refine_cli_rejects_nonpositive_ncores(tmp_path: Path, fixed_structure_file: Path, ncores: int):
+def test_refine_cli_rejects_nonpositive_ncores(tmp_path: Path, known_structure_file: Path, ncores: int):
     with pytest.raises(ValidationError, match="Must be > 0"):
         app.parse_args(
-            ["refine", "run", str(tmp_path), str(fixed_structure_file), "--ncores", str(ncores)],
+            ["refine", "run", str(tmp_path), str(known_structure_file), "--ncores", str(ncores)],
             exit_on_error=False,
             print_error=False,
         )
 
 
 @pytest.mark.parametrize("chains", [["A", "C"], ["A", "C", "A"]])
-def test_refine_cli_accepts_fixed_chain_removal(tmp_path: Path, fixed_structure_file: Path, chains: list[str]):
+def test_refine_cli_accepts_known_chain_removal(tmp_path: Path, known_structure_file: Path, chains: list[str]):
     _, bound, _ = app.parse_args(
-        ["refine", "run", str(tmp_path), str(fixed_structure_file)]
-        + [token for chain in chains for token in ("--remove-fixed-chains", chain)],
+        ["refine", "run", str(tmp_path), str(known_structure_file)]
+        + [token for chain in chains for token in ("--remove-known-chains", chain)],
         exit_on_error=False,
         print_error=False,
     )
 
-    assert bound.arguments["remove_fixed_chains"] == {"A", "C"}
+    assert bound.arguments["remove_known_chains"] == {"A", "C"}
 
 
-def test_run_accepts_independent_run_ids(session_with_powerfit_results: Path, fixed_structure_file: Path):
+def test_run_accepts_independent_run_ids(session_with_powerfit_results: Path, known_structure_file: Path):
     _, bound, _ = app.parse_args(
         [
             "refine",
             "run",
             str(session_with_powerfit_results),
-            str(fixed_structure_file),
+            str(known_structure_file),
             "--powerfit-run-id",
             "run_003",
             "--refine-run-id",
@@ -61,8 +61,9 @@ def refinement_run(session_with_powerfit_results: Path) -> Path:
     run_dir.mkdir(parents=True)
     refinement_run = "refine/experiment/run_003/same_structure/fit_1.pdb"
     (run_dir / "io.csv").write_text(
-        "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
-        f"experiment,run_003,powerfit/run_003/same_structure/fit_1.pdb,{refinement_run}\n"
+        "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir,original_known_structure,processed_known_structure\n"
+        f"experiment,run_003,powerfit/run_003/same_structure/fit_1.pdb,{refinement_run},"
+        "refine/experiment/known partner.pdb,refine/experiment/known_structure.pdb\n"
     )
     return run_dir
 
@@ -70,14 +71,20 @@ def refinement_run(session_with_powerfit_results: Path) -> Path:
 def test_list_runs_options_and_read_only_crate(
     session_with_powerfit_results: Path, tmp_path: Path, refinement_run: Path
 ):
+    index = refinement_run / "io.csv"
+    header, row = index.read_text().splitlines()
+    index.write_text(f"{header}\n{row}\n{row}\n")
+    second = refinement_run.with_name("second")
+    second.mkdir()
+    (second / "io.csv").write_text(f"{header}\n{row.replace('experiment', 'second')}\n")
     options = "--refine-run-id experiment --rigidbody-sampling 10"
-    fixed_structure = "fixed partner.pdb"
+    known_structure = "known partner.pdb"
     crate = ROCrate()
     result = crate.add_file(refinement_run / "io.csv", dest_path="refine/experiment/io.csv")
     crate.add(
         ContextEntity(
             crate,
-            f"protein-detective refine run 'session with spaces' '{fixed_structure}' {options}",
+            f"protein-detective refine run 'session with spaces' '{known_structure}' {options}",
             properties={"@type": "CreateAction", "result": [result]},
         )
     )
@@ -89,7 +96,7 @@ def test_list_runs_options_and_read_only_crate(
         )
     )
     crate.write(session_with_powerfit_results)
-    listing = tmp_path / "runs.csv"
+    listing = tmp_path / "runs' listing.csv"
     crate_bytes = (session_with_powerfit_results / BASENAME).read_bytes()
 
     cli(["refine", "list-runs", str(session_with_powerfit_results), "--output", str(listing)])
@@ -98,8 +105,9 @@ def test_list_runs_options_and_read_only_crate(
     assert read_csv(listing) == [
         {
             "refine_run_id": "experiment",
-            "run_dir": str(refinement_run),
-            "fixed_structure": fixed_structure,
+            "run_dir": "refine/experiment",
+            "original_known_structure": "refine/experiment/known partner.pdb",
+            "processed_known_structure": "refine/experiment/known_structure.pdb",
             "options": options,
         }
     ]
@@ -111,11 +119,26 @@ def test_list_runs_without_crate(session_with_powerfit_results: Path, tmp_path: 
     cli(["refine", "list-runs", str(session_with_powerfit_results), "--output", str(listing)])
 
     assert not (session_with_powerfit_results / BASENAME).exists()
-    assert read_csv(listing) == [
-        {
-            "refine_run_id": "experiment",
-            "run_dir": str(refinement_run),
-            "fixed_structure": "",
-            "options": "",
-        }
-    ]
+    assert read_csv(listing) == []
+
+
+@pytest.mark.parametrize("output_args", [[], ["--output", "-"]])
+def test_list_runs_stdout(
+    session_with_powerfit_results: Path, refinement_run: Path, capfd: pytest.CaptureFixture[str], output_args: list[str]
+):
+    crate = ROCrate()
+    result = crate.add_file(refinement_run / "io.csv", dest_path="refine/experiment/io.csv")
+    crate.add(
+        ContextEntity(
+            crate,
+            "protein-detective refine run session known.pdb",
+            properties={"@type": "CreateAction", "result": [result]},
+        )
+    )
+    crate.write(session_with_powerfit_results)
+    cli(["refine", "list-runs", str(session_with_powerfit_results), *output_args])
+
+    assert capfd.readouterr().out == (
+        "refine_run_id,run_dir,original_known_structure,processed_known_structure,options\n"
+        'experiment,refine/experiment,refine/experiment/known partner.pdb,refine/experiment/known_structure.pdb,""\n'
+    )

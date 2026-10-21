@@ -12,8 +12,8 @@ def fitted_structure(cif_6j5w: Path, tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def fixed_structure(cif_6j5w: Path, tmp_path: Path) -> Path:
-    """Extract author chain B from 6J5W as the fixed partner."""
+def known_structure(cif_6j5w: Path, tmp_path: Path) -> Path:
+    """Extract author chain B from 6J5W as the known partner."""
     return write_single_chain_structure_file(cif_6j5w, chain2keep="B", output_dir=tmp_path, out_chain="B")
 
 
@@ -58,7 +58,7 @@ def session_with_powerfit_results(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def fixed_structure_file(tmp_path: Path) -> Path:
-    fixed_structure = tmp_path / "fixed.pdb"
-    fixed_structure.write_text("MODEL\nENDMDL\n")
-    return fixed_structure
+def known_structure_file(tmp_path: Path) -> Path:
+    known_structure = tmp_path / "known.pdb"
+    known_structure.write_text("MODEL\nENDMDL\n")
+    return known_structure

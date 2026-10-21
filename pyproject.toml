@@ -40,11 +40,12 @@ dependencies = [
     "protein-quest>=1.7.0",
     "pyopencl>=2025.2.5",
     "rich>=14.0.0",
-    "rocrate-action-recorder>=0.5.3",
+    "rocrate-action-recorder>=0.8.1",
     "tqdm>=4.67.1",
     "rocrate>=0.15.0",
     "haddock3>=2026.10.0",
     "gemmi>=0.7.5",
+    "aiohttp>=3.12",
 ]
 
 [project.urls]
@@ -92,6 +93,12 @@ docs = [
 [build-system]
 requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/protein_detective"]
 
 [tool.hatch.version]
 path = "src/protein_detective/__version__.py"
@@ -221,7 +228,6 @@ branch = true
 [tool.zorilla]
 include = ["tests/**/*.py"]
 exclude = ["**/fixtures/**", "**/cassettes/**"]
-
 
 [tool.zorilla.rules]
 ZR004 = { enabled = false }  # disabled as sometimes you need many asserts

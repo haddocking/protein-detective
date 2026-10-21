@@ -72,7 +72,19 @@ erDiagram
     }
     "pdbe" ||--o{ "pdbe_retrieve_stats" : has
     "structure_files" ||--o{ "pdbe_retrieve_stats" : "file = output_file"
-    "pdbe_retrieve_stats" ||--o{ "merge_structure_files" : "pdb_id-derived source"
+    "pdbe_retrieve_stats" ||--o{ "uniprots_verified_stats" : "output_file = input_file"
+    "single_chain_stats" {
+      VARCHAR input_file FK
+      VARCHAR chain2keep
+      VARCHAR output_chain
+      BOOLEAN passed
+      VARCHAR discard_reason
+      VARCHAR output_file FK
+    }
+    "uniprots_verified_stats" ||--o{ "single_chain_stats" : "output_file = input_file"
+    "single_chain_stats" ||--o{ "merge_structure_files" : "output_file = source"
+    "structure_files" ||--o{ "single_chain_stats" : "file = input_file"
+    "structure_files" ||--o{ "single_chain_stats" : "file = output_file"
     "rocrate_create_actions" {
       VARCHAR id FK,PK
       VARCHAR type
@@ -127,6 +139,17 @@ erDiagram
     }
     "rocrate_create_actions" ||--o{ "rocrate_results" : has
     "rocrate_inodes" ||--o{ "rocrate_results" : has
+    "powerfit_runs" {
+      VARCHAR powerfit_run_id PK
+      VARCHAR powerfit_run_dir
+      VARCHAR used_target
+      VARCHAR options
+      VARCHAR action_id FK
+    }
+    "rocrate_create_actions" |o--o{ "powerfit_runs" : "id = action_id"
+    "powerfit_runs" ||--o{ "solutions" : "powerfit_run_id"
+    "powerfit_runs" ||--o{ "fitted_models" : "powerfit_run_id"
+    "powerfit_runs" ||--o{ "refinements_io" : "powerfit_run_id"
     "solutions" {
       VARCHAR powerfit_run_id
       VARCHAR structure FK
@@ -157,18 +180,24 @@ erDiagram
     "refinements_runs" {
       VARCHAR refine_run_id PK
       VARCHAR run_dir
-      VARCHAR fixed_structure
-      VARCHAR processed_fixed_structure
+      VARCHAR original_known_structure FK
+      VARCHAR processed_known_structure FK
       VARCHAR options
     }
     "refinements_runs" ||--o{ "refinements_io" : "refine_run_id = refine_run_id"
+    "structure_files" ||--o{ "refinements_runs" : "file = original_known_structure"
+    "structure_files" ||--o{ "refinements_runs" : "file = processed_known_structure"
     "refinements_io" {
       VARCHAR refine_run_id FK
       VARCHAR powerfit_run_id
       VARCHAR fitted_model FK
       VARCHAR refine_run_dir PK
+      VARCHAR original_known_structure FK
+      VARCHAR processed_known_structure FK
     }
     "fitted_models" ||--o{ "refinements_io" : "fitted_model_file = fitted_model"
+    "structure_files" ||--o{ "refinements_io" : "file = original_known_structure"
+    "structure_files" ||--o{ "refinements_io" : "file = processed_known_structure"
     "refinements_baseline" {
       VARCHAR model
       VARCHAR md5
@@ -202,7 +231,7 @@ erDiagram
       DOUBLE vean
       DOUBLE xpcs
       VARCHAR refine_run_dir PK,FK
-      VARCHAR fitted_structure
+      VARCHAR unrefined_complex
       VARCHAR unfitted_structure
       VARCHAR powerfit_run_id
       VARCHAR refine_run_id
@@ -241,18 +270,20 @@ erDiagram
       DOUBLE vean
       DOUBLE xpcs
       VARCHAR filename
-      VARCHAR refined_structure_path
       VARCHAR refine_run_dir FK
-      VARCHAR fitted_structure
+      VARCHAR unrefined_complex
       VARCHAR unfitted_structure
       VARCHAR powerfit_run_id
       VARCHAR refine_run_id
+      VARCHAR refined_complex FK
+      VARCHAR refined_fitted_structure FK
+      VARCHAR refined_known_structure FK
     }
     "refinements_capri_clt" {
       BIGINT cluster_rank
       BIGINT cluster_id PK
       BIGINT n
-      VARCHAR under_eval
+      BOOLEAN under_eval
       DOUBLE score
       DOUBLE score_std
       DOUBLE irmsd
@@ -281,7 +312,7 @@ erDiagram
       DOUBLE vdw_std
       BIGINT caprieval_rank
       VARCHAR refine_run_dir PK,FK
-      VARCHAR fitted_structure
+      VARCHAR unrefined_complex
       VARCHAR unfitted_structure
       VARCHAR powerfit_run_id
       VARCHAR refine_run_id
@@ -308,3 +339,7 @@ erDiagram
     "structure_files" ||--o{ "uniprots_verified_stats" : has
 
     "refinements_capri_clt" ||--o{ "refinements_capri_ss" : "refine_run_dir, cluster_id"
+
+    "structure_files" ||--o{ "refinements_capri_ss" : "file = refined_fitted_structure"
+    "structure_files" ||--o{ "refinements_capri_ss" : "file = refined_known_structure"
+    "structure_files" ||--o{ "refinements_capri_ss" : "file = refined_complex"

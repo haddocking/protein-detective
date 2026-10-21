@@ -21,7 +21,7 @@ It uses
 - [powerfit](https://pypi.org/project/powerfit-em/) to fit protein structure in
   a Electron Microscopy (EM) density map.
 - [haddock3](https://www.bonvinlab.org/haddock3) to refine fitted protein
-  structures against a fixed structure.
+  structures against a known structure.
 - [cyclopts](https://cyclopts.readthedocs.io/en/latest/) for command line
   interface
 - [molviewspec](https://molstar.org/mol-view-spec/) to visualize the fitted
@@ -81,7 +81,7 @@ flowchart TB
     P1 -- "**/solutions.out" --> E1 & M1
 
     subgraph refine [protein-detective refine run]
-        R1[haddock3 refine-fitted2fixed.cfg]
+        R1[haddock3 refine-fitted2known.cfg]
     end
     M1 -- "**/fit_*.pdb" --> refine
 
@@ -379,7 +379,7 @@ The models fitted with powerfit can be further refined using the refine command
 using haddock3.
 
 ```shell
-protein-detective refine run mysession fixed_structure.pdb
+protein-detective refine run mysession known_structure.pdb
 protein-detective refine list-runs mysession
 protein-detective refine report mysession --top 2 --output refined.csv
 ```
@@ -394,6 +394,23 @@ detective session:
 ```shell
 protein-detective meta mysession/
 ```
+
+### Dashboard
+
+Browse candidates, fitting and refinement scores, saved structures with density,
+and recorded workflow provenance in a local dashboard:
+
+```shell
+protein-detective dashboard mysession --host localhost --port 8765
+```
+
+The command prints a launch URL by default. Add `--browser` to open the browser
+automatically. Open the printed launch URL to authenticate. **Do not modify the
+session directory while the dashboard is running.** Missing metadata is
+generated with a warning before startup; existing metadata is read as supplied.
+The installed package includes the frontend, so no Node.js installation is
+needed. The on-demand Mol\* 3D viewer requires internet access; other dashboard
+views work offline. See [dashboard usage and development](docs/dashboard.md).
 
 ## Contributing
 
