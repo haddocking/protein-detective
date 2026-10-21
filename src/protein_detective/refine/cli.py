@@ -21,6 +21,7 @@ refine_app = App(name="refine", help="HADDOCK3 refinement commands")
 @refine_app.command
 def run(
     session_dir: Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=True, exists=True))],
+    # TODO rename known_structure
     fixed_structure: Annotated[Path, Parameter(validator=validators.Path(file_okay=True, dir_okay=False, exists=True))],
     /,
     *,

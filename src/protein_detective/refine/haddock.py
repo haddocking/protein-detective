@@ -128,6 +128,7 @@ def generate_haddock3_config_body(
 
         [rigidbody]
         separate = false
+        mol_fix_origin_1 = true
         mol_fix_origin_2 = true
         sampling = {options.rigidbody_sampling}
         cmrest = true
@@ -146,6 +147,8 @@ def generate_haddock3_config_body(
         [mdref]
         sampling_factor = {options.water_refinement_sampling_factor}
         solvent = "{options.water_refinement_solvent}"
+        mol_fix_origin_1 = true
+        mol_fix_origin_2 = true
 
         [clustfcc]
         min_population = 1

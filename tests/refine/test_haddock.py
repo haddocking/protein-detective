@@ -193,6 +193,7 @@ class TestGenerateHaddock3ConfigBody:
 
             [rigidbody]
             separate = false
+            mol_fix_origin_1 = true
             mol_fix_origin_2 = true
             sampling = 42
             cmrest = true
@@ -211,6 +212,8 @@ class TestGenerateHaddock3ConfigBody:
             [mdref]
             sampling_factor = 7
             solvent = "dmso"
+            mol_fix_origin_1 = true
+            mol_fix_origin_2 = true
 
             [clustfcc]
             min_population = 1
@@ -245,6 +248,7 @@ class TestGenerateHaddock3ConfigBody:
 
             [rigidbody]
             separate = false
+            mol_fix_origin_1 = true
             mol_fix_origin_2 = true
             sampling = 1000
             cmrest = true
@@ -263,6 +267,8 @@ class TestGenerateHaddock3ConfigBody:
             [mdref]
             sampling_factor = 1
             solvent = "none"
+            mol_fix_origin_1 = true
+            mol_fix_origin_2 = true
 
             [clustfcc]
             min_population = 1
