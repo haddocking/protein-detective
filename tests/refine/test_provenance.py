@@ -37,7 +37,10 @@ def test_recorded_refinement_arguments_and_known_structure_origin(session_with_p
     options = RefineOptions(rigidbody_sampling=10)
     (refinement_run / "refinement/workflow.cfg").write_text(
         generate_haddock3_config_body(
-            run_dir=refinement_run / "refinement", fitted_model=fitted, known_structure=known_structure, options=options
+            run_dir=refinement_run / "refinement",
+            fitted_model=fitted,
+            processed_known_structure=known_structure,
+            options=options,
         )
     )
     io_csv = run_dir / "io.csv"
@@ -59,8 +62,8 @@ def test_recorded_refinement_arguments_and_known_structure_origin(session_with_p
         write_refinement_ro_crate(
             session_dir=session_with_powerfit_results,
             start_time=start_time,
-            session_known_structure=known_structure,
-            known_structure=original,
+            processed_known_structure=known_structure,
+            input_known_structure=original,
             refined=[(fitted, refinement_run)],
             io_csv=io_csv,
             options=options,
@@ -69,7 +72,7 @@ def test_recorded_refinement_arguments_and_known_structure_origin(session_with_p
         )
 
     assert refine_run_arguments_from_rocrate(session_with_powerfit_results) == {
-        run_dir.name: (str(original), shlex.join(invocation_options)),
+        run_dir.name: shlex.join(invocation_options),
     }
 
     command = shlex.join(

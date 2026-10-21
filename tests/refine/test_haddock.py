@@ -77,7 +77,7 @@ def workflow_config(tmp_path: Path, fitted_structure: Path, known_structure: Pat
     inputs.mkdir()
     fitted = inputs / "fitted.pdb"
     write_structure(read_structure(fitted_structure), fitted)
-    known = prepare_known_structure(known_structure, inputs)
+    known, _ = prepare_known_structure(known_structure, inputs)
     run_dir = tmp_path / workflow_name
     run_dir.mkdir()
     config = run_dir / "workflow.cfg"
@@ -113,8 +113,11 @@ class TestPrepareKnownStructure:
             for residue in chain
         )
 
-        result = read_structure(prepare_known_structure(cif_1gru, tmp_path, remove_known_chains=remove_known_chains))
+        prepared, saved_original = prepare_known_structure(cif_1gru, tmp_path, remove_known_chains=remove_known_chains)
+        result = read_structure(prepared)
 
+        assert saved_original == tmp_path / cif_1gru.name
+        assert saved_original.read_bytes() == cif_1gru.read_bytes()
         assert len(result) == len(original)
         assert {chain.name for chain in chains_in_structure(result)} == {"B"}
         assert result[0].count_atom_sites() == expected_atom_count
@@ -137,7 +140,7 @@ class TestPrepareKnownStructure:
         refine_dir = tmp_path / "refine"
         refine_dir.mkdir()
 
-        known_structure = prepare_known_structure(cif_1gru, refine_dir)
+        known_structure, _ = prepare_known_structure(cif_1gru, refine_dir)
 
         result_chains = [c.name for c in chains_in_structure(read_structure(known_structure))]
 
@@ -149,7 +152,7 @@ class TestPrepareKnownStructure:
         refine_dir = tmp_path / "refine"
         refine_dir.mkdir()
 
-        known_structure = prepare_known_structure(cif_1gru, refine_dir, out_chain="Z")
+        known_structure, _ = prepare_known_structure(cif_1gru, refine_dir, out_chain="Z")
 
         result_chains = {c.name for c in chains_in_structure(read_structure(known_structure))}
 

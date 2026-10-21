@@ -1,17 +1,16 @@
 """Expose commands for running, listing and reporting HADDOCK3 refinements."""
 
-import csv
 import logging
 from pathlib import Path
 from typing import Annotated
 
+import duckdb
 from cyclopts import App, Group, Parameter, validators
 from cyclopts.types import PositiveInt, StdioPath
 from protein_quest.cli.common import Common
 
-from protein_detective.meta import refinement_run_io_paths
+from protein_detective.meta import refinement_runs_query
 from protein_detective.refine.haddock import RefineOptions
-from protein_detective.refine.provenance import refine_run_arguments_from_rocrate
 from protein_detective.refine.report import refinement_report
 from protein_detective.refine.run import refine_with_haddock3
 
@@ -36,6 +35,10 @@ def run(
 
     The fitted structures will be refined against the known structure
     using HADDOCK3 rigidbody and molecular dynamics refinement.
+
+    Each refinement workflow includes 9_reconstruct/ with separate fitted and
+    known PDB files and io.tsv linking them to the 6_mdref/ complexes. The known
+    partner's original chain identifiers and residue numbers are restored.
 
     Args:
         session_dir: Session directory containing fitted PowerFit results
@@ -80,7 +83,9 @@ def list_runs(
     *,
     output: StdioPath | None = None,
 ):
-    """List refinement runs, known structures and options recorded in RO-Crate.
+    """List refinement runs and saved known structures from their IO indexes.
+
+    Read command options from RO-Crate and include runs recorded in both sources.
 
     Args:
         session_dir: Session directory containing refinement runs.
@@ -88,13 +93,17 @@ def list_runs(
     """
     if output is None:
         output = StdioPath("-")
-    arguments = refine_run_arguments_from_rocrate(session_dir)
-    with output.open("wt") as fh:
-        writer = csv.writer(fh)
-        writer.writerow(["refine_run_id", "run_dir", "known_structure", "options"])
-        for index in refinement_run_io_paths(session_dir):
-            known_structure, options = arguments.get(index.parent.name, ("", ""))
-            writer.writerow([index.parent.name, index.parent, known_structure, options])
+    query, parameters = refinement_runs_query(session_dir)
+    destination = "/dev/stdout" if str(output) == "-" else str(output)
+    # COPY destinations cannot be bound parameters; escape the SQL string literal.
+    destination = destination.replace("'", "''")
+    with duckdb.connect() as con:
+        con.execute(
+            f"""
+            COPY ({query}) TO '{destination}' (FORMAT CSV, HEADER)
+            """,
+            parameters,
+        )
 
 
 @refine_app.command(help=refinement_report.__doc__)

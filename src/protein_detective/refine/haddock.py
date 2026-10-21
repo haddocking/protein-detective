@@ -1,11 +1,13 @@
 """Prepare structures, configure workflows and execute HADDOCK3 refinement."""
 
 import logging
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 from typing import Literal
 
+import gemmi
 from cyclopts.types import PositiveInt
 from haddock.core.defaults import RUNDIR
 from haddock.gear.prepare_run import setup_run
@@ -39,12 +41,12 @@ class RefineOptions:
     fcc_clust_cutoff: float = 0.60
 
 
-def prepare_fitted_and_known(fitted_model: Path, known_structure: Path, output_dir: Path) -> Path:
+def prepare_fitted_and_known(fitted_model: Path, processed_known_structure: Path, output_dir: Path) -> Path:
     """Combine fitted chain A and known chain B without transforming coordinates.
 
     Args:
         fitted_model: Fitted structure containing only chain A.
-        known_structure: Prepared known structure containing only chain B.
+        processed_known_structure: Prepared known structure containing only chain B.
         output_dir: Directory in which to write the combined structure.
 
     Returns:
@@ -54,7 +56,7 @@ def prepare_fitted_and_known(fitted_model: Path, known_structure: Path, output_d
         ValueError: An input has multiple models or unexpected chains.
     """
     structure = read_structure(fitted_model)
-    known = read_structure(known_structure)
+    known = read_structure(processed_known_structure)
     if len(structure) != 1 or len(known) != 1:
         msg = "Baseline scoring requires single-model fitted and known structures."
         raise ValueError(msg)
@@ -99,14 +101,14 @@ def generate_unrefined_config_body(run_dir: Path, complex_file: Path, ncores: in
 
 
 def generate_haddock3_config_body(
-    run_dir: Path, fitted_model: Path, known_structure: Path, options: RefineOptions
+    run_dir: Path, fitted_model: Path, processed_known_structure: Path, options: RefineOptions
 ) -> str:
     """Generate the configuration body for a HADDOCK3 refinement run.
 
     Args:
         run_dir: Path of the HADDOCK3 run directory.
         fitted_model: Path to the fitted model file.
-        known_structure: Path to the known structure file.
+        processed_known_structure: Path to the known structure file.
         options: Refinement parameters for HADDOCK3.
 
     Returns:
@@ -121,7 +123,7 @@ def generate_haddock3_config_body(
 
         molecules = [
             "{fitted_model}",
-            "{known_structure}"
+            "{processed_known_structure}"
         ]
 
         [topoaa]
@@ -159,27 +161,27 @@ def generate_haddock3_config_body(
 
 
 def prepare_known_structure(
-    known_structure: Path, refine_dir: Path, out_chain: str = "B", *, remove_known_chains: set[str] | None = None
-) -> Path:
+    input_known_structure: Path, refine_dir: Path, out_chain: str = "B", *, remove_known_chains: set[str] | None = None
+) -> tuple[Path, Path]:
     """Prepare the known structure for refinement.
 
-    By removing selected chains, converting it to PDB format and renaming chains if necessary.
+    Save the original input, remove selected chains, and prepare the chain-B partner.
 
     Args:
-        known_structure: Path to the known structure file.
+        input_known_structure: Path to the known structure file.
         refine_dir: Directory where the refined structure will be saved.
         out_chain: The chain identifier to rename to if necessary.
         remove_known_chains: Original chain identifiers to remove from every model before renaming.
             For mmCIF inputs, use author chain identifiers (auth_asym_id).
 
     Returns:
-        Path to the prepared known structure in PDB format.
+        Paths to the prepared PDB and the saved original input, respectively.
 
     Raises:
         ValueError: A requested chain is missing or all chains would be removed.
     """
-    known_structure_dest = refine_dir / "known_structure.pdb"
-    structure = read_structure(known_structure)
+    processed_known_structure = refine_dir / "known_structure.pdb"
+    structure = read_structure(input_known_structure)
 
     if remove_known_chains:
         chains_to_remove = remove_known_chains
@@ -195,12 +197,22 @@ def prepare_known_structure(
             for chain_name in chains_to_remove:
                 model.remove_chain(chain_name)
 
+    # Unique numbers preserve residue identity when chains with overlapping IDs merge.
+    for model in structure:
+        for number, residue in enumerate((residue for chain in model for residue in chain), start=1):
+            residue.seqid = gemmi.SeqId(number, " ")
+
     chain_names = {chain.name for chain in chains_in_structure(structure)}
     for chain_name in chain_names - {out_chain}:
         structure.rename_chain(chain_name, out_chain)
 
-    write_structure(structure, known_structure_dest)
-    return known_structure_dest
+    original_known_structure = refine_dir / input_known_structure.name
+    if original_known_structure == processed_known_structure:
+        original_known_structure = refine_dir / "original" / input_known_structure.name
+        original_known_structure.parent.mkdir(exist_ok=True)
+    shutil.copy2(input_known_structure, original_known_structure)
+    write_structure(structure, processed_known_structure)
+    return processed_known_structure, original_known_structure
 
 
 def set_haddock3_log_level(log_level: int) -> None:

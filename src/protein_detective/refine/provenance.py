@@ -14,23 +14,15 @@ from protein_detective.provenance import command_arguments
 from protein_detective.refine.haddock import RefineOptions
 
 
-def refine_run_arguments_from_rocrate(
-    session_dir: Path, *, session_relative: bool = False
-) -> dict[str, tuple[str, str]]:
-    """Extract known structure paths and options from recorded invocations.
+def refine_run_arguments_from_rocrate(session_dir: Path) -> dict[str, str]:
+    """Extract command options from recorded refinement invocations.
 
     Args:
         session_dir: Session directory containing RO-Crate metadata.
-        session_relative: Express known structure paths relative to the session.
-            Use the action's recorded PWD when available. For older crates,
-            paired relative arguments use their recorded relationship; when only
-            the known argument is relative, metadata generation must run from
-            the original working directory.
 
     Returns:
-        Refinement run IDs mapped to known structure paths and command options,
-        excluding positional arguments. Paths retain the original argument unless
-        session_relative is set. Empty when the session has no RO-Crate metadata.
+        Refinement run IDs mapped to command options, excluding positional
+        arguments. Empty when the session has no RO-Crate metadata.
     """
     if not (session_dir / BASENAME).is_file():
         return {}
@@ -42,30 +34,24 @@ def refine_run_arguments_from_rocrate(
         }
         option_arity.update(
             dict.fromkeys(
-                ("--remove-known-chains", "--refine-run-id", "--powerfit-run-id", "--scheduler-address"), True
+                (
+                    "--remove-known-chains",
+                    "--refine-run-id",
+                    "--powerfit-run-id",
+                    "--scheduler-address",
+                ),
+                True,
             )
         )
         option_arity.update(dict.fromkeys(("--verbose", "--quiet", "-v", "-q"), False))
         parsed = command_arguments(action.id, ("protein-detective", "refine", "run"), option_arity)
         if parsed is None or len(parsed[0]) != 2:
             continue
-        (recorded_session_arg, known_structure), rest = parsed
-        if session_relative:
-            recorded_session = Path(recorded_session_arg)
-            known_path = Path(known_structure)
-            cwd = next((item["value"] for item in action.get("environment", []) if item.get("name") == "PWD"), None)
-            if cwd is not None:
-                base = Path(cwd) / recorded_session
-                known_path = Path(cwd) / known_path
-            else:
-                # Paired paths share the original invocation's coordinate system.
-                base = recorded_session if recorded_session.is_absolute() == known_path.is_absolute() else session_dir
-            known_structure = str(known_path.resolve().relative_to(base.resolve(), walk_up=True))
-        options = shlex.join(rest)
+        options = shlex.join(parsed[1])
         for result in action.get("result", []):
             parts = Path(result.id).parts
             if len(parts) >= 2 and parts[0] == "refine":
-                runs[parts[1]] = (known_structure, options)
+                runs[parts[1]] = options
     return runs
 
 
@@ -73,39 +59,50 @@ def write_refinement_ro_crate(
     *,
     session_dir: Path,
     start_time: datetime,
-    session_known_structure: Path,
-    known_structure: Path,
+    processed_known_structure: Path,
+    input_known_structure: Path,
     refined: list[tuple[Path, Path]],
     io_csv: Path,
     options: RefineOptions,
     remove_known_chains: set[str] | None,
     powerfit_run_id: str | None,
+    original_known_structure: Path | None = None,
 ):
     """Record refinement inputs, outputs and effective options in RO-Crate.
 
     Args:
         session_dir: Session directory in which to write RO-Crate metadata.
         start_time: Time at which the refinement invocation started.
-        session_known_structure: Prepared known structure inside the session.
-        known_structure: Original known structure used to prepare the partner.
+        processed_known_structure: Prepared known structure inside the session.
+        input_known_structure: Original known structure used to prepare the partner.
         refined: Fitted inputs paired with their refinement output directories.
         io_csv: Per-run index containing the input/output mapping.
         options: Effective HADDOCK3 refinement parameters.
         remove_known_chains: Original chain identifiers removed before renaming.
         powerfit_run_id: Selected source fitting run, or all runs when omitted.
+        original_known_structure: Unmodified known input saved inside the session.
     """
     ioargs = IOArgumentPaths(
         input_files=[
             IOArgumentPath(
-                name="known_structure",
-                path=session_known_structure,
+                name="processed_known_structure",
+                path=processed_known_structure,
                 help=(
-                    f"Known structure prepared from {known_structure.resolve()}; "
+                    f"Known structure prepared from {input_known_structure.resolve()}; "
                     f"removed chains {sorted(remove_known_chains or [])}; "
                     "renamed remaining chains to B."
                 ),
             ),
         ]
+        + (
+            [
+                IOArgumentPath(
+                    name="original_known_structure", path=original_known_structure, help="Original known input."
+                )
+            ]
+            if original_known_structure is not None
+            else []
+        )
         + [
             IOArgumentPath(
                 name=f"refined_{i}",

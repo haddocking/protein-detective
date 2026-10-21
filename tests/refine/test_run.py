@@ -116,11 +116,15 @@ def assert_refinement_results(session_dir: Path, expected_results: dict[str, pd.
 
 def assert_refinement_rocrate(session_dir: Path, known_structure: Path):
     expected_io_csv_lines = {
-        "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir",
-        "refine_run_001,run_001,powerfit/run_001/fakestructure.cif/fit_1.pdb,refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb",
+        "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir,original_known_structure,processed_known_structure",
+        (
+            "refine_run_001,run_001,powerfit/run_001/fakestructure.cif/fit_1.pdb,refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb,"
+            f"refine/refine_run_001/{known_structure.name},refine/refine_run_001/known_structure.pdb"
+        ),
     }
     crate_input_ids = {
         "refine/refine_run_001/known_structure.pdb",
+        f"refine/refine_run_001/{known_structure.name}",
         "powerfit/run_001/fakestructure.cif/fit_1.pdb",
     }
     crate_output_ids = {

@@ -25,8 +25,9 @@ def add_run(session: Path, clustered_refinement_results_paths: dict[str, Path], 
     run = session / "refine" / run_id / "run_001" / "protein" / "fit_1.pdb"
     run.mkdir(parents=True)
     (run.parents[2] / "io.csv").write_text(
-        "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
-        f"{run_id},run_001,powerfit/run_001/protein/fit_1.pdb,{run.relative_to(session)}\n"
+        "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir,original_known_structure,processed_known_structure\n"
+        f"{run_id},run_001,powerfit/run_001/protein/fit_1.pdb,{run.relative_to(session)},"
+        f"refine/{run_id}/known.pdb,refine/{run_id}/known_structure.pdb\n"
     )
     stage = run / "refinement/8_caprieval"
     stage.mkdir(parents=True)
@@ -321,7 +322,10 @@ def test_each_fitted_input_has_independent_clusters(
     second = first.parents[2] / "run_003/protein/fit_2.pdb"
     shutil.copytree(first, second)
     with (first.parents[2] / "io.csv").open("a") as fh:
-        fh.write(f"experiment,run_003,powerfit/run_003/protein/fit_2.pdb,{second.relative_to(tmp_path)}\n")
+        fh.write(
+            f"experiment,run_003,powerfit/run_003/protein/fit_2.pdb,{second.relative_to(tmp_path)},"
+            "refine/experiment/known.pdb,refine/experiment/known_structure.pdb\n"
+        )
     with (tmp_path / "powerfit/fitted_models.csv").open("a") as fh:
         fh.write("run_003,protein,2,powerfit/run_003/protein/fit_2.pdb\n")
     results = refinement_report(tmp_path, top=2)

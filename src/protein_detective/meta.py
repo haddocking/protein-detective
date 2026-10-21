@@ -590,48 +590,33 @@ def refinements_baseline(session_dir: Path) -> list[DDLStatement]:
     ]
 
 
-def refinements_runs_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
-    # parsing known structure from rocrate action id is too hard in duckdb,
-    # so we use Python shlex instead and use classical `CREATE TABLE` and `INSERT` statements.
-    runs = refine_run_arguments_from_rocrate(session_dir, session_relative=True)
-    if not runs:
-        return []
-    statements: list[DDLStatement] = [
-        (
-            """\
-        CREATE TABLE refinements_runs (
-            refine_run_id TEXT,
-            run_dir TEXT,
-            known_structure TEXT,
-            processed_known_structure TEXT,
-            options TEXT
-        )
+def refinement_runs_query(session_dir: Path) -> DDLStatement:
+    """Select recorded refinement runs and both known partner paths from IO indexes."""
+    arguments = refine_run_arguments_from_rocrate(session_dir)
+    return (
+        """
+        SELECT DISTINCT io.refine_run_id, 'refine/' || io.refine_run_id AS run_dir,
+            io.original_known_structure, io.processed_known_structure, options
+        FROM read_csv($indexes, all_varchar = true, union_by_name = true) io
+        INNER JOIN (
+            SELECT unnest($run_ids)::VARCHAR AS refine_run_id, unnest($options)::VARCHAR AS options
+        ) arguments USING (refine_run_id)
+        ORDER BY refine_run_id
         """,
-            {},
-        ),
-    ]
-    for refinement_run_id, (known_structure, options) in runs.items():
-        run_dir = Path("refine") / refinement_run_id
-        processed_known_structure = run_dir / "known_structure.pdb"
-        statements.append(
-            (
-                """\
-                INSERT INTO refinements_runs (
-                    refine_run_id, run_dir, known_structure, processed_known_structure, options
-                ) VALUES (
-                    $refine_run_id, $run_dir, $known_structure, $processed_known_structure, $options
-                )
-                """,
-                {
-                    "refine_run_id": refinement_run_id,
-                    "run_dir": str(run_dir),
-                    "known_structure": known_structure,
-                    "processed_known_structure": str(processed_known_structure),
-                    "options": options,
-                },
-            )
-        )
-    return statements
+        {
+            "indexes": str(session_dir / "refine/*/io.csv"),
+            "run_ids": list(arguments),
+            "options": list(arguments.values()),
+        },
+    )
+
+
+def refinements_runs_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+    """Join refinement IO indexes with recorded command options."""
+    if not refinement_run_io_paths(session_dir):
+        return []
+    query, parameters = refinement_runs_query(session_dir)
+    return [("CREATE TABLE refinements_runs AS\n" + query, parameters)]
 
 
 def refinement_tables(session_dir: Path) -> list[DDLStatement]:

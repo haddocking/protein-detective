@@ -61,8 +61,9 @@ def refinement_run(session_with_powerfit_results: Path) -> Path:
     run_dir.mkdir(parents=True)
     refinement_run = "refine/experiment/run_003/same_structure/fit_1.pdb"
     (run_dir / "io.csv").write_text(
-        "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir\n"
-        f"experiment,run_003,powerfit/run_003/same_structure/fit_1.pdb,{refinement_run}\n"
+        "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir,original_known_structure,processed_known_structure\n"
+        f"experiment,run_003,powerfit/run_003/same_structure/fit_1.pdb,{refinement_run},"
+        "refine/experiment/known partner.pdb,refine/experiment/known_structure.pdb\n"
     )
     return run_dir
 
@@ -70,6 +71,12 @@ def refinement_run(session_with_powerfit_results: Path) -> Path:
 def test_list_runs_options_and_read_only_crate(
     session_with_powerfit_results: Path, tmp_path: Path, refinement_run: Path
 ):
+    index = refinement_run / "io.csv"
+    header, row = index.read_text().splitlines()
+    index.write_text(f"{header}\n{row}\n{row}\n")
+    second = refinement_run.with_name("second")
+    second.mkdir()
+    (second / "io.csv").write_text(f"{header}\n{row.replace('experiment', 'second')}\n")
     options = "--refine-run-id experiment --rigidbody-sampling 10"
     known_structure = "known partner.pdb"
     crate = ROCrate()
@@ -89,7 +96,7 @@ def test_list_runs_options_and_read_only_crate(
         )
     )
     crate.write(session_with_powerfit_results)
-    listing = tmp_path / "runs.csv"
+    listing = tmp_path / "runs' listing.csv"
     crate_bytes = (session_with_powerfit_results / BASENAME).read_bytes()
 
     cli(["refine", "list-runs", str(session_with_powerfit_results), "--output", str(listing)])
@@ -98,8 +105,9 @@ def test_list_runs_options_and_read_only_crate(
     assert read_csv(listing) == [
         {
             "refine_run_id": "experiment",
-            "run_dir": str(refinement_run),
-            "known_structure": known_structure,
+            "run_dir": "refine/experiment",
+            "original_known_structure": "refine/experiment/known partner.pdb",
+            "processed_known_structure": "refine/experiment/known_structure.pdb",
             "options": options,
         }
     ]
@@ -111,11 +119,26 @@ def test_list_runs_without_crate(session_with_powerfit_results: Path, tmp_path: 
     cli(["refine", "list-runs", str(session_with_powerfit_results), "--output", str(listing)])
 
     assert not (session_with_powerfit_results / BASENAME).exists()
-    assert read_csv(listing) == [
-        {
-            "refine_run_id": "experiment",
-            "run_dir": str(refinement_run),
-            "known_structure": "",
-            "options": "",
-        }
-    ]
+    assert read_csv(listing) == []
+
+
+@pytest.mark.parametrize("output_args", [[], ["--output", "-"]])
+def test_list_runs_stdout(
+    session_with_powerfit_results: Path, refinement_run: Path, capfd: pytest.CaptureFixture[str], output_args: list[str]
+):
+    crate = ROCrate()
+    result = crate.add_file(refinement_run / "io.csv", dest_path="refine/experiment/io.csv")
+    crate.add(
+        ContextEntity(
+            crate,
+            "protein-detective refine run session known.pdb",
+            properties={"@type": "CreateAction", "result": [result]},
+        )
+    )
+    crate.write(session_with_powerfit_results)
+    cli(["refine", "list-runs", str(session_with_powerfit_results), *output_args])
+
+    assert capfd.readouterr().out == (
+        "refine_run_id,run_dir,original_known_structure,processed_known_structure,options\n"
+        'experiment,refine/experiment,refine/experiment/known partner.pdb,refine/experiment/known_structure.pdb,""\n'
+    )
