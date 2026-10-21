@@ -11,19 +11,19 @@ from protein_detective.refine.haddock import (
     RefineOptions,
     generate_haddock3_config_body,
     generate_unrefined_config_body,
-    prepare_fitted_and_fixed,
-    prepare_fixed_structure,
+    prepare_fitted_and_known,
+    prepare_known_structure,
     set_haddock3_log_level,
 )
 
 
 def test_baseline_complex_preserves_coordinates_and_chains(
-    tmp_path: Path, fitted_structure: Path, fixed_structure: Path
+    tmp_path: Path, fitted_structure: Path, known_structure: Path
 ):
-    result = read_structure(prepare_fitted_and_fixed(fitted_structure, fixed_structure, tmp_path))
+    result = read_structure(prepare_fitted_and_known(fitted_structure, known_structure, tmp_path))
     assert [chain.name for chain in result[0]] == ["A", "B"]
     for chain, source in zip(
-        result[0], (read_structure(fitted_structure)[0], read_structure(fixed_structure)[0]), strict=True
+        result[0], (read_structure(fitted_structure)[0], read_structure(known_structure)[0]), strict=True
     ):
         actual = [(atom.name, (atom.pos.x, atom.pos.y, atom.pos.z)) for residue in chain for atom in residue]
         expected = [
@@ -35,24 +35,24 @@ def test_baseline_complex_preserves_coordinates_and_chains(
         assert actual == expected
 
 
-@pytest.mark.parametrize("partner,chain_name", [("fitted", "Z"), ("fixed", "A")])
+@pytest.mark.parametrize("partner,chain_name", [("fitted", "Z"), ("known", "A")])
 def test_baseline_rejects_wrong_chains(
-    tmp_path: Path, fitted_structure: Path, fixed_structure: Path, partner: str, chain_name: str
+    tmp_path: Path, fitted_structure: Path, known_structure: Path, partner: str, chain_name: str
 ):
-    inputs = {"fitted": fitted_structure, "fixed": fixed_structure}
+    inputs = {"fitted": fitted_structure, "known": known_structure}
     structure = read_structure(inputs[partner])
     structure[0][0].name = chain_name
     wrong = tmp_path / "wrong.pdb"
     write_structure(structure, wrong)
     inputs[partner] = wrong
     with pytest.raises(ValueError, match="must contain only chain"):
-        prepare_fitted_and_fixed(inputs["fitted"], inputs["fixed"], tmp_path)
-    assert not (tmp_path / "fitted-and-fixed.pdb").exists()
+        prepare_fitted_and_known(inputs["fitted"], inputs["known"], tmp_path)
+    assert not (tmp_path / "fitted-and-known.pdb").exists()
 
 
 def test_baseline_configuration(tmp_path: Path):
     run = tmp_path / "baseline"
-    complex_file = run / "fitted-and-fixed.pdb"
+    complex_file = run / "fitted-and-known.pdb"
     config = generate_unrefined_config_body(run, complex_file, 3)
     assert config == dedent(f"""\
         run_dir = "{run}"
@@ -72,20 +72,20 @@ def test_baseline_configuration(tmp_path: Path):
 
 
 @pytest.fixture
-def workflow_config(tmp_path: Path, fitted_structure: Path, fixed_structure: Path, workflow_name: str) -> Path:
+def workflow_config(tmp_path: Path, fitted_structure: Path, known_structure: Path, workflow_name: str) -> Path:
     inputs = tmp_path / "inputs"
     inputs.mkdir()
     fitted = inputs / "fitted.pdb"
     write_structure(read_structure(fitted_structure), fitted)
-    fixed = prepare_fixed_structure(fixed_structure, inputs)
+    known = prepare_known_structure(known_structure, inputs)
     run_dir = tmp_path / workflow_name
     run_dir.mkdir()
     config = run_dir / "workflow.cfg"
     if workflow_name == "baseline":
-        complex_file = prepare_fitted_and_fixed(fitted, fixed, run_dir)
+        complex_file = prepare_fitted_and_known(fitted, known, run_dir)
         body = generate_unrefined_config_body(run_dir, complex_file, 1)
     else:
-        body = generate_haddock3_config_body(run_dir, fitted, fixed, RefineOptions())
+        body = generate_haddock3_config_body(run_dir, fitted, known, RefineOptions())
     config.write_text(body)
     return config
 
@@ -99,21 +99,21 @@ def test_workflow_setup_with_config_inside_run_directory(workflow_config: Path, 
     assert "topoaa.1" in modules
 
 
-class TestPrepareFixedStructure:
-    @pytest.mark.parametrize("remove_fixed_chains", [{"B"}, {"A", "C"}, set()])
+class TestPrepareKnownStructure:
+    @pytest.mark.parametrize("remove_known_chains", [{"B"}, {"A", "C"}, set()])
     def test_removes_original_chains_before_renaming(
-        self, tmp_path: Path, cif_1gru: Path, remove_fixed_chains: set[str]
+        self, tmp_path: Path, cif_1gru: Path, remove_known_chains: set[str]
     ):
         original = read_structure(cif_1gru)
         expected_atom_count = sum(
             len(residue)
             for model in original
             for chain in model
-            if chain.name not in remove_fixed_chains
+            if chain.name not in remove_known_chains
             for residue in chain
         )
 
-        result = read_structure(prepare_fixed_structure(cif_1gru, tmp_path, remove_fixed_chains=remove_fixed_chains))
+        result = read_structure(prepare_known_structure(cif_1gru, tmp_path, remove_known_chains=remove_known_chains))
 
         assert len(result) == len(original)
         assert {chain.name for chain in chains_in_structure(result)} == {"B"}
@@ -121,39 +121,39 @@ class TestPrepareFixedStructure:
 
     def test_rejects_missing_chain(self, tmp_path: Path, cif_1gru: Path):
         with pytest.raises(ValueError, match=r"Chains not found.*X"):
-            prepare_fixed_structure(cif_1gru, tmp_path, remove_fixed_chains={"X"})
+            prepare_known_structure(cif_1gru, tmp_path, remove_known_chains={"X"})
 
-        assert not (tmp_path / "fixed_structure.pdb").exists()
+        assert not (tmp_path / "known_structure.pdb").exists()
 
     def test_rejects_removing_all_chains(self, tmp_path: Path, cif_1gru: Path):
         all_chains = {chain.name for chain in chains_in_structure(read_structure(cif_1gru))}
 
         with pytest.raises(ValueError, match="Cannot remove all chains"):
-            prepare_fixed_structure(cif_1gru, tmp_path, remove_fixed_chains=all_chains)
+            prepare_known_structure(cif_1gru, tmp_path, remove_known_chains=all_chains)
 
-        assert not (tmp_path / "fixed_structure.pdb").exists()
+        assert not (tmp_path / "known_structure.pdb").exists()
 
     def test_renames_all_chains_to_b(self, tmp_path: Path, cif_1gru: Path):
         refine_dir = tmp_path / "refine"
         refine_dir.mkdir()
 
-        fixed_structure = prepare_fixed_structure(cif_1gru, refine_dir)
+        known_structure = prepare_known_structure(cif_1gru, refine_dir)
 
-        result_chains = [c.name for c in chains_in_structure(read_structure(fixed_structure))]
+        result_chains = [c.name for c in chains_in_structure(read_structure(known_structure))]
 
-        assert fixed_structure == refine_dir / "fixed_structure.pdb"
-        assert fixed_structure.exists()
+        assert known_structure == refine_dir / "known_structure.pdb"
+        assert known_structure.exists()
         assert result_chains == ["B"]
 
     def test_renames_all_chains_to_custom_out_chain(self, tmp_path: Path, cif_1gru: Path):
         refine_dir = tmp_path / "refine"
         refine_dir.mkdir()
 
-        fixed_structure = prepare_fixed_structure(cif_1gru, refine_dir, out_chain="Z")
+        known_structure = prepare_known_structure(cif_1gru, refine_dir, out_chain="Z")
 
-        result_chains = {c.name for c in chains_in_structure(read_structure(fixed_structure))}
+        result_chains = {c.name for c in chains_in_structure(read_structure(known_structure))}
 
-        assert fixed_structure == refine_dir / "fixed_structure.pdb"
+        assert known_structure == refine_dir / "known_structure.pdb"
         assert result_chains == {"Z"}
 
     def test_input_has_multiple_chains(self, cif_1gru: Path):
@@ -166,7 +166,7 @@ class TestGenerateHaddock3ConfigBody:
     def test_custom_options(self, tmp_path: Path):
         run_dir = tmp_path / "refine" / "run_001"
         fitted_model = tmp_path / "powerfit" / "run_001" / "model.cif.gz" / "fit_1.pdb"
-        fixed_structure = tmp_path / "fixed_structure.pdb"
+        known_structure = tmp_path / "known_structure.pdb"
         options = RefineOptions(
             rigidbody_sampling=42,
             top_clusters=3,
@@ -186,7 +186,7 @@ class TestGenerateHaddock3ConfigBody:
 
             molecules = [
                 "{fitted_model}",
-                "{fixed_structure}"
+                "{known_structure}"
             ]
 
             [topoaa]
@@ -222,14 +222,14 @@ class TestGenerateHaddock3ConfigBody:
             [caprieval]
         """)
 
-        config = generate_haddock3_config_body(run_dir, fitted_model, fixed_structure, options)
+        config = generate_haddock3_config_body(run_dir, fitted_model, known_structure, options)
 
         assert config == expected
 
     def test_default_options(self, tmp_path: Path):
         run_dir = tmp_path / "refine" / "run_001"
         fitted_model = tmp_path / "fit_1.pdb"
-        fixed_structure = tmp_path / "fixed_structure.pdb"
+        known_structure = tmp_path / "known_structure.pdb"
         options = RefineOptions()
 
         expected = dedent(f"""\
@@ -241,7 +241,7 @@ class TestGenerateHaddock3ConfigBody:
 
             molecules = [
                 "{fitted_model}",
-                "{fixed_structure}"
+                "{known_structure}"
             ]
 
             [topoaa]
@@ -277,7 +277,7 @@ class TestGenerateHaddock3ConfigBody:
             [caprieval]
         """)
 
-        config = generate_haddock3_config_body(run_dir, fitted_model, fixed_structure, options)
+        config = generate_haddock3_config_body(run_dir, fitted_model, known_structure, options)
 
         assert config == expected
 

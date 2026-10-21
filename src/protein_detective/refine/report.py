@@ -149,7 +149,7 @@ def refinement_report(
     - cluster_score_std: capri_clt.tsv column score_std.
     - modelcluster_ranking: capri_ss.tsv column modelcluster_ranking.
     - refined_score: capri_ss.tsv column score.
-    - unrefined_score: CAPRI score of unrefined structure and the fixed structure.
+    - unrefined_score: CAPRI score of unrefined structure and the known structure.
     - refined_structure_path: corrected (+.gz) capri_ss.tsv column model, prefixed with session_dir.
     - fitted_model: source input path from refine/*/io.csv column fitted_model,
       matched to fitted_models.csv column fitted_model_file.

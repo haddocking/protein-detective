@@ -212,7 +212,7 @@ export function StructureViewer({
         const parts = refined
           ? [
               { chain: "A", name: "Candidate (chain A)", color: 0x2c7fb8 },
-              { chain: "B", name: "Fixed partner (chain B)", color: 0xe89c36 },
+              { chain: "B", name: "Known partner (chain B)", color: 0xe89c36 },
             ]
           : [{ chain: "", name: label, color: 0x2c7fb8 }];
         for (const part of parts) {
@@ -318,7 +318,7 @@ export function StructureViewer({
   return (
     <section className="molecular-viewer" aria-label="3D structure viewer">
       <p className="muted">
-        Candidate in blue{refined ? "; fixed partner in orange (both from the refined file)" : ""}.
+        Candidate in blue{refined ? "; known partner in orange (both from the refined file)" : ""}.
         Density contour is in standard deviations (σ).
       </p>
       {status && <p role="status">{status}</p>}
@@ -356,7 +356,7 @@ export function StructureViewer({
                 visibility(1, event.target.checked);
               }}
             />
-            Fixed partner
+            Known partner
           </label>
         )}
         <label>

@@ -442,8 +442,8 @@ class DashboardData:
         with self._connect() as con:
             return self._fitting(con)
 
-    def _fixed_structure_path(self, recorded: Any) -> str | None:
-        # The original fixed partner can be outside the session. This path
+    def _known_structure_path(self, recorded: Any) -> str | None:
+        # The original known partner can be outside the session. This path
         # is only a local link; it does not grant access via /files/.
         if not isinstance(recorded, str) or not recorded:
             return None
@@ -489,7 +489,7 @@ class DashboardData:
                 m.score - b.score AS score_change,
                 pr.used_target,
                 r.options AS refinement_options,
-                r.fixed_structure
+                r.known_structure
             FROM refinements_capri_ss m
             LEFT JOIN refinements_io io ON m.refine_run_dir = io.refine_run_dir
             LEFT JOIN (SELECT DISTINCT * FROM fitted_models) fm ON io.fitted_model = fm.fitted_model_file
@@ -505,7 +505,7 @@ class DashboardData:
         )
         for row in rows:
             self._viewer(row, row["refined_structure_path"])
-            row["fixed_structure_absolute_path"] = self._fixed_structure_path(row.get("fixed_structure"))
+            row["known_structure_absolute_path"] = self._known_structure_path(row.get("known_structure"))
         return rows
 
     def refinements(self) -> list[dict[str, Any]]:

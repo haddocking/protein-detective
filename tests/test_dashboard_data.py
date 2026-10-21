@@ -36,8 +36,8 @@ def session(tmp_path: Path):
                 ('fit-a','a.cif.gz',1,'powerfit/fit-a/a.cif.gz/fit_1.pdb')
             ) t(powerfit_run_id, structure, rank, fitted_model_file);
             CREATE TABLE refinements_runs AS SELECT * FROM (VALUES
-                ('refine-a','--first', 'fixed.pdb'), ('refine-b','--second', 'fixed.pdb')
-            ) t(refine_run_id, options, fixed_structure);
+                ('refine-a','--first', 'known.pdb'), ('refine-b','--second', 'known.pdb')
+            ) t(refine_run_id, options, known_structure);
             CREATE TABLE refinements_io AS SELECT * FROM (VALUES
                 ('refine-a','powerfit/fit-a/a.cif.gz/fit_1.pdb','refine/refine-a/input'),
                 ('refine-b','powerfit/fit-a/a.cif.gz/fit_1.pdb','refine/refine-b/input')
@@ -439,19 +439,19 @@ def test_absolute_paths_follow_relocated_session(session: Path, recorded_prefix:
     assert row["density_absolute_path"] == str(relocated / "powerfit/fit-a/map.mrc")
 
 
-@pytest.mark.parametrize("template", ["fixed partner #1.pdb", "../fixed partner #1.pdb", "{root}/fixed partner #1.pdb"])
-def test_refinement_fixed_structure_link(session: Path, template: str):
+@pytest.mark.parametrize("template", ["known partner #1.pdb", "../known partner #1.pdb", "{root}/known partner #1.pdb"])
+def test_refinement_known_structure_link(session: Path, template: str):
     recorded = template.format(root=session.parent)
-    fixed = (session / recorded).resolve()
-    fixed.write_text("example")
+    known = (session / recorded).resolve()
+    known.write_text("example")
     with duckdb.connect(str(session / "meta.duckdb")) as con:
-        con.execute("UPDATE refinements_runs SET fixed_structure = ?", [recorded])
+        con.execute("UPDATE refinements_runs SET known_structure = ?", [recorded])
     rows = DashboardData(session).refinements()
-    assert all(row["fixed_structure_absolute_path"] == str(fixed) for row in rows)
+    assert all(row["known_structure_absolute_path"] == str(known) for row in rows)
 
 
-def test_missing_refinement_fixed_structure_has_no_link(session: Path):
-    assert all(row["fixed_structure_absolute_path"] is None for row in DashboardData(session).refinements())
+def test_missing_refinement_known_structure_has_no_link(session: Path):
+    assert all(row["known_structure_absolute_path"] is None for row in DashboardData(session).refinements())
 
 
 @pytest.mark.parametrize(

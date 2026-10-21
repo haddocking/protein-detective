@@ -40,7 +40,7 @@ def add_run(session: Path, clustered_refinement_results_paths: dict[str, Path], 
     crate.root_dataset.append_to("hasPart", result)
     crate.add_action(
         instrument={"@id": "protein-detective"},
-        identifier=f"protein-detective refine run session fixed.pdb --refine-run-id {run_id}",
+        identifier=f"protein-detective refine run session known.pdb --refine-run-id {run_id}",
         result=[result],
     )
     crate.write(session)

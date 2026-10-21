@@ -14,7 +14,7 @@ be built.
   refinement, and RO-Crate tables through `protein-detective meta SESSION_DIR`.
 - Refinement metadata now includes independent refinement run IDs, source
   PowerFit run IDs, input/output mappings, final model scores, cluster
-  summaries, baseline scores, and fixed structure paths/options recorded in
+  summaries, baseline scores, and known structure paths/options recorded in
   RO-Crate.
 - `src/protein_detective/refine/report.py` joins those refinement sources with
   PowerFit metadata in an in-memory DuckDB connection. It provides the reference
@@ -114,7 +114,7 @@ for development and validation. Its `meta.duckdb` contains:
 
 Only the 12 saved fitted structures can be viewed initially; the remaining
 fitting solutions still support inspection, filtering, and CSV export. Refined
-structure files already contain both the candidate and fixed partner. The
+structure files already contain both the candidate and known partner. The
 tutorial's PowerFit density map is `powerfit/emd0683/emd_0683-without-rks1.mrc`,
 relative to the session directory.
 
@@ -316,9 +316,9 @@ system.
 - Load large files on demand.
 - Resolve recorded paths against the supplied session directory.
 - Use `refinements_capri_ss.refined_structure_path` for cleaned, compressed PDB
-  outputs. Those refined files already contain the candidate and fixed partner;
+  outputs. Those refined files already contain the candidate and known partner;
   display them with distinct colors and independent visibility toggles. Do not
-  also load `refinements_runs.processed_fixed_structure`, which would duplicate
+  also load `refinements_runs.processed_known_structure`, which would duplicate
   the partner.
 - Require the density map associated with the source PowerFit run, including for
   refined structures. Join the run's recorded provenance inputs and outputs to

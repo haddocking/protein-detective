@@ -39,33 +39,33 @@ class RefineOptions:
     fcc_clust_cutoff: float = 0.60
 
 
-def prepare_fitted_and_fixed(fitted_model: Path, fixed_structure: Path, output_dir: Path) -> Path:
-    """Combine fitted chain A and fixed chain B without transforming coordinates.
+def prepare_fitted_and_known(fitted_model: Path, known_structure: Path, output_dir: Path) -> Path:
+    """Combine fitted chain A and known chain B without transforming coordinates.
 
     Args:
         fitted_model: Fitted structure containing only chain A.
-        fixed_structure: Prepared fixed structure containing only chain B.
+        known_structure: Prepared known structure containing only chain B.
         output_dir: Directory in which to write the combined structure.
 
     Returns:
-        Path to fitted-and-fixed.pdb.
+        Path to fitted-and-known.pdb.
 
     Raises:
         ValueError: An input has multiple models or unexpected chains.
     """
     structure = read_structure(fitted_model)
-    fixed = read_structure(fixed_structure)
-    if len(structure) != 1 or len(fixed) != 1:
-        msg = "Baseline scoring requires single-model fitted and fixed structures."
+    known = read_structure(known_structure)
+    if len(structure) != 1 or len(known) != 1:
+        msg = "Baseline scoring requires single-model fitted and known structures."
         raise ValueError(msg)
     if [chain.name for chain in structure[0]] != ["A"]:
         msg = "Fitted structure must contain only chain A."
         raise ValueError(msg)
-    if [chain.name for chain in fixed[0]] != ["B"]:
-        msg = "Fixed structure must contain only chain B."
+    if [chain.name for chain in known[0]] != ["B"]:
+        msg = "Known structure must contain only chain B."
         raise ValueError(msg)
-    structure[0].add_chain(fixed[0]["B"].clone())
-    output = output_dir / "fitted-and-fixed.pdb"
+    structure[0].add_chain(known[0]["B"].clone())
+    output = output_dir / "fitted-and-known.pdb"
     write_structure(structure, output)
     return output
 
@@ -75,7 +75,7 @@ def generate_unrefined_config_body(run_dir: Path, complex_file: Path, ncores: in
 
     Args:
         run_dir: HADDOCK3 scoring output directory.
-        complex_file: Combined fitted and fixed structure file.
+        complex_file: Combined fitted and known structure file.
         ncores: Number of CPU cores to use.
 
     Returns:
@@ -99,14 +99,14 @@ def generate_unrefined_config_body(run_dir: Path, complex_file: Path, ncores: in
 
 
 def generate_haddock3_config_body(
-    run_dir: Path, fitted_model: Path, fixed_structure: Path, options: RefineOptions
+    run_dir: Path, fitted_model: Path, known_structure: Path, options: RefineOptions
 ) -> str:
     """Generate the configuration body for a HADDOCK3 refinement run.
 
     Args:
         run_dir: Path of the HADDOCK3 run directory.
         fitted_model: Path to the fitted model file.
-        fixed_structure: Path to the fixed structure file.
+        known_structure: Path to the known structure file.
         options: Refinement parameters for HADDOCK3.
 
     Returns:
@@ -121,7 +121,7 @@ def generate_haddock3_config_body(
 
         molecules = [
             "{fitted_model}",
-            "{fixed_structure}"
+            "{known_structure}"
         ]
 
         [topoaa]
@@ -158,38 +158,38 @@ def generate_haddock3_config_body(
         """)
 
 
-def prepare_fixed_structure(
-    fixed_structure: Path, refine_dir: Path, out_chain: str = "B", *, remove_fixed_chains: set[str] | None = None
+def prepare_known_structure(
+    known_structure: Path, refine_dir: Path, out_chain: str = "B", *, remove_known_chains: set[str] | None = None
 ) -> Path:
-    """Prepare the fixed structure for refinement.
+    """Prepare the known structure for refinement.
 
     By removing selected chains, converting it to PDB format and renaming chains if necessary.
 
     Args:
-        fixed_structure: Path to the fixed structure file.
+        known_structure: Path to the known structure file.
         refine_dir: Directory where the refined structure will be saved.
         out_chain: The chain identifier to rename to if necessary.
-        remove_fixed_chains: Original chain identifiers to remove from every model before renaming.
+        remove_known_chains: Original chain identifiers to remove from every model before renaming.
             For mmCIF inputs, use author chain identifiers (auth_asym_id).
 
     Returns:
-        Path to the prepared fixed structure in PDB format.
+        Path to the prepared known structure in PDB format.
 
     Raises:
         ValueError: A requested chain is missing or all chains would be removed.
     """
-    fixed_structure_dest = refine_dir / "fixed_structure.pdb"
-    structure = read_structure(fixed_structure)
+    known_structure_dest = refine_dir / "known_structure.pdb"
+    structure = read_structure(known_structure)
 
-    if remove_fixed_chains:
-        chains_to_remove = remove_fixed_chains
+    if remove_known_chains:
+        chains_to_remove = remove_known_chains
         chain_names = {chain.name for chain in chains_in_structure(structure)}
         missing_chains = chains_to_remove - chain_names
         if missing_chains:
-            msg = f"Chains not found in fixed structure: {', '.join(sorted(missing_chains))}"
+            msg = f"Chains not found in known structure: {', '.join(sorted(missing_chains))}"
             raise ValueError(msg)
         if not chain_names - chains_to_remove:
-            msg = "Cannot remove all chains from the fixed structure."
+            msg = "Cannot remove all chains from the known structure."
             raise ValueError(msg)
         for model in structure:
             for chain_name in chains_to_remove:
@@ -199,8 +199,8 @@ def prepare_fixed_structure(
     for chain_name in chain_names - {out_chain}:
         structure.rename_chain(chain_name, out_chain)
 
-    write_structure(structure, fixed_structure_dest)
-    return fixed_structure_dest
+    write_structure(structure, known_structure_dest)
+    return known_structure_dest
 
 
 def set_haddock3_log_level(log_level: int) -> None:

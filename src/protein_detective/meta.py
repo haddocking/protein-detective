@@ -591,7 +591,7 @@ def refinements_baseline(session_dir: Path) -> list[DDLStatement]:
 
 
 def refinements_runs_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
-    # parsing fixed structure from rocrate action id is too hard in duckdb,
+    # parsing known structure from rocrate action id is too hard in duckdb,
     # so we use Python shlex instead and use classical `CREATE TABLE` and `INSERT` statements.
     runs = refine_run_arguments_from_rocrate(session_dir, session_relative=True)
     if not runs:
@@ -602,31 +602,31 @@ def refinements_runs_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
         CREATE TABLE refinements_runs (
             refine_run_id TEXT,
             run_dir TEXT,
-            fixed_structure TEXT,
-            processed_fixed_structure TEXT,
+            known_structure TEXT,
+            processed_known_structure TEXT,
             options TEXT
         )
         """,
             {},
         ),
     ]
-    for refinement_run_id, (fixed_structure, options) in runs.items():
+    for refinement_run_id, (known_structure, options) in runs.items():
         run_dir = Path("refine") / refinement_run_id
-        processed_fixed_structure = run_dir / "fixed_structure.pdb"
+        processed_known_structure = run_dir / "known_structure.pdb"
         statements.append(
             (
                 """\
                 INSERT INTO refinements_runs (
-                    refine_run_id, run_dir, fixed_structure, processed_fixed_structure, options
+                    refine_run_id, run_dir, known_structure, processed_known_structure, options
                 ) VALUES (
-                    $refine_run_id, $run_dir, $fixed_structure, $processed_fixed_structure, $options
+                    $refine_run_id, $run_dir, $known_structure, $processed_known_structure, $options
                 )
                 """,
                 {
                     "refine_run_id": refinement_run_id,
                     "run_dir": str(run_dir),
-                    "fixed_structure": fixed_structure,
-                    "processed_fixed_structure": str(processed_fixed_structure),
+                    "known_structure": known_structure,
+                    "processed_known_structure": str(processed_known_structure),
                     "options": options,
                 },
             )

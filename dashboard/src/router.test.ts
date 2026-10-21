@@ -111,7 +111,7 @@ it("authenticates a direct provenance link and keeps its selected result across 
         ...fitting[0],
         id: "refined-1",
         refine_run_id: "refine-1",
-        fixed_structure_absolute_path: "/other files/fixed #1.pdb",
+        known_structure_absolute_path: "/other files/known #1.pdb",
       },
     ],
   };
@@ -243,7 +243,7 @@ it("authenticates a direct provenance link and keeps its selected result across 
       });
     });
     const copyButtons = container.querySelectorAll<HTMLButtonElement>(".file-paths button");
-    expect(copyButtons[2]?.title).toBe("/other files/fixed #1.pdb");
+    expect(copyButtons[2]?.title).toBe("/other files/known #1.pdb");
     for (const button of copyButtons) {
       await act(async () => button.click());
       expect(writeText).toHaveBeenLastCalledWith(button.title);

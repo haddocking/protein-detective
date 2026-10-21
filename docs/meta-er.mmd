@@ -180,8 +180,8 @@ erDiagram
     "refinements_runs" {
       VARCHAR refine_run_id PK
       VARCHAR run_dir
-      VARCHAR fixed_structure
-      VARCHAR processed_fixed_structure
+      VARCHAR known_structure
+      VARCHAR processed_known_structure
       VARCHAR options
     }
     "refinements_runs" ||--o{ "refinements_io" : "refine_run_id = refine_run_id"

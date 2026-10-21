@@ -56,7 +56,7 @@ anonymous CORS. **Internet access is required for the first 3D viewer
 download**; tables, filters, details, export, and provenance work without it. A
 blocked download shows a Retry viewer action. Structures and density maps stay
 on the authenticated local server. Refined models already include the candidate
-(chain A, blue) and fixed partner (chain B, orange), each with a visibility
+(chain A, blue) and known partner (chain B, orange), each with a visibility
 toggle. Density controls adjust visibility, opacity, and contour in standard
 deviations; Reset camera frames the scene again.
 

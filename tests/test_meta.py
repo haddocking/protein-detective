@@ -745,27 +745,27 @@ def test_generated_path_columns_are_session_relative(
 
 
 @pytest.mark.parametrize(
-    "fixed_kind", ["absolute_internal", "absolute_external", "relative_internal", "relative_external"]
+    "known_kind", ["absolute_internal", "absolute_external", "relative_internal", "relative_external"]
 )
 @pytest.mark.parametrize("options_first", [False, True])
 @pytest.mark.parametrize("record_cwd", [False, True])
-def test_refinement_fixed_structure_is_relative_to_session(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fixed_kind: str, options_first: bool, record_cwd: bool
+def test_refinement_known_structure_is_relative_to_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, known_kind: str, options_first: bool, record_cwd: bool
 ):
     monkeypatch.chdir(tmp_path)
     session = tmp_path / "session with spaces"
     session.mkdir()
-    internal = fixed_kind.endswith("internal")
-    fixed = session / "fixed partner.pdb" if internal else tmp_path / "external partner.pdb"
-    fixed.write_text("END\n")
-    argument = str(fixed if fixed_kind.startswith("absolute") else fixed.relative_to(tmp_path))
+    internal = known_kind.endswith("internal")
+    known = session / "known partner.pdb" if internal else tmp_path / "external partner.pdb"
+    known.write_text("END\n")
+    argument = str(known if known_kind.startswith("absolute") else known.relative_to(tmp_path))
     options = "--refine-run-id example"
     session_argument = str(session) if record_cwd else session.name
     positionals = f"{shlex.quote(session_argument)} {shlex.quote(argument)}"
     arguments = f"{options} {positionals}" if options_first else f"{positionals} {options}"
     command = f"protein-detective refine run {arguments}"
     crate = ROCrate()
-    result = crate.add_file(fixed, dest_path="refine/example/fixed_structure.pdb")
+    result = crate.add_file(known, dest_path="refine/example/known_structure.pdb")
     action = ContextEntity(crate, command, properties={"@type": "CreateAction", "result": [result]})
     crate.add(action)
     pwd = crate.add(
@@ -779,8 +779,8 @@ def test_refinement_fixed_structure_is_relative_to_session(
     monkeypatch.chdir(session)
     with duckdb.connect() as con:
         execute_ddl_statements(con, refinements_runs_as_duckdb_ddl(Path()))
-        assert con.execute("SELECT fixed_structure, options FROM refinements_runs").fetchall() == [
-            ("fixed partner.pdb" if internal else "../external partner.pdb", options)
+        assert con.execute("SELECT known_structure, options FROM refinements_runs").fetchall() == [
+            ("known partner.pdb" if internal else "../external partner.pdb", options)
         ]
     assert (session / "ro-crate-metadata.json").read_bytes() == crate_bytes
 
@@ -793,7 +793,7 @@ def test_recorded_parent_relative_paths_do_not_depend_on_generation_cwd(
     external = tmp_path / "external.pdb"
     external.write_text("END\n")
     crate = ROCrate()
-    result = crate.add_file(external, dest_path="refine/example/fixed_structure.pdb")
+    result = crate.add_file(external, dest_path="refine/example/known_structure.pdb")
     crate.add(
         ContextEntity(
             crate,
@@ -805,7 +805,7 @@ def test_recorded_parent_relative_paths_do_not_depend_on_generation_cwd(
     monkeypatch.chdir(session)
     with duckdb.connect() as con:
         execute_ddl_statements(con, refinements_runs_as_duckdb_ddl(Path()))
-        assert con.execute("SELECT fixed_structure FROM refinements_runs").fetchall() == [("../external.pdb",)]
+        assert con.execute("SELECT known_structure FROM refinements_runs").fetchall() == [("../external.pdb",)]
 
 
 def test_single_chain_stats_is_loaded_with_paths_and_rejected_rows(tmp_path: Path):
