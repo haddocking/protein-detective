@@ -194,7 +194,7 @@ export interface FittingResult extends StructureResult {
 }
 
 export interface RefinementResult extends StructureResult {
-  known_structure_absolute_path: string | null;
+  original_known_structure_absolute_path: string | null;
   refine_run_id: string;
   refine_run_dir: string;
   fitted_model: string;

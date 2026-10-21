@@ -107,8 +107,10 @@ class DashboardData:
         return {row[0] for row in con.execute("SHOW TABLES").fetchall()}
 
     @staticmethod
-    def _query(con: duckdb.DuckDBPyConnection, sql: str) -> list[dict[str, Any]]:
-        cursor = con.execute(sql)
+    def _query(
+        con: duckdb.DuckDBPyConnection, sql: str, parameters: dict[str, str] | None = None
+    ) -> list[dict[str, Any]]:
+        cursor = con.execute(sql, parameters)
         names = [column[0] for column in (cursor.description or [])]
         return [dict(zip(names, _normalize_json(row), strict=True)) for row in cursor.fetchall()]
 
@@ -442,17 +444,6 @@ class DashboardData:
         with self._connect() as con:
             return self._fitting(con)
 
-    def _known_structure_path(self, recorded: Any) -> str | None:
-        # The original known partner can be outside the session. This path
-        # is only a local link; it does not grant access via /files/.
-        if not isinstance(recorded, str) or not recorded:
-            return None
-        try:
-            path = (self.session_dir / recorded).resolve()
-            return str(path) if path.is_file() else None
-        except (ValueError, OSError):
-            return None
-
     def _refinements(self, con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
         if not {
             "refinements_capri_ss",
@@ -489,7 +480,8 @@ class DashboardData:
                 m.score - b.score AS score_change,
                 pr.used_target,
                 r.options AS refinement_options,
-                r.known_structure
+                r.original_known_structure,
+                $session_dir || '/' || r.original_known_structure AS original_known_structure_absolute_path
             FROM refinements_capri_ss m
             LEFT JOIN refinements_io io ON m.refine_run_dir = io.refine_run_dir
             LEFT JOIN (SELECT DISTINCT * FROM fitted_models) fm ON io.fitted_model = fm.fitted_model_file
@@ -502,10 +494,10 @@ class DashboardData:
             WHERE m.score IS NOT NULL
             ORDER BY m.score, m.refined_structure_path
             """,
+            {"session_dir": str(self.session_dir)},
         )
         for row in rows:
             self._viewer(row, row["refined_structure_path"])
-            row["known_structure_absolute_path"] = self._known_structure_path(row.get("known_structure"))
         return rows
 
     def refinements(self) -> list[dict[str, Any]]:

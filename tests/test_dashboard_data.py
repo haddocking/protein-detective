@@ -1,12 +1,15 @@
 """Dashboard joins, partial sessions, and safe local file resolution."""
 
 import json
+import shlex
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
 import duckdb
 import pytest
+from rocrate.model.contextentity import ContextEntity
+from rocrate.rocrate import ROCrate
 
 from protein_detective.dashboard.data import DashboardData, _normalize_json, _resolve_session_file
 
@@ -37,7 +40,7 @@ def session(tmp_path: Path):
             ) t(powerfit_run_id, structure, rank, fitted_model_file);
             CREATE TABLE refinements_runs AS SELECT * FROM (VALUES
                 ('refine-a','--first', 'known.pdb'), ('refine-b','--second', 'known.pdb')
-            ) t(refine_run_id, options, known_structure);
+            ) t(refine_run_id, options, original_known_structure);
             CREATE TABLE refinements_io AS SELECT * FROM (VALUES
                 ('refine-a','powerfit/fit-a/a.cif.gz/fit_1.pdb','refine/refine-a/input'),
                 ('refine-b','powerfit/fit-a/a.cif.gz/fit_1.pdb','refine/refine-b/input')
@@ -439,19 +442,74 @@ def test_absolute_paths_follow_relocated_session(session: Path, recorded_prefix:
     assert row["density_absolute_path"] == str(relocated / "powerfit/fit-a/map.mrc")
 
 
-@pytest.mark.parametrize("template", ["known partner #1.pdb", "../known partner #1.pdb", "{root}/known partner #1.pdb"])
-def test_refinement_known_structure_link(session: Path, template: str):
-    recorded = template.format(root=session.parent)
-    known = (session / recorded).resolve()
+@pytest.mark.parametrize("recorded", ["known partner #1.pdb", "refine/example/known partner #1.pdb"])
+def test_refinement_known_structure_link(session: Path, recorded: str):
+    known = session / recorded
+    known.parent.mkdir(parents=True, exist_ok=True)
     known.write_text("example")
     with duckdb.connect(str(session / "meta.duckdb")) as con:
-        con.execute("UPDATE refinements_runs SET known_structure = ?", [recorded])
+        con.execute("UPDATE refinements_runs SET original_known_structure = ?", [recorded])
+    relocated = session.with_name("relocated session's root")
+    session.rename(relocated)
+    rows = DashboardData(relocated).refinements()
+    assert all(row["original_known_structure_absolute_path"] == str(relocated / recorded) for row in rows)
+
+
+def test_unrecorded_refinement_known_structure_has_no_link(session: Path):
+    with duckdb.connect(str(session / "meta.duckdb")) as con:
+        con.execute("UPDATE refinements_runs SET original_known_structure = NULL")
+    assert all(row["original_known_structure_absolute_path"] is None for row in DashboardData(session).refinements())
+
+
+@pytest.mark.parametrize("remove_option", ["--remove-known-chains", "--remove-fixed-chains"])
+def test_refinement_known_structure_uses_database_path(
+    session: Path, monkeypatch: pytest.MonkeyPatch, remove_option: str
+):
+    crate = ROCrate()
+    expected = {}
+    for run_id in ("refine-a", "refine-b"):  # zorilla: ignore -- Two actions verify PWD is selected per run.
+        cwd = session / "refine" / run_id
+        cwd.mkdir(parents=True)
+        known = cwd / "known partner.pdb"
+        known.write_text("END\n")
+        expected[run_id] = str(known)
+        result = crate.add_file(known, dest_path=f"refine/{run_id}/known_structure.pdb")
+        pwd = crate.add(
+            ContextEntity(
+                crate, f"#pwd-{run_id}", properties={"@type": "PropertyValue", "name": "PWD", "value": str(cwd)}
+            )
+        )
+        command = shlex.join(
+            [
+                "protein-detective",
+                "refine",
+                "run",
+                str(session),
+                known.name,
+                "--refine-run-id",
+                run_id,
+                remove_option,
+                "A",
+            ]
+        )
+        crate.add(
+            ContextEntity(
+                crate, command, properties={"@type": "CreateAction", "environment": [pwd], "result": [result]}
+            )
+        )
+    crate.write(session)
+    with duckdb.connect(str(session / "meta.duckdb")) as con:
+        for run_id, path in expected.items():
+            con.execute(
+                "UPDATE refinements_runs SET original_known_structure = ? WHERE refine_run_id = ?",
+                [str(Path(path).relative_to(session)), run_id],
+            )
+    (session / "known partner.pdb").write_text("Wrong partner\n")
+    monkeypatch.chdir(session)
+
     rows = DashboardData(session).refinements()
-    assert all(row["known_structure_absolute_path"] == str(known) for row in rows)
-
-
-def test_missing_refinement_known_structure_has_no_link(session: Path):
-    assert all(row["known_structure_absolute_path"] is None for row in DashboardData(session).refinements())
+    assert len(rows) == 3
+    assert all(row["original_known_structure_absolute_path"] == expected[row["refine_run_id"]] for row in rows)
 
 
 @pytest.mark.parametrize(

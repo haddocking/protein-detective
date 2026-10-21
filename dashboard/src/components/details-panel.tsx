@@ -113,7 +113,9 @@ export function DetailsPanel() {
           {[
             ["model", "Structure"],
             ["density", "Density"],
-            ...(selectedKind === "refinements" ? [["known_structure", "Known structure"]] : []),
+            ...(selectedKind === "refinements"
+              ? [["original_known_structure", "Known structure"]]
+              : []),
           ].map(([kind, label]) => {
             const path = selected[`${kind}_absolute_path`];
             return typeof path === "string" ? (

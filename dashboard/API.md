@@ -75,11 +75,11 @@ Fitting fields include `rank`, `cc`, `fishz`, and `relative_z`. Default grouping
 uses `(powerfit_run_id, candidate_id)`, retaining the lowest solution rank;
 default sorting uses CC descending. FishZ and relative Z are separate metrics.
 
-Refinements also include nullable `known_structure_absolute_path`, resolved from
-its recorded path relative to the session. The original known partner may be
-outside the session; this copyable path does not make it available through
-`/files/`. The dashboard shows compact buttons that copy absolute paths to the
-clipboard, with the full path in each tooltip.
+Refinements also include nullable `original_known_structure_absolute_path`,
+constructed from `original_known_structure` relative to the current session
+root. It is null when no original path is recorded. The dashboard shows compact
+buttons that copy absolute paths to the clipboard, with the full path in each
+tooltip.
 
 Refinement fields include `refine_run_id`, `refine_run_dir`, `fitted_model`,
 `fitted_rank`, `cluster_id`, `cluster_rank`, `member_rank`, `refined_score`,

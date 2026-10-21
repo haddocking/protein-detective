@@ -111,7 +111,7 @@ it("authenticates a direct provenance link and keeps its selected result across 
         ...fitting[0],
         id: "refined-1",
         refine_run_id: "refine-1",
-        known_structure_absolute_path: "/other files/known #1.pdb",
+        original_known_structure_absolute_path: "/other files/known #1.pdb",
       },
     ],
   };
