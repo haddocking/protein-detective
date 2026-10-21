@@ -22,10 +22,10 @@ def refine_run_arguments_from_rocrate(
     Args:
         session_dir: Session directory containing RO-Crate metadata.
         session_relative: Express fixed structure paths relative to the session.
-            Paired relative invocation arguments use their recorded relationship,
-            independently of the current working directory. When only the fixed
-            argument is relative, its original working directory is unknown;
-            metadata generation must run from the original working directory.
+            Use the action's recorded PWD when available. For older crates,
+            paired relative arguments use their recorded relationship; when only
+            the fixed argument is relative, metadata generation must run from
+            the original working directory.
 
     Returns:
         Refinement run IDs mapped to fixed structure paths and command options,
@@ -53,8 +53,13 @@ def refine_run_arguments_from_rocrate(
         if session_relative:
             recorded_session = Path(recorded_session_arg)
             fixed_path = Path(fixed_structure)
-            # Paired paths share the original invocation's coordinate system.
-            base = recorded_session if recorded_session.is_absolute() == fixed_path.is_absolute() else session_dir
+            cwd = next((item["value"] for item in action.get("environment", []) if item.get("name") == "PWD"), None)
+            if cwd is not None:
+                base = Path(cwd) / recorded_session
+                fixed_path = Path(cwd) / fixed_path
+            else:
+                # Paired paths share the original invocation's coordinate system.
+                base = recorded_session if recorded_session.is_absolute() == fixed_path.is_absolute() else session_dir
             fixed_structure = str(fixed_path.resolve().relative_to(base.resolve(), walk_up=True))
         options = shlex.join(rest)
         for result in action.get("result", []):

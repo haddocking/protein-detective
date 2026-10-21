@@ -748,8 +748,9 @@ def test_generated_path_columns_are_session_relative(
     "fixed_kind", ["absolute_internal", "absolute_external", "relative_internal", "relative_external"]
 )
 @pytest.mark.parametrize("options_first", [False, True])
+@pytest.mark.parametrize("record_cwd", [False, True])
 def test_refinement_fixed_structure_is_relative_to_session(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fixed_kind: str, options_first: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fixed_kind: str, options_first: bool, record_cwd: bool
 ):
     monkeypatch.chdir(tmp_path)
     session = tmp_path / "session with spaces"
@@ -759,12 +760,18 @@ def test_refinement_fixed_structure_is_relative_to_session(
     fixed.write_text("END\n")
     argument = str(fixed if fixed_kind.startswith("absolute") else fixed.relative_to(tmp_path))
     options = "--refine-run-id example"
-    positionals = f"{shlex.quote(session.name)} {shlex.quote(argument)}"
+    session_argument = str(session) if record_cwd else session.name
+    positionals = f"{shlex.quote(session_argument)} {shlex.quote(argument)}"
     arguments = f"{options} {positionals}" if options_first else f"{positionals} {options}"
     command = f"protein-detective refine run {arguments}"
     crate = ROCrate()
     result = crate.add_file(fixed, dest_path="refine/example/fixed_structure.pdb")
-    crate.add(ContextEntity(crate, command, properties={"@type": "CreateAction", "result": [result]}))
+    action = ContextEntity(crate, command, properties={"@type": "CreateAction", "result": [result]})
+    crate.add(action)
+    pwd = crate.add(
+        ContextEntity(crate, "#pwd", properties={"@type": "PropertyValue", "name": "PWD", "value": str(tmp_path)})
+    )
+    action["environment"] = [pwd] * record_cwd
     crate.write(session)
     crate_bytes = (session / "ro-crate-metadata.json").read_bytes()
 

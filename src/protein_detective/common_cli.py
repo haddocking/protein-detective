@@ -6,7 +6,10 @@ from typing import Annotated
 from cyclopts import Group, Parameter
 from protein_quest.cli.common import setup_logging
 from rich.console import Console
+from rocrate.model.contextentity import ContextEntity
+from rocrate.rocrate import ROCrate
 from rocrate_action_recorder import IOArgumentPaths, Program, record
+from rocrate_action_recorder.core import make_action_id
 
 from protein_detective.__version__ import __version__
 
@@ -84,3 +87,16 @@ def write_ro_crate(
         start_time=start_time,
         crate_dir=session_dir,
     )
+    # TODO remove once https://github.com/i-VRESSE/rocrate-action-recorder/issues/28 is fixed
+    crate = ROCrate(session_dir)
+    crate.metadata.extra_contexts.append("https://w3id.org/ro/terms/workflow-run/context")
+    action = next(action for action in crate.get_by_type("CreateAction") if action.id == make_action_id())
+    action["environment"] = [
+        crate.add(
+            ContextEntity(
+                crate,
+                properties={"@type": "PropertyValue", "name": "PWD", "value": str(Path.cwd())},
+            )
+        )
+    ]
+    crate.metadata.write(session_dir)

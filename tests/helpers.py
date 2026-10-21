@@ -89,6 +89,7 @@ def assert_crate(
         assert action["name"] == action_id
 
     assert action["instrument"]["@id"] == f"protein-detective@{__version__}"
+    assert [(item["name"], item["value"]) for item in action["environment"]] == [("PWD", str(Path.cwd()))]
 
     actual_input_ids = {i["@id"] for i in action.get("object", [])}
     if input_ids is not None:

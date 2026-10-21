@@ -77,7 +77,9 @@ def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_p
     )
     crate_bytes = (session_with_powerfit_results / BASENAME).read_bytes()
     metadata = json.loads(crate_bytes)
-    end_time = metadata["@graph"][-1]["endTime"]
+    action = next(item for item in metadata["@graph"] if item["@id"] == command)
+    end_time = action["endTime"]
+    pwd_id = action["environment"][0]["@id"]
     expected = {
         "@context": ["https://w3id.org/ro/crate/1.1/context", "https://w3id.org/ro/terms/workflow-run/context"],
         "@graph": [
@@ -155,6 +157,7 @@ def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_p
                 "@type": "CreateAction",
                 "agent": {"@id": getpass.getuser()},
                 "endTime": end_time,
+                "environment": [{"@id": pwd_id}],
                 "instrument": {"@id": f"protein-detective@{__version__}"},
                 "name": command,
                 "object": [
@@ -167,6 +170,8 @@ def test_recorded_refinement_arguments_and_fixed_structure_origin(session_with_p
                 ],
                 "startTime": start_time.isoformat(),
             },
+            {"@id": pwd_id, "@type": "PropertyValue", "name": "PWD", "value": str(Path.cwd())},
         ],
     }
-    assert metadata == expected
+    assert metadata["@context"] == expected["@context"]
+    assert {item["@id"]: item for item in metadata["@graph"]} == {item["@id"]: item for item in expected["@graph"]}
