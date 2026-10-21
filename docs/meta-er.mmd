@@ -231,7 +231,7 @@ erDiagram
       DOUBLE vean
       DOUBLE xpcs
       VARCHAR refine_run_dir PK,FK
-      VARCHAR fitted_structure
+      VARCHAR unrefined_complex
       VARCHAR unfitted_structure
       VARCHAR powerfit_run_id
       VARCHAR refine_run_id
@@ -270,12 +270,14 @@ erDiagram
       DOUBLE vean
       DOUBLE xpcs
       VARCHAR filename
-      VARCHAR refined_structure_path
       VARCHAR refine_run_dir FK
-      VARCHAR fitted_structure
+      VARCHAR unrefined_complex
       VARCHAR unfitted_structure
       VARCHAR powerfit_run_id
       VARCHAR refine_run_id
+      VARCHAR refined_complex FK
+      VARCHAR refined_fitted_structure FK
+      VARCHAR refined_known_structure FK
     }
     "refinements_capri_clt" {
       BIGINT cluster_rank
@@ -310,7 +312,7 @@ erDiagram
       DOUBLE vdw_std
       BIGINT caprieval_rank
       VARCHAR refine_run_dir PK,FK
-      VARCHAR fitted_structure
+      VARCHAR unrefined_complex
       VARCHAR unfitted_structure
       VARCHAR powerfit_run_id
       VARCHAR refine_run_id
@@ -337,3 +339,7 @@ erDiagram
     "structure_files" ||--o{ "uniprots_verified_stats" : has
 
     "refinements_capri_clt" ||--o{ "refinements_capri_ss" : "refine_run_dir, cluster_id"
+
+    "structure_files" ||--o{ "refinements_capri_ss" : "file = refined_fitted_structure"
+    "structure_files" ||--o{ "refinements_capri_ss" : "file = refined_known_structure"
+    "structure_files" ||--o{ "refinements_capri_ss" : "file = refined_complex"
