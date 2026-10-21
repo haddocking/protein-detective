@@ -463,10 +463,11 @@ class DashboardData:
                 m.*,
                 m.unfitted_structure AS structure,
                 m.unfitted_structure AS candidate_id,
-                m.refined_structure_path AS id,
+                m.refined_fitted_structure AS id,
                 m.score AS refined_score,
                 m.modelcluster_ranking AS member_rank,
                 io.fitted_model,
+                $session_dir || '/' || io.fitted_model AS fitted_model_absolute_path,
                 fm.rank AS fitted_rank,
                 fs.uniprot_accessions,
                 fs.is_alphafold,
@@ -481,7 +482,9 @@ class DashboardData:
                 pr.used_target,
                 r.options AS refinement_options,
                 r.original_known_structure,
-                $session_dir || '/' || r.original_known_structure AS original_known_structure_absolute_path
+                $session_dir || '/' || r.original_known_structure AS original_known_structure_absolute_path,
+                $session_dir || '/' || m.refined_fitted_structure AS refined_fitted_structure_absolute_path,
+                $session_dir || '/' || m.refined_known_structure AS refined_known_structure_absolute_path
             FROM refinements_capri_ss m
             LEFT JOIN refinements_io io ON m.refine_run_dir = io.refine_run_dir
             LEFT JOIN (SELECT DISTINCT * FROM fitted_models) fm ON io.fitted_model = fm.fitted_model_file
@@ -492,12 +495,15 @@ class DashboardData:
             LEFT JOIN powerfit_runs pr ON m.powerfit_run_id = pr.powerfit_run_id
             LEFT JOIN refinements_runs r ON m.refine_run_id = r.refine_run_id
             WHERE m.score IS NOT NULL
-            ORDER BY m.score, m.refined_structure_path
+            ORDER BY m.score, m.refined_fitted_structure
             """,
             {"session_dir": str(self.session_dir)},
         )
         for row in rows:
-            self._viewer(row, row["refined_structure_path"])
+            self._viewer(row, row["refined_fitted_structure"])
+            if not self._exists(self._path(row["refined_known_structure"])):
+                row["viewer_available"] = False
+                row["viewer_error"] = "Refined known structure not saved"
         return rows
 
     def refinements(self) -> list[dict[str, Any]]:

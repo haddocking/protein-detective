@@ -50,7 +50,9 @@ def session(tmp_path: Path):
                 ('refine-a','fit-a','a.cif.gz','refine/refine-a/input',1,2,-11.0,'refine/a2.pdb.gz'),
                 ('refine-b','fit-a','a.cif.gz','refine/refine-b/input',1,1,-25.0,'refine/b.pdb.gz')
             ) t(refine_run_id, powerfit_run_id, unfitted_structure, refine_run_dir,
-                cluster_id, modelcluster_ranking, score, refined_structure_path);
+                cluster_id, modelcluster_ranking, score, refined_fitted_structure);
+            ALTER TABLE refinements_capri_ss ADD COLUMN refined_known_structure VARCHAR;
+            UPDATE refinements_capri_ss SET refined_known_structure = replace(refined_fitted_structure, '.pdb.gz', '_known.pdb.gz');
             CREATE TABLE refinements_capri_clt AS SELECT * FROM (VALUES
                 ('refine/refine-a/input',1,1,2,-11.5,0.5),
                 ('refine/refine-b/input',1,2,1,-25.0,0.0)
@@ -74,6 +76,9 @@ def session(tmp_path: Path):
         "refine/a.pdb.gz",
         "refine/a2.pdb.gz",
         "refine/b.pdb.gz",
+        "refine/a_known.pdb.gz",
+        "refine/a2_known.pdb.gz",
+        "refine/b_known.pdb.gz",
     ):
         target = root / path
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -118,6 +123,9 @@ def test_refinement_joins_are_scoped_by_independent_run_and_input(session: Path)
     first = next(row for row in rows if row["id"] == "refine/a.pdb.gz")
     second = next(row for row in rows if row["id"] == "refine/b.pdb.gz")
     assert first["model_absolute_path"] == str(session / "refine/a.pdb.gz")
+    assert first["fitted_model_absolute_path"] == str(session / "powerfit/fit-a/a.cif.gz/fit_1.pdb")
+    assert first["refined_fitted_structure_absolute_path"] == str(session / "refine/a.pdb.gz")
+    assert first["refined_known_structure_absolute_path"] == str(session / "refine/a_known.pdb.gz")
     assert first["density_absolute_path"] == str(session / "powerfit/fit-a/map.mrc")
     assert first["fitted_rank"] == second["fitted_rank"] == 1
     assert first["powerfit_run_id"] == second["powerfit_run_id"] == "fit-a"

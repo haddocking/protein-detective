@@ -1,5 +1,7 @@
 # Dashboard snapshot API
 
+<!-- TODO this is way to much docs, simplify it or construct an openapi specification -->
+
 The frontend and Python server share one configured origin (loopback by
 default). Each dataset is stable for one server lifetime. There is no refresh or
 workflow mutation endpoint. React fetches each needed dataset once and performs
@@ -80,6 +82,18 @@ constructed from `original_known_structure` relative to the current session
 root. It is null when no original path is recorded. The dashboard shows compact
 buttons that copy absolute paths to the clipboard, with the full path in each
 tooltip.
+
+Refinement rows include `refined_complex`, `refined_fitted_structure`, and
+`refined_known_structure` from `9_reconstruct/io.csv`. The viewer loads the
+reconstructed fitted and known partners as separate structures, preserving the
+known partner's original chains. `refined_known_structure_absolute_path` is the
+copyable path to that refined partner.
+
+The refinement details panel groups local file paths into inputs (density,
+unrefined fitted model, original known structure) and outputs (refined fitted
+structure, refined known structure). `fitted_model_absolute_path` and
+`refined_fitted_structure_absolute_path` distinguish the fitted model before and
+after refinement.
 
 Refinement fields include `refine_run_id`, `refine_run_dir`, `fitted_model`,
 `fitted_rank`, `cluster_id`, `cluster_rank`, `member_rank`, `refined_score`,

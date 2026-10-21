@@ -194,10 +194,16 @@ export interface FittingResult extends StructureResult {
 }
 
 export interface RefinementResult extends StructureResult {
+  refined_complex: string | null;
+  refined_fitted_structure: string | null;
+  refined_known_structure: string | null;
+  refined_fitted_structure_absolute_path: string | null;
+  refined_known_structure_absolute_path: string | null;
   original_known_structure_absolute_path: string | null;
   refine_run_id: string;
   refine_run_dir: string;
   fitted_model: string;
+  fitted_model_absolute_path: string | null;
   fitted_rank: number;
   cluster_id: number;
   cluster_rank: number;

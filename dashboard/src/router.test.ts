@@ -7,8 +7,18 @@ import { createDashboardRouter } from "./router";
 import { clusterKey } from "./data";
 
 vi.mock("./viewer", () => ({
-  StructureViewer: ({ structureUrl }: { structureUrl: string }) =>
-    createElement("div", { className: "mock-viewer" }, structureUrl),
+  StructureViewer: ({
+    structureUrl,
+    refinedKnownStructureUrl,
+  }: {
+    structureUrl: string;
+    refinedKnownStructureUrl?: string;
+  }) =>
+    createElement(
+      "div",
+      { className: "mock-viewer", "data-known-url": refinedKnownStructureUrl },
+      structureUrl,
+    ),
 }));
 
 describe("dashboard routing", () => {
@@ -111,7 +121,11 @@ it("authenticates a direct provenance link and keeps its selected result across 
         ...fitting[0],
         id: "refined-1",
         refine_run_id: "refine-1",
-        original_known_structure_absolute_path: "/other files/known #1.pdb",
+        fitted_model_absolute_path: "/session/powerfit/unrefined.pdb",
+        original_known_structure_absolute_path: "/session/original-known.pdb",
+        refined_fitted_structure_absolute_path: "/session/refine/refined-fitted.pdb.gz",
+        refined_known_structure: "refine/9_reconstruct/mdref_1_known.pdb.gz",
+        refined_known_structure_absolute_path: "/other files/known #1.pdb",
       },
     ],
   };
@@ -228,6 +242,9 @@ it("authenticates a direct provenance link and keeps its selected result across 
     });
     expect(container.querySelector<HTMLElement>(".retained-viewer")?.hidden).toBe(false);
     // Selecting a related result also opens the viewer by default.
+    expect(container.querySelector(".mock-viewer")?.getAttribute("data-known-url")).toBe(
+      "/files/refine/9_reconstruct/mdref_1_known.pdb.gz",
+    );
     await act(async () => {
       await router.navigate({
         to: "/refinements",
@@ -243,7 +260,25 @@ it("authenticates a direct provenance link and keeps its selected result across 
       });
     });
     const copyButtons = container.querySelectorAll<HTMLButtonElement>(".file-paths button");
-    expect(copyButtons[2]?.title).toBe("/other files/known #1.pdb");
+    const inputButtons = container.querySelectorAll<HTMLButtonElement>(
+      '[aria-label="Inputs"] button',
+    );
+    expect(
+      Array.from(inputButtons, (button) => [button.getAttribute("aria-label"), button.title]),
+    ).toEqual([
+      ["Copy density path", "/session/density.map"],
+      ["Copy unrefined fitted model path", "/session/powerfit/unrefined.pdb"],
+      ["Copy original known structure path", "/session/original-known.pdb"],
+    ]);
+    const outputButtons = container.querySelectorAll<HTMLButtonElement>(
+      '[aria-label="Outputs"] button',
+    );
+    expect(
+      Array.from(outputButtons, (button) => [button.getAttribute("aria-label"), button.title]),
+    ).toEqual([
+      ["Copy refined fitted structure path", "/session/refine/refined-fitted.pdb.gz"],
+      ["Copy refined known structure path", "/other files/known #1.pdb"],
+    ]);
     for (const button of copyButtons) {
       await act(async () => button.click());
       expect(writeText).toHaveBeenLastCalledWith(button.title);

@@ -386,6 +386,11 @@ aside {
   border-bottom: 1px solid var(--border);
   font-size: 12px;
 }
+.file-paths h3 {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: inherit;
+}
 .file-paths button {
   display: inline-flex;
   align-items: center;

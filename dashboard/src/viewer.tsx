@@ -98,6 +98,7 @@ async function modelText(url: string, signal: AbortSignal): Promise<string> {
 export interface StructureViewerProps {
   structureUrl: string;
   densityUrl: string;
+  refinedKnownStructureUrl?: string;
   refined?: boolean;
   label?: string;
 }
@@ -105,6 +106,7 @@ export interface StructureViewerProps {
 export function StructureViewer({
   structureUrl,
   densityUrl,
+  refinedKnownStructureUrl,
   refined = false,
   label = "Selected structure",
 }: StructureViewerProps) {
@@ -209,22 +211,16 @@ export function StructureViewer({
         await removeRoots(session.modelRoots);
         reps.current = [];
         if (obsolete()) return;
-        const parts = refined
-          ? [
-              { chain: "A", name: "Candidate (chain A)", color: 0x2c7fb8 },
-              { chain: "B", name: "Known partner (chain B)", color: 0xe89c36 },
-            ]
-          : [{ chain: "", name: label, color: 0x2c7fb8 }];
+        const parts = [{ text, name: refined ? "Refined candidate" : label, color: 0x2c7fb8 }];
+        if (refined) {
+          if (!refinedKnownStructureUrl)
+            throw new Error("The refined known partner is unavailable.");
+          const knownText = await modelText(refinedKnownStructureUrl, controller.signal);
+          if (obsolete()) return;
+          parts.push({ text: knownText, name: "Refined known partner", color: 0xe89c36 });
+        }
         for (const part of parts) {
-          const pdb = part.chain
-            ? text
-                .split("\n")
-                .filter((line) => /^(ATOM  |HETATM)/.test(line) && line[21] === part.chain)
-                .join("\n") + "\nEND\n"
-            : text;
-          if (part.chain && !pdb.includes("ATOM"))
-            throw new Error(`Refined structure is missing ${part.name}.`);
-          const data = await plugin.builders.data.rawData({ data: pdb, label: part.name });
+          const data = await plugin.builders.data.rawData({ data: part.text, label: part.name });
           session.modelRoots.push(data.ref);
           if (obsolete()) return;
           const trajectory = await plugin.builders.structure.parseTrajectory(data, "pdb");
@@ -286,7 +282,7 @@ export function StructureViewer({
       }
     });
     return () => controller.abort();
-  }, [structureUrl, densityUrl, refined, label, attempt]);
+  }, [structureUrl, densityUrl, refinedKnownStructureUrl, refined, label, attempt]);
 
   function visibility(index: number, visible: boolean) {
     const rep = reps.current[index];
@@ -318,8 +314,8 @@ export function StructureViewer({
   return (
     <section className="molecular-viewer" aria-label="3D structure viewer">
       <p className="muted">
-        Candidate in blue{refined ? "; known partner in orange (both from the refined file)" : ""}.
-        Density contour is in standard deviations (σ).
+        Candidate in blue{refined ? "; refined known partner in orange" : ""}. Density contour is in
+        standard deviations (σ).
       </p>
       {status && <p role="status">{status}</p>}
       {error && (

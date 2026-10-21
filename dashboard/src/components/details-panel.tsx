@@ -108,32 +108,62 @@ export function DetailsPanel() {
           3D viewer
         </button>
       </div>
-      {selected && selectedKind !== "candidates" && (
-        <section className="file-paths" aria-label="Local files">
-          {[
-            ["model", "Structure"],
-            ["density", "Density"],
-            ...(selectedKind === "refinements"
-              ? [["original_known_structure", "Known structure"]]
-              : []),
-          ].map(([kind, label]) => {
-            const path = selected[`${kind}_absolute_path`];
-            return typeof path === "string" ? (
-              <CopyPathButton key={`${kind}:${path}`} path={path} label={label} />
-            ) : (
-              <span key={kind} className="unavailable-file" title="File unavailable">
-                {label} unavailable
-              </span>
-            );
-          })}
-        </section>
-      )}
+      {selected &&
+        selectedKind !== "candidates" &&
+        (selectedKind === "refinements"
+          ? [
+              {
+                title: "Inputs",
+                files: [
+                  ["density", "Density"],
+                  ["fitted_model", "Unrefined fitted model"],
+                  ["original_known_structure", "Original known structure"],
+                ],
+              },
+              {
+                title: "Outputs",
+                files: [
+                  ["refined_fitted_structure", "Refined fitted structure"],
+                  ["refined_known_structure", "Refined known structure"],
+                ],
+              },
+            ]
+          : [
+              {
+                title: "Local files",
+                files: [
+                  ["model", "Structure"],
+                  ["density", "Density"],
+                ],
+              },
+            ]
+        ).map(({ title, files }) => (
+          <section key={title} className="file-paths" aria-label={title}>
+            {selectedKind === "refinements" && <h3>{title}</h3>}
+            {files.map(([kind, label]) => {
+              const path = selected[`${kind}_absolute_path`];
+              return typeof path === "string" ? (
+                <CopyPathButton key={`${kind}:${path}`} path={path} label={label} />
+              ) : (
+                <span key={kind} className="unavailable-file" title="File unavailable">
+                  {label} unavailable
+                </span>
+              );
+            })}
+          </section>
+        ))}
+
       {viewerSelection && (
         <div className="retained-viewer" hidden={!viewerVisible}>
           <Suspense fallback={<p>Loading 3D viewer…</p>}>
             <StructureViewer
               structureUrl={fileUrl(viewerSelection.row.model_path)}
               densityUrl={fileUrl(viewerSelection.row.density_path)}
+              refinedKnownStructureUrl={
+                viewerSelection.kind === "refinements"
+                  ? fileUrl(viewerSelection.row.refined_known_structure)
+                  : undefined
+              }
               refined={viewerSelection.kind === "refinements"}
               label={display(viewerSelection.row.structure)}
             />
