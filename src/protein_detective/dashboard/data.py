@@ -454,58 +454,56 @@ class DashboardData:
             return None
 
     def _refinements(self, con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
-        tables = self._tables(con)
-        if "refinements_capri_ss" not in tables:
+        if not {
+            "refinements_capri_ss",
+            "refinements_io",
+            "fitted_models",
+            "fittable_structures",
+            "refinements_capri_clt",
+            "refinements_baseline",
+            "powerfit_runs",
+            "refinements_runs",
+        } <= self._tables(con):
             return []
-        fields = [
-            "m.*",
-            "m.unfitted_structure AS structure",
-            "m.score AS refined_score",
-            "m.modelcluster_ranking AS member_rank",
-        ]
-        joins = []
-        if "refinements_io" in tables:
-            joins.append("LEFT JOIN refinements_io io ON m.refine_run_dir = io.refine_run_dir")
-            fields.append("io.fitted_model")
-            if "fitted_models" in tables:
-                joins.append(
-                    "LEFT JOIN (SELECT DISTINCT * FROM fitted_models) fm ON io.fitted_model = fm.fitted_model_file"
-                )
-                fields.append("fm.rank AS fitted_rank")
-        if "fittable_structures" in tables:
-            joins.append("LEFT JOIN fittable_structures fs ON m.unfitted_structure = fs.structure")
-            fields += ["fs.uniprot_accessions", "fs.is_alphafold", "fs.structure_id"]
-        if "refinements_capri_clt" in tables:
-            joins.append(
-                "LEFT JOIN refinements_capri_clt cl ON m.refine_run_dir = cl.refine_run_dir "
-                "AND m.cluster_id = cl.cluster_id"
-            )
-            fields += [
-                "cl.cluster_rank",
-                "cl.n AS population",
-                "cl.score AS cluster_score",
-                "cl.score_std AS cluster_score_std",
-            ]
-        if "refinements_baseline" in tables:
-            joins.append("LEFT JOIN refinements_baseline b ON m.refine_run_dir = b.refine_run_dir")
-            fields.append("b.score AS baseline_score")
-        if "powerfit_runs" in tables:
-            joins.append("LEFT JOIN powerfit_runs pr ON m.powerfit_run_id = pr.powerfit_run_id")
-            fields.append("pr.used_target")
-        if "refinements_runs" in tables:
-            joins.append("LEFT JOIN refinements_runs r ON m.refine_run_id = r.refine_run_id")
-            fields += ["r.options AS refinement_options", "r.fixed_structure"]
         rows = self._query(
             con,
-            f"SELECT {', '.join(fields)} FROM refinements_capri_ss m {' '.join(joins)} "  # noqa: S608
-            "WHERE m.score IS NOT NULL ORDER BY m.score, m.refined_structure_path",
+            """
+            SELECT
+                m.*,
+                m.unfitted_structure AS structure,
+                m.unfitted_structure AS candidate_id,
+                m.refined_structure_path AS id,
+                m.score AS refined_score,
+                m.modelcluster_ranking AS member_rank,
+                io.fitted_model,
+                fm.rank AS fitted_rank,
+                fs.uniprot_accessions,
+                fs.is_alphafold,
+                CASE WHEN fs.is_alphafold THEN 'AlphaFold' ELSE 'PDB' END AS source,
+                fs.structure_id,
+                cl.cluster_rank,
+                cl.n AS population,
+                cl.score AS cluster_score,
+                cl.score_std AS cluster_score_std,
+                b.score AS baseline_score,
+                m.score - b.score AS score_change,
+                pr.used_target,
+                r.options AS refinement_options,
+                r.fixed_structure
+            FROM refinements_capri_ss m
+            LEFT JOIN refinements_io io ON m.refine_run_dir = io.refine_run_dir
+            LEFT JOIN (SELECT DISTINCT * FROM fitted_models) fm ON io.fitted_model = fm.fitted_model_file
+            LEFT JOIN fittable_structures fs ON m.unfitted_structure = fs.structure
+            LEFT JOIN refinements_capri_clt cl
+                ON m.refine_run_dir = cl.refine_run_dir AND m.cluster_id = cl.cluster_id
+            LEFT JOIN refinements_baseline b ON m.refine_run_dir = b.refine_run_dir
+            LEFT JOIN powerfit_runs pr ON m.powerfit_run_id = pr.powerfit_run_id
+            LEFT JOIN refinements_runs r ON m.refine_run_id = r.refine_run_id
+            WHERE m.score IS NOT NULL
+            ORDER BY m.score, m.refined_structure_path
+            """,
         )
         for row in rows:
-            row["candidate_id"] = row["structure"]
-            row["id"] = row["refined_structure_path"]
-            row["source"] = "AlphaFold" if row.get("is_alphafold") else "PDB"
-            baseline = row.get("baseline_score")
-            row["score_change"] = row["refined_score"] - baseline if baseline is not None else None
             self._viewer(row, row["refined_structure_path"])
             row["fixed_structure_absolute_path"] = self._fixed_structure_path(row.get("fixed_structure"))
         return rows
@@ -517,7 +515,7 @@ class DashboardData:
             Rows ordered by individual score, with cluster scores kept separate.
                 Score change is refined minus baseline; negative means improvement.
                 Group members by refinement run, fitted input, and cluster. Returns
-                an empty list when refinement results are absent.
+                an empty list when required metadata tables are absent.
         """
         with self._connect() as con:
             return self._refinements(con)

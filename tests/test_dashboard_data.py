@@ -179,7 +179,7 @@ def test_solutions_without_saved_models(session: Path):
     data = DashboardData(session)
     assert data.summary()["fitting_status"] == "structures_not_saved"
     assert all(not row["viewer_available"] for row in data.fitting())
-    assert len(data.refinements()) == 3
+    assert data.refinements() == []
 
 
 def test_file_paths_resolve_after_relocation_and_reject_escapes(session: Path, tmp_path: Path):
@@ -360,7 +360,8 @@ def test_legacy_metadata_without_runs_keeps_scores_and_disables_viewer(session: 
     with duckdb.connect(str(session / "meta.duckdb")) as con:
         con.execute("DROP TABLE powerfit_runs")
     data = DashboardData(session)
-    assert len(data.fitting()) == len(data.refinements()) == 3
+    assert len(data.fitting()) == 3
+    assert data.refinements() == []
     assert all(not row["viewer_available"] for row in data.fitting())
     assert data.summary()["powerfit_runs"] == ["fit-a", "fit-b"]
 
@@ -451,3 +452,22 @@ def test_refinement_fixed_structure_link(session: Path, template: str):
 
 def test_missing_refinement_fixed_structure_has_no_link(session: Path):
     assert all(row["fixed_structure_absolute_path"] is None for row in DashboardData(session).refinements())
+
+
+@pytest.mark.parametrize(
+    "table",
+    [
+        "refinements_capri_ss",
+        "refinements_io",
+        "fitted_models",
+        "fittable_structures",
+        "refinements_capri_clt",
+        "refinements_baseline",
+        "powerfit_runs",
+        "refinements_runs",
+    ],
+)
+def test_refinements_require_all_joined_tables(session: Path, table: str):
+    with duckdb.connect(str(session / "meta.duckdb")) as con:
+        con.execute(f'DROP TABLE "{table}"')
+    assert DashboardData(session).refinements() == []
