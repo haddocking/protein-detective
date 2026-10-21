@@ -4,8 +4,6 @@ Each dataset call opens its own DuckDB connection. Missing workflow stages
 produce empty results; recorded file paths are resolved against the session.
 """
 
-from __future__ import annotations
-
 import math
 from datetime import date, datetime
 from decimal import Decimal
