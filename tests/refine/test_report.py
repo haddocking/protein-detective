@@ -18,7 +18,7 @@ from protein_detective.meta import (
     refinements_io_as_duckdb_ddl,
 )
 from protein_detective.refine.report import refinement_report
-from tests.helpers import cli
+from tests.helpers import cli, write_reconstruction_index
 
 
 def add_run(session: Path, clustered_refinement_results_paths: dict[str, Path], run_id: str = "experiment") -> Path:
@@ -33,6 +33,7 @@ def add_run(session: Path, clustered_refinement_results_paths: dict[str, Path], 
     stage.mkdir(parents=True)
     for key, table in (("models", "ss"), ("clusters", "clt")):
         shutil.copyfile(clustered_refinement_results_paths[key], stage / f"capri_{table}.tsv")
+    write_reconstruction_index(run / "refinement")
     baseline = run / "baseline/2_caprieval"
     baseline.mkdir(parents=True)
     (baseline / "capri_ss.tsv").write_text("model\tscore\nfirst.pdb\t-10\n")
@@ -93,6 +94,53 @@ def test_unrefined_score_and_workflow_separation(session_with_baseline: Path):
         ]
 
 
+def test_report_lists_input_and_output_paths(session_with_baseline: Path):
+    session = session_with_baseline
+    density = session / "powerfit/run_001/input density.mrc"
+    density.parent.mkdir(parents=True)
+    density.write_text("density")
+    crate = ROCrate(session)
+    target = crate.add_file(
+        density,
+        dest_path="powerfit/run_001/input density.mrc",
+        properties={"description": "Density map used for fitting."},
+    )
+    result = crate.add_dataset(density.parent, dest_path="powerfit/run_001")
+    crate.add_action(
+        instrument={"@id": "protein-detective"},
+        identifier="protein-detective powerfit run map.mrc 3.7 session",
+        object=[target],
+        result=[result],
+    )
+    crate.write(session)
+    output = session / "report.csv"
+
+    cli(["refine", "report", str(session), "--output", str(output)])
+
+    with output.open() as stream:
+        row = next(csv.DictReader(stream))
+    assert {
+        column: row[column]
+        for column in (
+            "density",
+            "unrefined_fitted_model",
+            "original_known_structure",
+            "refined_fitted_structure",
+            "refined_known_structure",
+        )
+    } == {
+        "density": str(density),
+        "unrefined_fitted_model": str(session / "powerfit/run_001/protein/fit_1.pdb"),
+        "original_known_structure": str(session / "refine/first/known.pdb"),
+        "refined_fitted_structure": str(
+            session / "refine/first/run_001/protein/fit_1.pdb/refinement/9_reconstruct/mdref_8_fitted.pdb.gz"
+        ),
+        "refined_known_structure": str(
+            session / "refine/first/run_001/protein/fit_1.pdb/refinement/9_reconstruct/mdref_8_known.pdb.gz"
+        ),
+    }
+
+
 def test_cluster_members_metadata_and_compressed_paths(
     clustered_refinement_results_paths: dict[str, Path], tmp_path: Path
 ):
@@ -120,7 +168,11 @@ def test_cluster_members_metadata_and_compressed_paths(
         -56.840,
     ]
     assert results["modelcluster_ranking"].tolist() == [1, 2] * 4
-    assert results.iloc[0]["refined_structure_path"] == str(model)
+    assert results["density"].isna().all()
+    assert results.iloc[0]["original_known_structure"] == str(run.parents[2] / "known.pdb")
+    assert results.iloc[0]["refined_complex"] == str(model)
+    assert results.iloc[0]["refined_fitted_structure"] == str(run / "refinement/9_reconstruct/mdref_8_fitted.pdb.gz")
+    assert results.iloc[0]["refined_known_structure"] == str(run / "refinement/9_reconstruct/mdref_8_known.pdb.gz")
 
 
 @pytest.mark.parametrize("top,expected", [(1, 5), (2, 10), (3, 15), (4, 15)])
@@ -142,6 +194,7 @@ def test_top_members_of_every_cluster(
         "cluster_id\tcluster_rank\tn\tunder_eval\tscore\tscore_std\n"
         + "".join(f"{cluster}\t{cluster}\t3\tyes\t-98\t1\n" for cluster in range(1, 6))
     )
+    write_reconstruction_index(run / "refinement")
     results = refinement_report(tmp_path, top=top)
     assert len(results) == expected
     assert (
@@ -158,8 +211,9 @@ def test_capri_member_ranks(clustered_refinement_results_paths: dict[str, Path],
         "model\tcaprieval_rank\tscore\tcluster_id\tmodel-cluster_ranking\n"
         "../6_mdref/z.pdb\t1\t-9\t1\t1\n../6_mdref/a.pdb\t2\t-100\t1\t3\n../6_mdref/c.pdb\t3\t-100\t1\t4\n../6_mdref/b.pdb\t3\t-100\t1\t2\n"
     )
+    write_reconstruction_index(run / "refinement")
     results = refinement_report(tmp_path, top=2)
-    assert [Path(model).name for model in results["refined_structure_path"]] == ["z.pdb.gz", "b.pdb.gz"]
+    assert [Path(model).name for model in results["refined_complex"]] == ["z.pdb.gz", "b.pdb.gz"]
     assert results["modelcluster_ranking"].tolist() == [1, 2]
 
 
@@ -355,7 +409,7 @@ def test_report_uses_io_mapping(session_with_baseline: Path):
     results = refinement_report(session, top=2)
     assert len(results) == 16
     assert (
-        results.loc[results["refine_run_id"] == "first", "fitted_model"].tolist()
+        results.loc[results["refine_run_id"] == "first", "unrefined_fitted_model"].tolist()
         == [str(session / "powerfit/run_001/protein/renamed.pdb")] * 8
     )
     assert results.loc[results["refine_run_id"] == "first", "fitted_rank"].tolist() == [2] * 8
@@ -389,6 +443,8 @@ def test_missing_scores_in_another_run_preserve_numeric_ranking(
     (missing / "refinement/8_caprieval/capri_ss.tsv").write_text(
         "model\tcaprieval_rank\tscore\tcluster_id\tmodel-cluster_ranking\n../6_mdref/missing.pdb\t1\t-\t-\t-\n"
     )
+    write_reconstruction_index(valid / "refinement")
+    write_reconstruction_index(missing / "refinement")
     results = refinement_report(tmp_path, top=2)
     assert results["refined_score"].tolist() == [-100, -9]
     assert results["cluster_id"].tolist() == [1, 1]
@@ -418,8 +474,11 @@ def test_report_paths_preserve_session_argument(
         with output.open() as fh:
             row = next(csv.DictReader(fh))
         for column, expected_path in (
-            ("refined_structure_path", model),
-            ("fitted_model", fitted_model),
+            ("refined_complex", model),
+            ("refined_fitted_structure", run / "refinement/9_reconstruct/mdref_8_fitted.pdb.gz"),
+            ("refined_known_structure", run / "refinement/9_reconstruct/mdref_8_known.pdb.gz"),
+            ("unrefined_fitted_model", fitted_model),
+            ("original_known_structure", run.parents[2] / "known.pdb"),
             ("refine_run_dir", run),
         ):
             assert results.iloc[0][column] == row[column]
@@ -456,6 +515,8 @@ def test_no_group_by_structure_selects_best_models_overall(
         "cluster_id\tcluster_rank\tn\tunder_eval\tscore\tscore_std\n1\t1\t1\tyes\t-120\t0\n2\t2\t1\tyes\t-80\t0\n"
     )
     output = tmp_path / "report.csv"
+    write_reconstruction_index(first / "refinement")
+    write_reconstruction_index(second / "refinement")
     cli(["refine", "report", str(tmp_path), "--no-group-by-structure", "--top", str(top), "--output", str(output)])
     with output.open() as fh:
         rows = list(csv.DictReader(fh))

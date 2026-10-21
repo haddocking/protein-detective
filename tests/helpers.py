@@ -18,6 +18,30 @@ from protein_detective.__version__ import __version__
 from protein_detective.cli import app
 
 
+def write_reconstruction_index(refinement_dir: Path) -> None:
+    """Add reconstructed output mappings for synthetic CAPRI results."""
+    output_dir = refinement_dir / "9_reconstruct"
+    output_dir.mkdir(exist_ok=True)
+    with (refinement_dir / "8_caprieval/capri_ss.tsv").open() as stream:
+        models = [
+            row["model"]
+            for row in csv.DictReader((line for line in stream if not line.startswith("#")), delimiter="\t")
+        ]
+    with (output_dir / "io.csv").open("w", newline="") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(["model", "refined_complex", "refined_fitted_structure", "refined_known_structure"])
+        for model in models:
+            name = Path(model).stem
+            writer.writerow(
+                [
+                    model,
+                    f"6_mdref/{name}.pdb.gz",
+                    f"9_reconstruct/{name}_fitted.pdb.gz",
+                    f"9_reconstruct/{name}_known.pdb.gz",
+                ]
+            )
+
+
 @contextmanager
 def cli_args(tokens: list[str]) -> Generator[None]:
     """Set process arguments for a CLI invocation and restore them afterward."""

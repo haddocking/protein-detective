@@ -22,6 +22,7 @@ from protein_detective.meta import (
     stats_csv_as_duckdb_ddl,
     structure_files_as_duckdb_ddl,
 )
+from tests.helpers import write_reconstruction_index
 
 
 def test_solutions_ddl_requires_fittable_structures_and_solutions(tmp_path: Path):
@@ -510,12 +511,14 @@ def capri_tables(tmp_path: Path, clustered_refinement_results_paths: dict[str, P
         refinement = session_dir / run_dir / "refinement"
         copy_capri_tables(refinement / "2_caprieval", clustered_refinement_results_paths)
         copy_capri_tables(refinement / "8_caprieval", clustered_refinement_results_paths)
+        write_reconstruction_index(refinement)
         # Postprocessed copies must not duplicate the stage results.
         copy_capri_tables(refinement / "analysis/8_caprieval_analysis", clustered_refinement_results_paths)
 
     # Include results from runs not recorded in refinements_io.
     orphan_dir = refine_dir / "refine_run_003/run_001/structure.cif/fit_1.pdb/refinement/8_caprieval"
     copy_capri_tables(orphan_dir, clustered_refinement_results_paths)
+    write_reconstruction_index(orphan_dir.parent)
 
     with duckdb.connect(database=":memory:") as con:
         execute_ddl_statements(con, refinements_io_as_duckdb_ddl(session_dir))
@@ -574,12 +577,12 @@ def test_capri_ss_joins_refinement_runs_and_only_loads_final_stage(
     expected_columns += [
         "filename",
         "refine_run_dir",
-        "fitted_structure",
+        "unrefined_complex",
         "unfitted_structure",
         "powerfit_run_id",
         "refine_run_id",
     ]
-    expected_columns.insert(expected_columns.index("refine_run_dir"), "refined_structure_path")
+    expected_columns += ["refined_complex", "refined_fitted_structure", "refined_known_structure"]
     assert columns == expected_columns
     assert rows == expected_rows
     assert con.table("refinements_capri_ss").count("*").fetchone() == (expected_count,)
@@ -641,7 +644,7 @@ def test_capri_clt_joins_refinement_runs_and_only_loads_final_stage(
     expected_count = 12
     expected_columns += [
         "refine_run_dir",
-        "fitted_structure",
+        "unrefined_complex",
         "unfitted_structure",
         "powerfit_run_id",
         "refine_run_id",
@@ -661,6 +664,7 @@ def test_capri_ddl_loads_without_refinement_io_and_skips_missing_tables(
     stage_dir.mkdir(parents=True)
     results = stage_dir / "capri_ss.tsv"
     shutil.copyfile(clustered_refinement_results_paths["models"], results)
+    write_reconstruction_index(stage_dir.parent)
     statements = refinements_capri_ss_as_duckdb_ddl(tmp_path)
     assert len(statements) == 1
     assert "CREATE TABLE refinements_capri_ss" in statements[0][0]
@@ -684,6 +688,7 @@ def multiple_refinement_indexes(tmp_path: Path):
         stage = tmp_path / refinement_run / "refinement" / "8_caprieval"
         stage.mkdir(parents=True)
         (stage / "capri_ss.tsv").write_text("model\tscore\tcaprieval_rank\tcluster_id\nx.pdb\t-10\t1\t-\n")
+        write_reconstruction_index(stage.parent)
     with duckdb.connect() as con:
         for statement, params in refinements_io_as_duckdb_ddl(tmp_path) + refinements_capri_ss_as_duckdb_ddl(tmp_path):
             con.execute(statement, params)
@@ -716,6 +721,7 @@ def test_generated_path_columns_are_session_relative(
     baseline.mkdir(parents=True)
     (baseline / "capri_ss.tsv").write_text("model\tscore\n../1_emscoring/emscoring_1.pdb\t-5\n")
     (stage / "capri_clt.tsv").write_text("cluster_id\tscore\n1\t-10\n")
+    write_reconstruction_index(stage.parent)
     artifact = repeated_directory / "test.pdb"
     (session / artifact).parent.mkdir(parents=True)
     (session / artifact).write_text("END\n")
@@ -729,7 +735,7 @@ def test_generated_path_columns_are_session_relative(
             (str(artifact), str(artifact.parent), artifact.name)
         ]
         assert con.execute(
-            "SELECT filename, refine_run_dir, refined_structure_path, model FROM refinements_capri_ss"
+            "SELECT filename, refine_run_dir, refined_complex, model FROM refinements_capri_ss"
         ).fetchall() == [
             (
                 str(run_dir / "refinement/8_caprieval/capri_ss.tsv"),

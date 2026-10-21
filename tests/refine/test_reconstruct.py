@@ -6,7 +6,11 @@ import gemmi
 import pytest
 from protein_quest.structure.formats import read_structure, write_structure
 
-from protein_detective.meta import execute_ddl_statements, refinements_runs_as_duckdb_ddl
+from protein_detective.meta import (
+    execute_ddl_statements,
+    refinements_capri_ss_as_duckdb_ddl,
+    refinements_runs_as_duckdb_ddl,
+)
 from protein_detective.refine import run
 from protein_detective.refine.haddock import prepare_fitted_and_known, prepare_known_structure
 from protein_detective.refine.reconstruct import reconstruct_refined_structures
@@ -71,18 +75,19 @@ def test_refinement_reconstructs_partners(tmp_path: Path, input_name: str):
         write_structure(structure, mdref / f"mdref_{number}.pdb.gz")
     reconstruct_refined_structures(refinement, saved, remove_known_chains={"Z"})
     output = refinement / "9_reconstruct"
-    with (output / "io.tsv").open() as stream:
-        rows = list(csv.DictReader(stream, delimiter="\t"))
+    with (output / "io.csv").open() as stream:
+        rows = list(csv.DictReader(stream))
     assert len(rows) == 2
     for number, row in enumerate(rows, start=1):  # zorilla: ignore -- Check each indexed output pair.
         assert row == {
+            "model": f"../6_mdref/mdref_{number}.pdb",
             "refined_complex": f"6_mdref/mdref_{number}.pdb.gz",
-            "fitted_structure": f"9_reconstruct/mdref_{number}_fitted.pdb.gz",
-            "known_structure": f"9_reconstruct/mdref_{number}_known.pdb.gz",
+            "refined_fitted_structure": f"9_reconstruct/mdref_{number}_fitted.pdb.gz",
+            "refined_known_structure": f"9_reconstruct/mdref_{number}_known.pdb.gz",
         }
-        fitted_result = read_structure(refinement / row["fitted_structure"])
+        fitted_result = read_structure(refinement / row["refined_fitted_structure"])
         assert [c.name for c in fitted_result[0]] == ["A"]
-        known_result = read_structure(refinement / row["known_structure"])
+        known_result = read_structure(refinement / row["refined_known_structure"])
         assert [(c.name, [str(r.seqid) for r in c]) for c in known_result[0]] == [("X", ["7"]), ("Y", ["7", "7A"])]
         for result in (fitted_result, known_result):
             for chain in result[0]:
@@ -90,12 +95,31 @@ def test_refinement_reconstructs_partners(tmp_path: Path, input_name: str):
                     assert residue[0].pos.tolist() == [4, 5, 6]
                     assert [a.name for a in residue] == ["CA", "H"]
 
+    stage = refinement / "8_caprieval"
+    stage.mkdir()
+    (stage / "capri_ss.tsv").write_text("model\tscore\n../6_mdref/mdref_1.pdb\t-10\n../6_mdref/mdref_2.pdb\t-9\n")
+
     # Runs without recorded provenance are excluded even when their IO indexes exist.
     source.unlink()
     relocated = session.with_name("relocated")
     session.rename(relocated)
     with duckdb.connect() as con:
         execute_ddl_statements(con, refinements_runs_as_duckdb_ddl(relocated))
+        execute_ddl_statements(con, refinements_capri_ss_as_duckdb_ddl(relocated))
+        prefix = "refine/refine_run_001/run_001/model/fit_1.pdb/refinement"
+        assert con.execute(
+            "SELECT model, unrefined_complex, refined_complex, refined_fitted_structure, refined_known_structure "
+            "FROM refinements_capri_ss ORDER BY model"
+        ).fetchall() == [
+            (
+                f"../6_mdref/mdref_{number}.pdb",
+                "fit_1.pdb",
+                f"{prefix}/6_mdref/mdref_{number}.pdb.gz",
+                f"{prefix}/9_reconstruct/mdref_{number}_fitted.pdb.gz",
+                f"{prefix}/9_reconstruct/mdref_{number}_known.pdb.gz",
+            )
+            for number in (1, 2)
+        ]
         assert (
             con.execute("SELECT original_known_structure, processed_known_structure FROM refinements_runs").fetchall()
             == []

@@ -493,38 +493,51 @@ def refinements_capri_ss_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     has_ss = any(session_dir.glob(str(capri_ss_pattern.relative_to(session_dir))))
     if not has_ss:
         return []
-    # the clean = True in haddock3 config, causes pdb files to be gzipped,
-    # but tsv files are still pointing to the original filenames (model column)
-    # also path is relative to tsv make it relative to session_dir
-    # so ../6_mdref/mdref_3.pdb + filename -> refine_run_dir / 6_mdref/mdref_3.pdb.gz
-    # to make refined_structure_path
-    # Normalize names so `model-cluster_ranking` becomes `modelcluster_ranking`.
+    reconstruction_pattern = refine_dirs / "refinement/9_reconstruct/io.csv"
     return [
         (
-            _PATH_MACROS
-            + """\
+            _PATH_MACROS  # noqa: S608 - concatenating only constant SQL.
+            + """
             CREATE TABLE refinements_capri_ss AS
-            SELECT
-            * REPLACE (session_relative_path(filename, $session_dir) AS filename)
-            ,session_relative_path(
-                parse_dirpath(parse_dirpath(filename)) || '/' || substring(model, 4) || '.gz', $session_dir
-            ) AS refined_structure_path
-            ,refinement_run_directory(filename, $session_dir) AS refine_run_dir
-            ,parse_path(filename)[-4] AS fitted_structure
-            ,parse_path(filename)[-5] AS unfitted_structure
-            ,parse_path(filename)[-6] AS powerfit_run_id
-            ,parse_path(filename)[-7] AS refine_run_id
-            FROM
-            read_csv(
-                $capri_ss_pattern, delim = '\t', header = true, nullstr = '-',
-                normalize_names = true, comment = '#', filename = true
+            WITH scores AS (
+                SELECT * FROM read_csv(
+                    $capri_ss_pattern, delim = '\t', header = true, nullstr = '-',
+                    normalize_names = true, comment = '#', filename = true
+                )
+            ), reconstructed AS (
+                SELECT * FROM read_csv($reconstruction_pattern, all_varchar = true, filename = true)
             )
+            SELECT
+                scores.* REPLACE (session_relative_path(scores.filename, $session_dir) AS filename),
+                refinement_run_directory(scores.filename, $session_dir) AS refine_run_dir,
+                parse_path(scores.filename)[-4] AS unrefined_complex,
+                parse_path(scores.filename)[-5] AS unfitted_structure,
+                parse_path(scores.filename)[-6] AS powerfit_run_id,
+                parse_path(scores.filename)[-7] AS refine_run_id,
+                session_relative_path(
+                    parse_dirpath(parse_dirpath(reconstructed.filename)) || '/' || reconstructed.refined_complex,
+                    $session_dir
+                ) AS refined_complex,
+                session_relative_path(
+                    parse_dirpath(parse_dirpath(reconstructed.filename)) || '/'
+                        || reconstructed.refined_fitted_structure,
+                    $session_dir
+                ) AS refined_fitted_structure,
+                session_relative_path(
+                    parse_dirpath(parse_dirpath(reconstructed.filename)) || '/'
+                        || reconstructed.refined_known_structure,
+                    $session_dir
+                ) AS refined_known_structure
+            FROM scores
+            INNER JOIN reconstructed ON scores.model = reconstructed.model
+                AND parse_dirpath(parse_dirpath(scores.filename)) = parse_dirpath(parse_dirpath(reconstructed.filename))
             """,
             {
                 "session_dir": str(session_dir),
                 "capri_ss_pattern": str(capri_ss_pattern),
+                "reconstruction_pattern": str(reconstruction_pattern),
             },
-        ),
+        )
     ]
 
 
@@ -544,7 +557,7 @@ def refinements_capri_clt_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]
             SELECT
             *
             ,refinement_run_directory(filename, $session_dir) AS refine_run_dir
-            ,parse_path(filename)[-4] AS fitted_structure
+            ,parse_path(filename)[-4] AS unrefined_complex
             ,parse_path(filename)[-5] AS unfitted_structure
             ,parse_path(filename)[-6] AS powerfit_run_id
             ,parse_path(filename)[-7] AS refine_run_id
@@ -575,7 +588,7 @@ def refinements_baseline(session_dir: Path) -> list[DDLStatement]:
             SELECT
             *
             ,refinement_run_directory(filename, $session_dir) AS refine_run_dir
-            ,parse_path(filename)[-4] AS fitted_structure
+            ,parse_path(filename)[-4] AS unrefined_complex
             ,parse_path(filename)[-5] AS unfitted_structure
             ,parse_path(filename)[-6] AS powerfit_run_id
             ,parse_path(filename)[-7] AS refine_run_id
@@ -689,7 +702,8 @@ def create_meta_duckdb(
     """Generate a DuckDB metadata database for a Protein Detective session.
 
     Filesystem paths are relative to the session directory. Raw CAPRI ``model``
-    values retain their source meaning; use ``refined_structure_path`` instead.
+    values retain their source meaning; use ``refined_fitted_structure`` and
+    ``refined_known_structure`` for reconstructed partners.
     Recorded commands and other provenance text retain their original values.
 
     Args:

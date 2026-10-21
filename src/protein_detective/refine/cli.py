@@ -36,9 +36,9 @@ def run(
     The fitted structures will be refined against the known structure
     using HADDOCK3 rigidbody and molecular dynamics refinement.
 
-    Each refinement workflow includes 9_reconstruct/ with separate fitted and
-    known PDB files and io.tsv linking them to the 6_mdref/ complexes. The known
-    partner's original chain identifiers and residue numbers are restored.
+    The refined fitted structure and refined known structure
+    are reconstructed from the refined complex made by HADDOCK3. The known
+    structures original chain identifiers and residue numbers are restored.
 
     Args:
         session_dir: Session directory containing fitted PowerFit results

@@ -21,7 +21,7 @@ def reconstruct_refined_structures(
         remove_known_chains: Original chains omitted when preparing the partner.
 
     Returns:
-        Path to 9_reconstruct/io.tsv.
+        Path to 9_reconstruct/io.csv.
     """
     original = read_structure(original_known_structure)
     if len(original) != 1:
@@ -39,10 +39,10 @@ def reconstruct_refined_structures(
         raise FileNotFoundError(msg)
     output_dir = refinement_dir / "9_reconstruct"
     output_dir.mkdir()
-    index = output_dir / "io.tsv"
+    index = output_dir / "io.csv"
     with index.open("w", newline="") as stream:
-        writer = csv.writer(stream, delimiter="\t")
-        writer.writerow(["refined_complex", "fitted_structure", "known_structure"])
+        writer = csv.writer(stream)
+        writer.writerow(["model", "refined_complex", "refined_fitted_structure", "refined_known_structure"])
         for complex_path in complexes:
             complex_structure = read_structure(complex_path)
             if len(complex_structure) != 1 or not {"A", "B"} <= {c.name for c in complex_structure[0]}:
@@ -70,5 +70,10 @@ def reconstruct_refined_structures(
             known_path = output_dir / f"{name}_known.pdb.gz"
             write_structure(complex_structure, fitted_path)
             write_structure(known, known_path)
-            writer.writerow(str(path.relative_to(refinement_dir)) for path in (complex_path, fitted_path, known_path))
+            writer.writerow(
+                [
+                    str(complex_path.relative_to(output_dir, walk_up=True)).removesuffix(".gz"),
+                    *(str(path.relative_to(refinement_dir)) for path in (complex_path, fitted_path, known_path)),
+                ]
+            )
     return index

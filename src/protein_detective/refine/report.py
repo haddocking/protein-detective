@@ -6,6 +6,7 @@ import duckdb
 import pandas as pd
 
 from protein_detective.meta import (
+    powerfit_runs_as_duckdb_ddl,
     refinements_baseline,
     refinements_capri_clt_as_duckdb_ddl,
     refinements_capri_ss_as_duckdb_ddl,
@@ -29,8 +30,12 @@ SELECT
     m.modelcluster_ranking,
     u.score AS unrefined_score,
     m.score AS refined_score,
-    concat_ws('/', $session_prefix, m.refined_structure_path) AS refined_structure_path,
-    concat_ws('/', $session_prefix, fm.fitted_model_file) AS fitted_model,
+    CASE WHEN pr.used_target IS NOT NULL THEN concat_ws('/', $session_prefix, pr.used_target) END AS density,
+    concat_ws('/', $session_prefix, io.fitted_model) AS unrefined_fitted_model,
+    concat_ws('/', $session_prefix, r.original_known_structure) AS original_known_structure,
+    concat_ws('/', $session_prefix, m.refined_complex) AS refined_complex,
+    concat_ws('/', $session_prefix, m.refined_fitted_structure) AS refined_fitted_structure,
+    concat_ws('/', $session_prefix, m.refined_known_structure) AS refined_known_structure,
     concat_ws('/', $session_prefix, m.refine_run_dir) AS refine_run_dir
 FROM refinements_capri_ss m
 JOIN refinements_runs r USING (refine_run_id)
@@ -40,6 +45,7 @@ JOIN (SELECT DISTINCT * FROM fitted_models) fm ON io.fitted_model = fm.fitted_mo
 JOIN fittable_structures fs ON m.unfitted_structure = fs.structure
 JOIN refinements_capri_clt cl USING (refine_run_dir, cluster_id)
 JOIN refinements_baseline u USING (refine_run_dir)
+LEFT JOIN powerfit_runs pr ON m.powerfit_run_id = pr.powerfit_run_id
 WHERE m.score IS NOT NULL
     AND ($refine_run_id IS NULL OR m.refine_run_id = $refine_run_id)
     AND (NOT $group_by_structure OR modelcluster_ranking <= $top)
@@ -51,7 +57,7 @@ ORDER BY
     cluster_rank,
     m.cluster_id,
     modelcluster_ranking,
-    refined_structure_path
+    refined_complex
 """
 
 
@@ -96,6 +102,15 @@ def _ensure_metadata(con: duckdb.DuckDBPyConnection, session_dir: Path) -> None:
         msg = f"Empty PowerFit metadata file: {fittable_structures_csv}"
         raise ValueError(msg)
 
+    statements = powerfit_runs_as_duckdb_ddl(session_dir)
+    if not statements:
+        con.execute("CREATE TABLE powerfit_runs (powerfit_run_id VARCHAR, used_target VARCHAR)")
+    for statement, parameters in statements:
+        con.execute(statement, parameters)
+
+
+# TODO In docs use HADDOCK3 not Haddock3 or HADDOCK. That is how they refer to the software.
+
 
 def refinement_report(
     session_dir: Path,
@@ -117,7 +132,7 @@ def refinement_report(
 
     Include UniProt accessions, fitted rank, source and refinement run IDs,
     cluster summaries, and individual model scores in separate columns.
-    CSV columns refined_structure_path, fitted_model and refine_run_dir are prefixed with session_dir.
+    All file paths and refine_run_dir are prefixed with session_dir.
     Relative session paths remain relative to the current working directory; absolute session paths remain absolute.
     Model paths reference compressed PDBs produced by HADDOCK cleanup with clean = True.
 
@@ -150,9 +165,13 @@ def refinement_report(
     - modelcluster_ranking: capri_ss.tsv column modelcluster_ranking.
     - refined_score: capri_ss.tsv column score.
     - unrefined_score: CAPRI score of unrefined structure and the known structure.
-    - refined_structure_path: corrected (+.gz) capri_ss.tsv column model, prefixed with session_dir.
-    - fitted_model: source input path from refine/*/io.csv column fitted_model,
-      matched to fitted_models.csv column fitted_model_file.
+    - density: path to the density map used to fit the model; empty when it was not recorded.
+    - unrefined_fitted_model: path to the fitted model before refinement.
+    - original_known_structure: path to the supplied known structure before chain removal or renaming.
+    - refined_complex: path to the refined complex containing both the fitted and known structures.
+    - refined_fitted_structure: path to the fitted structure after refinement, extracted from the refined complex.
+    - refined_known_structure: path to the known structure after refinement, with its original
+      chain identifiers and residue numbers restored.
     - refine_run_dir: model run directory containing
       baseline and refinement/8_caprieval, discovered as
       refine/{refine_run_id}/{powerfit_run_id}/{structure}/{fitted_model_name}.
