@@ -39,9 +39,9 @@ show all filtered rows before the top-N selection and pagination.
 
 Opening Fitting results or Refinement results selects the first listed result
 and shows it in the 3D viewer. Select another result to view it, or use Details
-to inspect it. Press j or Down to select the next result and k or Up to
-select the previous one; paging follows the selection. Unsaved fitted solutions
-remain available for inspection and export; save structures with
+to inspect it. Press j or Down to select the next result and k or Up to select
+the previous one; paging follows the selection. Unsaved fitted solutions remain
+available for inspection and export; save structures with
 `protein-detective powerfit fit-models` before viewing them. Missing density
 maps or ambiguous provenance associations must be repaired before 3D viewing.
 

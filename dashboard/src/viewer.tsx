@@ -18,6 +18,39 @@ declare global {
   }
 }
 
+// Scene colors per theme. The dark palette brightens structure and density
+// colors so they stay contrasty on the dark canvas background.
+const LIGHT = { background: 0xfcfbf9, candidate: 0x2c7fb8, partner: 0xe89c36, density: 0x8294a7 };
+const DARK = { background: 0x131d23, candidate: 0x5aa9e6, partner: 0xf2a64a, density: 0xa3b8cc };
+
+function resolveDark(): boolean {
+  const attr = document.documentElement.getAttribute("data-theme");
+  if (attr === "dark") return true;
+  if (attr === "light") return false;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+// The theme toggle and this lazy-loaded panel hold separate React state, so
+// follow the root element's data-theme attribute and the system preference.
+function useDarkTheme(): boolean {
+  const [dark, setDark] = useState(resolveDark);
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () => setDark(resolveDark());
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    media.addEventListener("change", update);
+    return () => {
+      observer.disconnect();
+      media.removeEventListener("change", update);
+    };
+  }, []);
+  return dark;
+}
+
 let runtimePromise: Promise<Runtime> | undefined;
 let stylesheetReady = false;
 
@@ -131,6 +164,8 @@ export function StructureViewer({
   const [density, setDensity] = useState(true);
   const [opacity, setOpacity] = useState(0.25);
   const [contour, setContour] = useState(1.5);
+  const dark = useDarkTheme();
+  const palette = useRef(LIGHT);
 
   // The plugin belongs to this panel, rather than to an individual selection.
   useEffect(() => {
@@ -178,6 +213,55 @@ export function StructureViewer({
     };
   }, [attempt]);
 
+  // Recolor the existing scene when the theme changes. Newly loaded
+  // structures and densities pick their colors from this palette instead.
+  useEffect(() => {
+    palette.current = dark ? DARK : LIGHT;
+    const scene = palette.current;
+    const session = sessionRef.current;
+    if (!session) return;
+    session.queue = session.queue.then(async () => {
+      try {
+        const viewer = await session.viewer;
+        if (session.disposed || !viewer) return;
+        const plugin = viewer.plugin;
+        plugin.canvas3d.setProps({ renderer: { backgroundColor: scene.background } });
+        for (const [index, rep] of reps.current.entries()) {
+          await plugin
+            .build()
+            .to(rep.ref)
+            .update((old: Runtime) => ({
+              ...old,
+              colorTheme: {
+                ...old.colorTheme,
+                params: {
+                  ...old.colorTheme.params,
+                  value: index === 0 ? scene.candidate : scene.partner,
+                },
+              },
+            }))
+            .commit();
+        }
+        const cell = volume.current;
+        if (cell) {
+          await plugin
+            .build()
+            .to(cell.transform.ref)
+            .update((old: Runtime) => ({
+              ...old,
+              colorTheme: {
+                ...old.colorTheme,
+                params: { ...old.colorTheme.params, value: scene.density },
+              },
+            }))
+            .commit();
+        }
+      } catch (cause) {
+        if (!session.disposed) setError(cause instanceof Error ? cause.message : String(cause));
+      }
+    });
+  }, [dark]);
+
   useEffect(() => {
     const session = sessionRef.current;
     if (!session) return;
@@ -198,6 +282,8 @@ export function StructureViewer({
         if (new URL(densityUrl, location.href).origin !== location.origin)
           throw new Error("Density files must use the dashboard origin.");
         const plugin = viewer.plugin;
+        // A retried or recreated viewer always starts with the current theme.
+        plugin.canvas3d.setProps({ renderer: { backgroundColor: palette.current.background } });
         const removeRoots = async (roots: string[]) => {
           if (!roots.length) return;
           const update = plugin.build();
@@ -211,13 +297,19 @@ export function StructureViewer({
         await removeRoots(session.modelRoots);
         reps.current = [];
         if (obsolete()) return;
-        const parts = [{ text, name: refined ? "Refined candidate" : label, color: 0x2c7fb8 }];
+        const parts = [
+          { text, name: refined ? "Refined candidate" : label, color: palette.current.candidate },
+        ];
         if (refined) {
           if (!refinedKnownStructureUrl)
             throw new Error("The refined known partner is unavailable.");
           const knownText = await modelText(refinedKnownStructureUrl, controller.signal);
           if (obsolete()) return;
-          parts.push({ text: knownText, name: "Refined known partner", color: 0xe89c36 });
+          parts.push({
+            text: knownText,
+            name: "Refined known partner",
+            color: palette.current.partner,
+          });
         }
         for (const part of parts) {
           const data = await plugin.builders.data.rawData({ data: part.text, label: part.name });
@@ -254,7 +346,7 @@ export function StructureViewer({
           const before = new Set<string>(plugin.state.data.cells.keys());
           try {
             await viewer.loadVolumeFromUrl({ url: densityUrl, format: "ccp4", isBinary: true }, [
-              { type: "relative", value: 1.5, color: 0x8294a7, alpha: 0.25 },
+              { type: "relative", value: 1.5, color: palette.current.density, alpha: 0.25 },
             ]);
             session.densityUrl = densityUrl;
           } finally {
@@ -328,7 +420,7 @@ export function StructureViewer({
           <button onClick={() => setAttempt((value) => value + 1)}>Retry viewer</button>
         </div>
       )}
-      <div ref={target} className="molecular-canvas" />
+      <div ref={target} className="molecular-canvas" data-dark={dark ? "" : undefined} />
       <fieldset disabled={!ready} className="viewer-controls">
         <legend>Display controls</legend>
         <label>
