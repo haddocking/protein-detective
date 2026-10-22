@@ -11,6 +11,31 @@
   --accent: #176c75;
   --soft: #eaf4f4;
 }
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color: #d4dfe4;
+  background: #131d23;
+  color-scheme: dark;
+  --surface: #1b282f;
+  --border: #34434b;
+  --muted: #9aaeb9;
+  --accent: #68c3c8;
+  --soft: #213b41;
+}
+:root[data-theme="dark"] .primary {
+  color: #102329;
+}
+:root[data-theme="dark"] .notice,
+:root[data-theme="dark"] .error {
+  background: #3e3421;
+  border-color: #72603b;
+  color: #edd69a;
+}
+:root[data-theme="dark"] .improved {
+  color: #7bd5ad;
+}
 * {
   box-sizing: border-box;
 }
@@ -88,6 +113,44 @@ header {
   border: 1px solid var(--border);
   border-radius: 30px;
   padding: 7px 12px;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.theme-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--soft);
+  border-radius: 20px;
+  padding: 3px;
+}
+.theme-toggle button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 16px;
+  padding: 5px 10px;
+  font-size: 12px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.theme-toggle button:hover {
+  color: var(--accent);
+}
+.theme-toggle button.active {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+}
+.theme-icon {
+  font-size: 14px;
+  line-height: 1;
 }
 nav {
   display: flex;
@@ -546,7 +609,7 @@ footer {
   gap: 6px;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color: #d4dfe4;
     background: #131d23;
     --surface: #1b282f;
@@ -555,16 +618,16 @@ footer {
     --accent: #68c3c8;
     --soft: #213b41;
   }
-  .primary {
+  :root:not([data-theme="light"]) .primary {
     color: #102329;
   }
-  .notice,
-  .error {
+  :root:not([data-theme="light"]) .notice,
+  :root:not([data-theme="light"]) .error {
     background: #3e3421;
     border-color: #72603b;
     color: #edd69a;
   }
-  .improved {
+  :root:not([data-theme="light"]) .improved {
     color: #7bd5ad;
   }
 }
@@ -605,6 +668,12 @@ footer {
   }
   .snapshot {
     display: none;
+  }
+  .theme-toggle .theme-label {
+    display: none;
+  }
+  .theme-toggle button {
+    padding: 5px 8px;
   }
   nav {
     padding: 0 18px;
