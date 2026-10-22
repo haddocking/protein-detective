@@ -180,6 +180,24 @@ section {
   padding: 20px;
   margin: 18px 0;
 }
+.overview-top {
+  display: grid;
+  grid-template-columns: minmax(260px, 2fr) 3fr;
+  gap: 16px;
+  align-items: start;
+  margin: 24px 0;
+}
+.overview-top .stats {
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  margin: 0;
+}
+.best-structure {
+  display: flex;
+  flex-direction: column;
+  height: min(560px, 70dvh);
+  min-width: 0;
+  margin: 0;
+}
 .overview-results {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -560,6 +578,9 @@ footer {
   .stats {
     grid-template-columns: repeat(2, 1fr);
   }
+  .overview-top {
+    grid-template-columns: 1fr;
+  }
   .chart-section {
     grid-template-columns: 1fr;
   }
@@ -692,4 +713,11 @@ aside.viewer-panel {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+}
+kbd {
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 11px;
 }

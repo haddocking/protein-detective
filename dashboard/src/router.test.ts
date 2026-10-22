@@ -182,7 +182,11 @@ it("authenticates a direct provenance link and keeps its selected result across 
     expect(container.querySelectorAll<HTMLButtonElement>(".file-paths button")[1]?.title).toBe(
       "/session/density.map",
     );
-    const viewer = container.querySelector(".mock-viewer");
+    // The overview shows the best refined structure without any clicks.
+    expect(container.querySelector(".best-structure .mock-viewer")?.textContent).toBe(
+      "/files/model-1.pdb",
+    );
+    const viewer = container.querySelector("aside .mock-viewer");
     expect(viewer?.textContent).toBe("/files/model-1.pdb");
     const panel = container.querySelector("aside")!;
     expect(panel.style.width).toBe(`${Math.max(440, Math.round(window.innerWidth * 0.6))}px`);
@@ -199,7 +203,7 @@ it("authenticates a direct provenance link and keeps its selected result across 
         search: (previous) => ({ ...previous, tab: "details" }),
       });
     });
-    expect(container.querySelector(".mock-viewer")).toBe(viewer);
+    expect(container.querySelector("aside .mock-viewer")).toBe(viewer);
     expect(container.querySelector<HTMLElement>(".retained-viewer")?.hidden).toBe(true);
     expect(panel.style.width).toBe(resizedWidth);
     await act(async () => {
@@ -208,7 +212,7 @@ it("authenticates a direct provenance link and keeps its selected result across 
         search: (previous) => ({ ...previous, selected: "fit-2", tab: "viewer" }),
       });
     });
-    expect(container.querySelector(".mock-viewer")).toBe(viewer);
+    expect(container.querySelector("aside .mock-viewer")).toBe(viewer);
     expect(viewer?.textContent).toBe("/files/model-2.pdb");
     expect(container.querySelector<HTMLButtonElement>(".file-paths button")?.title).toBe(
       "/session/model-2.pdb",
@@ -225,7 +229,7 @@ it("authenticates a direct provenance link and keeps its selected result across 
         search: { selected: "fit-1", selection: "fitting", tab: "details" },
       });
     });
-    expect(container.querySelector(".mock-viewer")).toBeNull();
+    expect(container.querySelector("aside .mock-viewer")).toBeNull();
     expect(container.querySelector("aside h2")?.textContent).toBe("1abc");
     await act(async () => {
       await router.navigate({
@@ -242,7 +246,7 @@ it("authenticates a direct provenance link and keeps its selected result across 
     });
     expect(container.querySelector<HTMLElement>(".retained-viewer")?.hidden).toBe(false);
     // Selecting a related result also opens the viewer by default.
-    expect(container.querySelector(".mock-viewer")?.getAttribute("data-known-url")).toBe(
+    expect(container.querySelector("aside .mock-viewer")?.getAttribute("data-known-url")).toBe(
       "/files/refine/9_reconstruct/mdref_1_known.pdb.gz",
     );
     await act(async () => {
@@ -299,6 +303,31 @@ it("authenticates a direct provenance link and keeps its selected result across 
     writeText.mockRejectedValueOnce(new Error("Clipboard denied"));
     await act(async () => copyButtons[0].click());
     expect(copyButtons[0].querySelector('[role="status"]')?.textContent).toBe("Copy failed");
+    // Opening a results page shows its first result in the viewer.
+    await act(async () => {
+      await router.navigate({ to: "/fitting", search: {} });
+    });
+    expect(router.state.location.search).toEqual({
+      selected: "fit-1",
+      selection: "fitting",
+      tab: "viewer",
+    });
+    // Keyboard navigation steps through solutions and stops at the ends.
+    await act(async () => {
+      await router.navigate({ to: "/fitting", search: { top: "all" } });
+    });
+    const press = (key: string) =>
+      act(async () => {
+        dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+      });
+    await press("j");
+    expect(router.state.location.search.selected).toBe("fit-1");
+    await press("ArrowDown");
+    expect(router.state.location.search.selected).toBe("fit-2");
+    await press("j");
+    expect(router.state.location.search.selected).toBe("fit-2");
+    await press("k");
+    expect(router.state.location.search).toMatchObject({ selected: "fit-1", tab: "viewer" });
     expect(fetchMock.mock.calls.filter(([url]) => url === "/api/auth")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([url]) => url === "/api/summary")).toHaveLength(1);
   } finally {

@@ -56,7 +56,25 @@ export function useResults(kind: ResultKind) {
       page: String(Math.floor(all.findIndex((r) => key(r) === key(row)) / pageSize) + 1),
     });
   }
+  /** Select the result `delta` rows away from the current one, across pages. */
+  function step(delta: number) {
+    if (!selectedRows.length) return;
+    const current = selectedRows.findIndex((r) => key(r) === p.get("selected"));
+    const index =
+      current < 0
+        ? (page - 1) * pageSize
+        : Math.max(0, Math.min(selectedRows.length - 1, current + delta));
+    if (index === current) return;
+    const row = selectedRows[index];
+    navigate({
+      selected: key(row),
+      selection: kind,
+      tab: p.get("tab") === "details" || !row.viewer_available ? "details" : "viewer",
+      page: String(Math.floor(index / pageSize) + 1),
+    });
+  }
   return {
+    step,
     rows,
     filtered,
     columns,
