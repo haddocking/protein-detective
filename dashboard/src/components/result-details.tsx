@@ -17,6 +17,7 @@ const detailsFields = new Set([
   "fishz",
   "relative_z",
   "fitted_rank",
+  "fitted_cc",
   "cluster_id",
   "cluster_rank",
   "member_rank",

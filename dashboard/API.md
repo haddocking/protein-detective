@@ -96,7 +96,7 @@ structure, refined known structure). `fitted_model_absolute_path` and
 after refinement.
 
 Refinement fields include `refine_run_id`, `refine_run_dir`, `fitted_model`,
-`fitted_rank`, `cluster_id`, `cluster_rank`, `member_rank`, `refined_score`,
+`fitted_rank`, `fitted_cc`, `cluster_id`, `cluster_rank`, `member_rank`, `refined_score`,
 `baseline_score`, `score_change`, `population`, `cluster_score`, and
 `cluster_score_std`. Default member selection retains the lowest `member_rank`
 within each independent refinement run, fitted input, and cluster. Default
@@ -105,6 +105,9 @@ deviations describe clusters. `score_change` is
 `refined_score - baseline_score`; negative values indicate improvement. Missing
 baseline/cluster measurements are null. Refinement run IDs are independent of
 source PowerFit run IDs, and multiple refinement runs can reuse a fitted input.
+`fitted_cc` and `uniprot_accessions` come from the fitted solution in
+`solutions`; when that table is absent they fall back to `fittable_structures`
+(null CC).
 
 Provenance fields include `command`, nullable `start_time` and `end_time`, and
 `inputs` and `outputs` arrays of recorded paths. Additional `files` metadata

@@ -128,6 +128,8 @@ def test_refinement_joins_are_scoped_by_independent_run_and_input(session: Path)
     assert first["refined_known_structure_absolute_path"] == str(session / "refine/a_known.pdb.gz")
     assert first["density_absolute_path"] == str(session / "powerfit/fit-a/map.mrc")
     assert first["fitted_rank"] == second["fitted_rank"] == 1
+    assert first["fitted_cc"] == second["fitted_cc"] == 0.8
+    assert first["uniprot_accessions"] == second["uniprot_accessions"] == "P12345"
     assert first["powerfit_run_id"] == second["powerfit_run_id"] == "fit-a"
     assert first["refine_run_id"] != second["refine_run_id"]
     assert first["cluster_score"] == -11.5
@@ -191,6 +193,15 @@ def test_solutions_without_saved_models(session: Path):
     assert data.summary()["fitting_status"] == "structures_not_saved"
     assert all(not row["viewer_available"] for row in data.fitting())
     assert data.refinements() == []
+
+
+def test_refinements_without_solutions_table_fall_back_to_fittable_structures(session: Path):
+    with duckdb.connect(str(session / "meta.duckdb")) as con:
+        con.execute("DROP TABLE solutions")
+    rows = DashboardData(session).refinements()
+    assert len(rows) == 3
+    assert all(row["fitted_cc"] is None for row in rows)
+    assert all(row["uniprot_accessions"] == "P12345" for row in rows)
 
 
 def test_file_paths_resolve_after_relocation_and_reject_escapes(session: Path, tmp_path: Path):
