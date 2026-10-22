@@ -396,9 +396,6 @@ export function StructureViewer({
             }}
           />
         </label>
-        <button onClick={() => viewerRef.current?.plugin.managers.camera.reset()}>
-          Reset camera
-        </button>
       </fieldset>
     </section>
   );

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useId, useState } from "react";
 import { display, fileUrl } from "../data";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
 import { useDetailsPanel } from "../hooks/use-details-panel";
@@ -47,6 +47,7 @@ function CopyPathButton({ path, label }: { path: string; label: string }) {
 }
 
 export function DetailsPanel() {
+  const fileMenuId = useId();
   const { navigate, selectedId } = useDashboardNavigation();
   const {
     selected,
@@ -89,6 +90,71 @@ export function DetailsPanel() {
       />
       <div className="panel-header">
         <strong>{display(selected?.structure ?? selectedId)}</strong>
+        {selected && selectedKind !== "candidates" && (
+          <div key={selectedId} className="file-menu">
+            <button type="button" popoverTarget={fileMenuId}>
+              Files ▾
+            </button>
+            <div
+              id={fileMenuId}
+              className="file-menu-content"
+              popover="auto"
+              onBeforeToggle={(event) => {
+                if (event.newState !== "open") return;
+                const menu = event.currentTarget;
+                const button = menu.previousElementSibling!.getBoundingClientRect();
+                menu.style.setProperty("--file-menu-top", `${button.bottom}px`);
+                menu.style.setProperty(
+                  "--file-menu-right",
+                  `${window.innerWidth - button.right}px`,
+                );
+              }}
+            >
+              {(selectedKind === "refinements"
+                ? [
+                    {
+                      title: "Inputs",
+                      files: [
+                        ["density", "Density"],
+                        ["fitted_model", "Unrefined fitted model"],
+                        ["original_known_structure", "Original known structure"],
+                      ],
+                    },
+                    {
+                      title: "Outputs",
+                      files: [
+                        ["refined_fitted_structure", "Refined fitted structure"],
+                        ["refined_known_structure", "Refined known structure"],
+                      ],
+                    },
+                  ]
+                : [
+                    {
+                      title: "Local files",
+                      files: [
+                        ["model", "Structure"],
+                        ["density", "Density"],
+                      ],
+                    },
+                  ]
+              ).map(({ title, files }) => (
+                <section key={title} className="file-paths" aria-label={title}>
+                  {selectedKind === "refinements" && <h3>{title}</h3>}
+                  {files.map(([kind, label]) => {
+                    const path = selected[`${kind}_absolute_path`];
+                    return typeof path === "string" ? (
+                      <CopyPathButton key={`${kind}:${path}`} path={path} label={label} />
+                    ) : (
+                      <span key={kind} className="unavailable-file" title="File unavailable">
+                        {label} unavailable
+                      </span>
+                    );
+                  })}
+                </section>
+              ))}
+            </div>
+          </div>
+        )}
         <button
           aria-label="Close details panel"
           onClick={() => navigate({ selected: null, selection: null, tab: null })}
@@ -108,50 +174,6 @@ export function DetailsPanel() {
           3D viewer
         </button>
       </div>
-      {selected &&
-        selectedKind !== "candidates" &&
-        (selectedKind === "refinements"
-          ? [
-              {
-                title: "Inputs",
-                files: [
-                  ["density", "Density"],
-                  ["fitted_model", "Unrefined fitted model"],
-                  ["original_known_structure", "Original known structure"],
-                ],
-              },
-              {
-                title: "Outputs",
-                files: [
-                  ["refined_fitted_structure", "Refined fitted structure"],
-                  ["refined_known_structure", "Refined known structure"],
-                ],
-              },
-            ]
-          : [
-              {
-                title: "Local files",
-                files: [
-                  ["model", "Structure"],
-                  ["density", "Density"],
-                ],
-              },
-            ]
-        ).map(({ title, files }) => (
-          <section key={title} className="file-paths" aria-label={title}>
-            {selectedKind === "refinements" && <h3>{title}</h3>}
-            {files.map(([kind, label]) => {
-              const path = selected[`${kind}_absolute_path`];
-              return typeof path === "string" ? (
-                <CopyPathButton key={`${kind}:${path}`} path={path} label={label} />
-              ) : (
-                <span key={kind} className="unavailable-file" title="File unavailable">
-                  {label} unavailable
-                </span>
-              );
-            })}
-          </section>
-        ))}
 
       {viewerSelection && (
         <div className="retained-viewer" hidden={!viewerVisible}>

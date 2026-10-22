@@ -356,11 +356,41 @@ aside {
   padding: 18px;
   border-bottom: 1px solid var(--border);
   overflow-wrap: anywhere;
+  gap: 10px;
 }
-.panel-header button {
+.panel-header > strong {
+  margin-right: auto;
+}
+.panel-header > button {
   border: 0;
   font-size: 22px;
   padding: 0 6px;
+}
+.file-menu {
+  flex-shrink: 0;
+}
+.file-menu > button {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: inherit;
+}
+.file-menu-content {
+  position: fixed;
+  inset: auto;
+  top: var(--file-menu-top);
+  right: var(--file-menu-right);
+  margin: 8px 0 0;
+  padding: 0;
+  color: inherit;
+  width: 270px;
+  max-width: calc(100vw - 60px);
+  max-height: 60dvh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  box-shadow: 0 6px 20px #0002;
 }
 .tabs {
   display: flex;
@@ -379,12 +409,18 @@ aside {
 }
 .file-paths {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  padding: 10px 24px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 12px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
   border-bottom: 1px solid var(--border);
   font-size: 12px;
+}
+.file-paths:last-child {
+  border-bottom: 0;
 }
 .file-paths h3 {
   flex-basis: 100%;
@@ -395,6 +431,7 @@ aside {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  text-align: left;
 }
 .unavailable-file {
   color: var(--muted);

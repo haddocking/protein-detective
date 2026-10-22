@@ -259,6 +259,18 @@ it("authenticates a direct provenance link and keeps its selected result across 
         search: { selected: "refined-1", selection: "refinements", tab: "details" },
       });
     });
+    const fileTrigger = container.querySelector<HTMLButtonElement>(".file-menu > button")!;
+    const fileMenu = container.querySelector<HTMLElement>(".file-menu-content")!;
+    expect(fileTrigger.getAttribute("popovertarget")).toBe(fileMenu.id);
+    expect(fileMenu.getAttribute("popover")).toBe("auto");
+    vi.spyOn(fileTrigger, "getBoundingClientRect").mockReturnValue(new DOMRect(800, 100, 80, 32));
+    await act(async () => {
+      fileMenu.dispatchEvent(Object.assign(new Event("beforetoggle"), { newState: "open" }));
+    });
+    expect(fileMenu.style.getPropertyValue("--file-menu-top")).toBe("132px");
+    expect(fileMenu.style.getPropertyValue("--file-menu-right")).toBe(
+      `${window.innerWidth - 880}px`,
+    );
     const copyButtons = container.querySelectorAll<HTMLButtonElement>(".file-paths button");
     const inputButtons = container.querySelectorAll<HTMLButtonElement>(
       '[aria-label="Inputs"] button',
