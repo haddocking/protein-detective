@@ -22,17 +22,17 @@ function BestStructure({ refinements }: { refinements: Row[] }) {
   const { select } = useDashboardNavigation();
   const best = sorted(
     refinements.filter((r) => r.viewer_available),
-    "refined_score",
-    false,
+    "after_cc",
+    true,
   )[0];
   if (!best) return null;
   return (
     <section className="best-structure">
       <div className="section-heading">
-        <h2>Best refined structure by CAPRI score</h2>
+        <h2>Best refined structure by PowerFit CC score</h2>
         <button className="text-link" onClick={() => select(best, "refinements")}>
-          {display(best.structure)} · {display(best.refine_run_id)} · CAPRI score{" "}
-          {display(best.refined_score)} →
+          {display(best.structure)} · {display(best.refine_run_id)} · PowerFit CC{" "}
+          {display(best.after_cc)} →
         </button>
       </div>
       <Suspense fallback={<p>Loading 3D viewer…</p>}>

@@ -3,7 +3,21 @@ import { Link } from "@tanstack/react-router";
 import { display, key, labels, type Dataset, type Row } from "../data";
 import { useSession } from "../hooks/use-session-data";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
+const secondaryScoreFields = [
+  "before_cc",
+  "cc_change",
+  "before_fishz",
+  "after_fishz",
+  "before_relative_z",
+  "after_relative_z",
+  "baseline_score",
+  "score_change",
+  "cluster_score",
+  "cluster_score_std",
+];
+
 const detailsFields = new Set([
+  ...secondaryScoreFields,
   "structure",
   "structure_id",
   "uniprot_accessions",
@@ -22,18 +36,8 @@ const detailsFields = new Set([
   "cluster_rank",
   "member_rank",
   "refined_score",
-  "baseline_score",
-  "score_change",
-  "before_cc",
   "after_cc",
-  "cc_change",
-  "before_fishz",
-  "after_fishz",
-  "before_relative_z",
-  "after_relative_z",
   "population",
-  "cluster_score",
-  "cluster_score_std",
 ]);
 
 export function ResultDetails({
@@ -49,6 +53,17 @@ export function ResultDetails({
 }) {
   const { data } = useSession();
   const { navigate, select } = useDashboardNavigation();
+  const metadata = { ...candidate, ...selected };
+  const fields = Object.entries(metadata).filter(([name]) => !secondaryScoreFields.includes(name));
+  const ccIndex = fields.findIndex(([name]) => name === "after_cc");
+  if (ccIndex >= 0) {
+    const [cc] = fields.splice(ccIndex, 1);
+    const capriIndex = fields.findIndex(([name]) => name === "refined_score");
+    fields.splice(capriIndex >= 0 ? capriIndex : fields.length, 0, cc);
+  }
+  for (const field of secondaryScoreFields) {
+    if (metadata[field] != null) fields.push([field, metadata[field]]);
+  }
   return (
     <div className="details-content">
       <p className="eyebrow">
@@ -122,7 +137,7 @@ export function ResultDetails({
         )
       )}
       <dl>
-        {Object.entries({ ...candidate, ...selected })
+        {fields
           .filter(
             ([k, v]) =>
               v != null &&

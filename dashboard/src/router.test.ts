@@ -122,7 +122,13 @@ it("authenticates a direct provenance link and keeps its selected result across 
         id: "refined-1",
         refine_run_id: "refine-1",
         after_cc: 0.8,
+        before_cc: 0.9,
+        cc_change: -0.1,
         refined_score: -12,
+        baseline_score: -10,
+        score_change: -2,
+        cluster_score: -11.5,
+        cluster_score_std: 0.5,
         fitted_model_absolute_path: "/session/powerfit/unrefined.pdb",
         original_known_structure_absolute_path: "/session/original-known.pdb",
         refined_fitted_structure_absolute_path: "/session/refine/refined-fitted.pdb.gz",
@@ -132,6 +138,10 @@ it("authenticates a direct provenance link and keeps its selected result across 
       {
         id: "refined-2",
         structure: "highest-cc",
+        viewer_available: true,
+        model_path: "highest-cc.pdb",
+        density_path: "density.map",
+        refined_known_structure: "highest-cc-known.pdb",
         refine_run_id: "refine-2",
         after_cc: 0.95,
         refined_score: 100,
@@ -193,7 +203,13 @@ it("authenticates a direct provenance link and keeps its selected result across 
     );
     // The overview shows the best refined structure without any clicks.
     expect(container.querySelector(".best-structure .mock-viewer")?.textContent).toBe(
-      "/files/model-1.pdb",
+      "/files/highest-cc.pdb",
+    );
+    expect(container.querySelector(".best-structure h2")?.textContent).toBe(
+      "Best refined structure by PowerFit CC score",
+    );
+    expect(container.querySelector(".best-structure button")?.textContent).toContain(
+      "PowerFit CC 0.9500",
     );
     const viewer = container.querySelector("aside .mock-viewer");
     expect(viewer?.textContent).toBe("/files/model-1.pdb");
@@ -256,6 +272,18 @@ it("authenticates a direct provenance link and keeps its selected result across 
     expect(container.querySelector("main thead")?.textContent).toContain(
       "CAPRI score change (after − before)",
     );
+    const detailLabels = Array.from(container.querySelectorAll("aside dt"), (dt) => dt.textContent);
+    const capriIndex = detailLabels.indexOf("CAPRI score after refinement");
+    expect(capriIndex).toBeGreaterThan(0);
+    expect(detailLabels[capriIndex - 1]).toBe("PowerFit CC after refinement");
+    expect(detailLabels.slice(-6)).toEqual([
+      "PowerFit CC before refinement",
+      "PowerFit CC change (after − before)",
+      "CAPRI score before refinement",
+      "CAPRI score change (after − before)",
+      "CAPRI cluster score",
+      "CAPRI cluster score standard deviation",
+    ]);
     await act(async () => {
       await router.navigate({
         to: "/refinements",

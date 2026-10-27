@@ -20,6 +20,7 @@ export const fittingColumns = [
 
 export const refinementColumns = [
   "structure",
+  "after_cc",
   "uniprot_accessions",
   "refine_run_id",
   "powerfit_run_id",
@@ -31,7 +32,6 @@ export const refinementColumns = [
   "baseline_score",
   "score_change",
   "before_cc",
-  "after_cc",
   "cc_change",
 ];
 
