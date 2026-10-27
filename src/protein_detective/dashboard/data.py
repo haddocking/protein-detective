@@ -445,20 +445,34 @@ class DashboardData:
             return self._fitting(con)
 
     def _refinements(self, con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
-        if not {
-            "refinements_capri_ss",
-            "refinements_io",
-            "fitted_models",
-            "fittable_structures",
-            "refinements_capri_clt",
-            "refinements_baseline",
-            "powerfit_runs",
-            "refinements_runs",
-        } <= self._tables(con):
+        tables = self._tables(con)
+        if (
+            not {
+                "refinements_capri_ss",
+                "refinements_io",
+                "fitted_models",
+                "fittable_structures",
+                "refinements_capri_clt",
+                "refinements_baseline",
+                "powerfit_runs",
+                "refinements_runs",
+            }
+            <= tables
+        ):
             return []
+        has_solutions = "solutions" in tables
+        solutions_join = (
+            "LEFT JOIN (SELECT DISTINCT * FROM solutions) s "
+            "ON s.powerfit_run_id = fm.powerfit_run_id "
+            "AND s.structure = fm.structure AND s.rank = fm.rank"
+            if has_solutions
+            else ""
+        )
+        fitted_cc = "s.cc" if has_solutions else "NULL"
+        uniprot = "coalesce(s.uniprot_accessions, fs.uniprot_accessions)" if has_solutions else "fs.uniprot_accessions"
         rows = self._query(
             con,
-            """
+            f"""
             SELECT
                 m.*,
                 m.unfitted_structure AS structure,
@@ -469,7 +483,8 @@ class DashboardData:
                 io.fitted_model,
                 $session_dir || '/' || io.fitted_model AS fitted_model_absolute_path,
                 fm.rank AS fitted_rank,
-                fs.uniprot_accessions,
+                {fitted_cc} AS fitted_cc,
+                {uniprot} AS uniprot_accessions,
                 fs.is_alphafold,
                 CASE WHEN fs.is_alphafold THEN 'AlphaFold' ELSE 'PDB' END AS source,
                 fs.structure_id,
@@ -496,6 +511,7 @@ class DashboardData:
             JOIN refinements_powerfit p ON m.refine_run_dir = p.refine_run_dir AND m.model = p.model
             LEFT JOIN refinements_io io ON m.refine_run_dir = io.refine_run_dir
             LEFT JOIN (SELECT DISTINCT * FROM fitted_models) fm ON io.fitted_model = fm.fitted_model_file
+            {solutions_join}
             LEFT JOIN fittable_structures fs ON m.unfitted_structure = fs.structure
             LEFT JOIN refinements_capri_clt cl
                 ON m.refine_run_dir = cl.refine_run_dir AND m.cluster_id = cl.cluster_id
@@ -504,7 +520,7 @@ class DashboardData:
             LEFT JOIN refinements_runs r ON m.refine_run_id = r.refine_run_id
             WHERE m.score IS NOT NULL
             ORDER BY p.after_cc DESC, m.refined_fitted_structure
-            """,
+            """,  # noqa: S608 - SQL fragments are internal constants
             {"session_dir": str(self.session_dir)},
         )
         for row in rows:

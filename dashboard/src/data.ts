@@ -20,9 +20,11 @@ export const fittingColumns = [
 
 export const refinementColumns = [
   "structure",
+  "uniprot_accessions",
   "refine_run_id",
   "powerfit_run_id",
   "fitted_rank",
+  "fitted_cc",
   "cluster_rank",
   "member_rank",
   "refined_score",
@@ -57,6 +59,7 @@ export const labels: Record<string, string> = {
   relative_z: "PowerFit relative z",
   model_available: "Fitted structure saved",
   fitted_rank: "Fitted rank",
+  fitted_cc: "PowerFit search CC (fitted solution)",
   cluster_rank: "CAPRI cluster rank",
   member_rank: "CAPRI member rank",
   refined_score: "CAPRI score after refinement",

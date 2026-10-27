@@ -28,8 +28,9 @@ runs `protein-detective meta` before starting; metadata generation is the only
 startup operation that writes to the session. An unreadable existing database
 raises an error instead of being regenerated.
 
-Overview includes searched and rejected candidates alongside fitted candidates.
-Fitting results initially show the best solution per structure and PowerFit run.
+Overview shows the best-scoring viewable refined structure in a 3D viewer and
+includes searched and rejected candidates alongside fitted candidates. Fitting
+results initially show the best solution per structure and PowerFit run.
 Refinement results initially show the best member per cluster, fitted input, and
 refinement run, using CAPRI member rank for this selection. Results initially
 sort by PowerFit CC after refinement, highest first. The table names CAPRI and
@@ -50,8 +51,10 @@ all pages; choose All solutions or All members before exporting every filtered
 result. Score charts show all filtered rows before the top-N selection and
 pagination.
 
-Select a result to inspect its details. Use View structure to load a saved model
-and its associated source density map on demand. Unsaved fitted solutions remain
+Opening Fitting results or Refinement results selects the first listed result
+and shows it in the 3D viewer. Select another result to view it, or use Details
+to inspect it. Press j or Down to select the next result and k or Up to select
+the previous one; paging follows the selection. Unsaved fitted solutions remain
 available for inspection and export; save structures with
 `protein-detective powerfit fit-models` before viewing them. Missing density
 maps or ambiguous provenance associations must be repaired before 3D viewing.

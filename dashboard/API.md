@@ -96,19 +96,23 @@ structure, refined known structure). `fitted_model_absolute_path` and
 after refinement.
 
 Refinement fields include `refine_run_id`, `refine_run_dir`, `fitted_model`,
-`fitted_rank`, `cluster_id`, `cluster_rank`, `member_rank`, `refined_score`,
-`baseline_score`, `score_change`, `population`, `cluster_score`, and
-`cluster_score_std`. Default member selection retains the lowest `member_rank`
-within each independent refinement run, fitted input, and cluster. Default
-sorting uses `after_cc` (PowerFit CC after refinement) descending. `before_cc`
-and `after_cc` are fixed-coordinate PowerFit scores; `cc_change` is
-`after_cc - before_cc`, where positive values indicate improvement.
-`refined_score`, `baseline_score`, `cluster_score`, and `cluster_score_std` are
-CAPRI scores. `score_change` is `refined_score - baseline_score`; negative
-values indicate improvement. Dashboard and CSV labels explicitly name each
-scoring system. Missing baseline/cluster measurements are null. Refinement run
-IDs are independent of source PowerFit run IDs, and multiple refinement runs can
-reuse a fitted input.
+`fitted_rank`, `fitted_cc`, `cluster_id`, `cluster_rank`, `member_rank`,
+`refined_score`, `baseline_score`, `score_change`, `population`,
+`cluster_score`, and `cluster_score_std`. Default member selection retains the
+lowest `member_rank` within each independent refinement run, fitted input, and
+cluster. Default sorting uses `after_cc` (PowerFit CC after refinement)
+descending. `before_cc` and `after_cc` are fixed-coordinate PowerFit scores;
+`cc_change` is `after_cc - before_cc`, where positive values indicate
+improvement. `refined_score`, `baseline_score`, `cluster_score`, and
+`cluster_score_std` are CAPRI scores. `score_change` is
+`refined_score - baseline_score`; negative values indicate improvement.
+Dashboard and CSV labels explicitly name each scoring system. Missing
+baseline/cluster measurements are null. Refinement run IDs are independent of
+source PowerFit run IDs, and multiple refinement runs can reuse a fitted input.
+`fitted_cc` and `uniprot_accessions` come from the fitted solution in
+`solutions`; when that table is absent they fall back to `fittable_structures`
+(null CC). `fitted_cc` is the original PowerFit search CC, which can differ from
+`before_cc`, the fitted input rescored at its saved coordinates.
 
 Provenance fields include `command`, nullable `start_time` and `end_time`, and
 `inputs` and `outputs` arrays of recorded paths. Additional `files` metadata

@@ -11,6 +11,31 @@
   --accent: #176c75;
   --soft: #eaf4f4;
 }
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color: #d4dfe4;
+  background: #131d23;
+  color-scheme: dark;
+  --surface: #1b282f;
+  --border: #34434b;
+  --muted: #9aaeb9;
+  --accent: #68c3c8;
+  --soft: #213b41;
+}
+:root[data-theme="dark"] .primary {
+  color: #102329;
+}
+:root[data-theme="dark"] .notice,
+:root[data-theme="dark"] .error {
+  background: #3e3421;
+  border-color: #72603b;
+  color: #edd69a;
+}
+:root[data-theme="dark"] .improved {
+  color: #7bd5ad;
+}
 * {
   box-sizing: border-box;
 }
@@ -88,6 +113,44 @@ header {
   border: 1px solid var(--border);
   border-radius: 30px;
   padding: 7px 12px;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.theme-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--soft);
+  border-radius: 20px;
+  padding: 3px;
+}
+.theme-toggle button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 16px;
+  padding: 5px 10px;
+  font-size: 12px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.theme-toggle button:hover {
+  color: var(--accent);
+}
+.theme-toggle button.active {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+}
+.theme-icon {
+  font-size: 14px;
+  line-height: 1;
 }
 nav {
   display: flex;
@@ -179,6 +242,24 @@ section {
   border-radius: 8px;
   padding: 20px;
   margin: 18px 0;
+}
+.overview-top {
+  display: grid;
+  grid-template-columns: minmax(260px, 2fr) 3fr;
+  gap: 16px;
+  align-items: start;
+  margin: 24px 0;
+}
+.overview-top .stats {
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  margin: 0;
+}
+.best-structure {
+  display: flex;
+  flex-direction: column;
+  height: min(560px, 70dvh);
+  min-width: 0;
+  margin: 0;
 }
 .overview-results {
   display: grid;
@@ -356,11 +437,41 @@ aside {
   padding: 18px;
   border-bottom: 1px solid var(--border);
   overflow-wrap: anywhere;
+  gap: 10px;
 }
-.panel-header button {
+.panel-header > strong {
+  margin-right: auto;
+}
+.panel-header > button {
   border: 0;
   font-size: 22px;
   padding: 0 6px;
+}
+.file-menu {
+  flex-shrink: 0;
+}
+.file-menu > button {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: inherit;
+}
+.file-menu-content {
+  position: fixed;
+  inset: auto;
+  top: var(--file-menu-top);
+  right: var(--file-menu-right);
+  margin: 8px 0 0;
+  padding: 0;
+  color: inherit;
+  width: 270px;
+  max-width: calc(100vw - 60px);
+  max-height: 60dvh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  box-shadow: 0 6px 20px #0002;
 }
 .tabs {
   display: flex;
@@ -379,12 +490,18 @@ aside {
 }
 .file-paths {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  padding: 10px 24px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 12px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
   border-bottom: 1px solid var(--border);
   font-size: 12px;
+}
+.file-paths:last-child {
+  border-bottom: 0;
 }
 .file-paths h3 {
   flex-basis: 100%;
@@ -395,6 +512,7 @@ aside {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  text-align: left;
 }
 .unavailable-file {
   color: var(--muted);
@@ -491,7 +609,7 @@ footer {
   gap: 6px;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color: #d4dfe4;
     background: #131d23;
     --surface: #1b282f;
@@ -500,16 +618,16 @@ footer {
     --accent: #68c3c8;
     --soft: #213b41;
   }
-  .primary {
+  :root:not([data-theme="light"]) .primary {
     color: #102329;
   }
-  .notice,
-  .error {
+  :root:not([data-theme="light"]) .notice,
+  :root:not([data-theme="light"]) .error {
     background: #3e3421;
     border-color: #72603b;
     color: #edd69a;
   }
-  .improved {
+  :root:not([data-theme="light"]) .improved {
     color: #7bd5ad;
   }
 }
@@ -522,6 +640,9 @@ footer {
   }
   .stats {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .overview-top {
+    grid-template-columns: 1fr;
   }
   .chart-section {
     grid-template-columns: 1fr;
@@ -547,6 +668,12 @@ footer {
   }
   .snapshot {
     display: none;
+  }
+  .theme-toggle .theme-label {
+    display: none;
+  }
+  .theme-toggle button {
+    padding: 5px 8px;
   }
   nav {
     padding: 0 18px;
@@ -634,6 +761,170 @@ aside.viewer-panel {
   min-width: 0;
   width: 100%;
 }
+
+/* Mol* ships a light UI only. Restyle its chrome when the viewer is dark.
+   The selectors out-specify molstar.css, which is injected after this sheet. */
+.molecular-canvas[data-dark] .msp-plugin {
+  background: #131d23;
+  color: #d4dfe4;
+  color-scheme: dark;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-viewport,
+.molecular-canvas[data-dark] .msp-plugin .msp-viewport-host3d > canvas {
+  background: #131d23;
+  background-image: none;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-layout-right,
+.molecular-canvas[data-dark] .msp-plugin .msp-layout-left {
+  background: #151f26;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-semi-transparent-background {
+  background: #131d23;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-btn-link-toggle-off,
+.molecular-canvas[data-dark] .msp-plugin .msp-btn-link-toggle-off:active,
+.molecular-canvas[data-dark] .msp-plugin .msp-btn-link-toggle-off:focus {
+  color: #9aaeb9 !important;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-btn-link-toggle-off:hover {
+  color: #f2a64a !important;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-btn-link-toggle-on {
+  color: #f2a64a;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-btn-link-toggle-on:hover {
+  color: #f2a64a !important;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-btn:hover {
+  color: #f2a64a;
+  background-color: #2a3c46;
+}
+/* Dropdown panels attached to viewport control buttons. */
+.molecular-canvas[data-dark] .msp-plugin .msp-hover-box-wrapper .msp-hover-box-body,
+.molecular-canvas[data-dark] .msp-plugin .msp-viewport-controls-panel {
+  background: #1b282f;
+  color: #d4dfe4;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-hover-box-body .msp-flex-row,
+.molecular-canvas[data-dark] .msp-plugin .msp-hover-box-body .msp-btn-block,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row > div,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row > button.msp-control-button-label,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row .msp-control-current,
+.molecular-canvas[data-dark] .msp-plugin .msp-flex-row,
+.molecular-canvas[data-dark] .msp-plugin .msp-flex-row > button.msp-control-button-label,
+.molecular-canvas[data-dark] .msp-plugin .msp-state-image-row,
+.molecular-canvas[data-dark] .msp-plugin .msp-section-header,
+.molecular-canvas[data-dark] .msp-plugin .msp-current-header,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-group-header,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-group-header > button,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-group-header div,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-group-header > span,
+.molecular-canvas[data-dark] .msp-plugin .msp-default-bg,
+.molecular-canvas[data-dark] .msp-plugin .msp-image-preview,
+.molecular-canvas[data-dark] .msp-plugin .msp-help-text,
+.molecular-canvas[data-dark] .msp-plugin .msp-help-row,
+.molecular-canvas[data-dark] .msp-plugin .msp-help-row > div,
+.molecular-canvas[data-dark] .msp-plugin .msp-row-text,
+.molecular-canvas[data-dark] .msp-plugin .msp-description,
+.molecular-canvas[data-dark] .msp-plugin .msp-simple-help-section,
+.molecular-canvas[data-dark] .msp-plugin .msp-copy-image-wrapper div {
+  background: #1b282f !important;
+  color: #d4dfe4;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-hover-box-body .msp-btn-block {
+  background: #22313a;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-btn,
+.molecular-canvas[data-dark] .msp-plugin .msp-btn-block,
+.molecular-canvas[data-dark] .msp-plugin .msp-form-control,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row select,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row button,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row input[type="text"],
+.molecular-canvas[data-dark] .msp-plugin .msp-text-area-wrapper textarea,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-text-area-wrapper textarea {
+  background-color: #22313a;
+  color: #d4dfe4;
+  background-image: none;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-btn:focus,
+.molecular-canvas[data-dark] .msp-plugin .msp-form-control:focus,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row select:focus,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row button:focus,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row input[type="text"]:focus {
+  background-color: #2a3c46;
+  color: #d4dfe4;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-btn[disabled],
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row button[disabled],
+.molecular-canvas[data-dark] .msp-plugin .msp-form-control[disabled],
+.molecular-canvas[data-dark] .msp-plugin .msp-form-control[readonly],
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row select[disabled],
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row button[readonly],
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row input[readonly][type="text"] {
+  background: #1b282f;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row > span,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row > button,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-row > div.msp-control-row-text,
+.molecular-canvas[data-dark] .msp-plugin .msp-row-text > div,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-group-header > button,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-group-header div,
+.molecular-canvas[data-dark] .msp-plugin .msp-control-group-header > span,
+.molecular-canvas[data-dark] .msp-plugin .msp-help-text > div,
+.molecular-canvas[data-dark] .msp-plugin .msp-help-text > p,
+.molecular-canvas[data-dark] .msp-plugin .msp-help-row > span,
+.molecular-canvas[data-dark] .msp-plugin .msp-description {
+  color: #9aaeb9;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-form-control,
+.molecular-canvas[data-dark] .msp-plugin select.msp-form-control,
+.molecular-canvas[data-dark] .msp-plugin select.msp-btn {
+  background: #22313a;
+  color: #d4dfe4;
+  background-image: none;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-form-control::placeholder {
+  color: #7f939f;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-slider-base-rail {
+  background-color: #34434b;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-slider-base-track {
+  background-color: #2e6f75;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-slider-base-handle {
+  background-color: #9aaeb9;
+  border-color: #1b282f;
+}
+/* Loading progress rows and toast messages. */
+.molecular-canvas[data-dark] .msp-plugin .msp-overlay-tasks .msp-task-state > div,
+.molecular-canvas[data-dark] .msp-plugin .msp-overlay-tasks .msp-task-state > div > div,
+.molecular-canvas[data-dark] .msp-plugin .msp-background-tasks .msp-task-state > div,
+.molecular-canvas[data-dark] .msp-plugin .msp-background-tasks .msp-task-state > div > div {
+  background: #1b282f;
+  color: #d4dfe4;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-toast-container .msp-toast-entry {
+  color: #d4dfe4;
+  background: #151f26;
+  border-color: #34434b;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-toast-container .msp-toast-entry .msp-toast-title {
+  background: #1b282f;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-highlight-info {
+  color: #f2a64a;
+  background: #1b282fe6;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-no-webgl {
+  background: #1b282f;
+  color: #d4dfe4;
+}
+.molecular-canvas[data-dark] .msp-plugin .msp-viewport-top-left-controls .msp-traj-controls {
+  background-color: #22313a;
+  color: #d4dfe4;
+}
 .molecular-viewer > .muted,
 .molecular-viewer .viewer-controls {
   flex-shrink: 0;
@@ -655,4 +946,11 @@ aside.viewer-panel {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+}
+kbd {
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 11px;
 }

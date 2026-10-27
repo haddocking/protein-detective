@@ -7,6 +7,8 @@ import { useSession } from "../hooks/use-session-data";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
 import { useResults } from "../hooks/use-results";
 import { type ResultKind } from "../navigation";
+import { useEffect, useRef } from "react";
+import { key } from "../data";
 export function ResultsPage({ kind }: { kind: ResultKind }) {
   const { data, summary } = useSession();
   const { p, navigate } = useDashboardNavigation();
@@ -24,7 +26,47 @@ export function ResultsPage({ kind }: { kind: ResultKind }) {
     setNotice,
     exportCsv,
     chartSelect,
+    step,
   } = useResults(kind);
+  // j/k or arrow keys step through results, unless typing or interacting with the viewer.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.defaultPrevented) return;
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest("input, select, textarea, [contenteditable], .molecular-canvas")
+      )
+        return;
+      const delta = { j: 1, ArrowDown: 1, k: -1, ArrowUp: -1 }[event.key];
+      if (!delta) return;
+      event.preventDefault();
+      step(delta);
+    }
+    addEventListener("keydown", onKeyDown);
+    return () => removeEventListener("keydown", onKeyDown);
+  });
+  const selectedId = p.get("selected");
+  useEffect(() => {
+    document.querySelector("tr.selected")?.scrollIntoView?.({ block: "nearest" });
+  }, [selectedId, page]);
+  // Show the first visible result in the viewer once, unless the URL already selects one.
+  const autoSelected = useRef(Boolean(p.get("selected")));
+  const first = data[kind] ? selectedRows[(page - 1) * pageSize] : undefined;
+  useEffect(() => {
+    if (autoSelected.current || !data[kind]) return;
+    autoSelected.current = true;
+    if (first)
+      navigate(
+        {
+          selected: key(first),
+          selection: kind,
+          tab: first.viewer_available ? "viewer" : "details",
+        },
+        kind,
+        true,
+      );
+  });
   return (
     <>
       <PageTitle>
@@ -100,6 +142,9 @@ export function ResultsPage({ kind }: { kind: ResultKind }) {
                   {kind === "fitting"
                     ? "Higher PowerFit CC is better"
                     : "Changes = after − before. PowerFit CC: positive is better. CAPRI score: negative is better."}
+                  {" · "}
+                  <kbd>j</kbd>/<kbd>k</kbd> or <kbd>↓</kbd>/<kbd>↑</kbd> step through{" "}
+                  {kind === "fitting" ? "solutions" : "members"}
                 </span>
               </div>
               <ResultsTable

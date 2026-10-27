@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#175d67" />
     <title>Protein Detective</title>
+    <script>
+      (function () {
+        var theme = localStorage.getItem("protein-detective-theme");
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.setAttribute("data-theme", theme);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

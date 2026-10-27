@@ -4,6 +4,7 @@ import { useDashboardNavigation } from "./hooks/use-dashboard-navigation";
 import { useSession } from "./hooks/use-session-data";
 import { SessionProvider } from "./components/session-provider";
 import { DetailsPanel } from "./components/details-panel";
+import { ThemeToggle } from "./components/theme-toggle";
 
 function SessionLayout() {
   const { ready, error } = useSession();
@@ -18,7 +19,10 @@ function SessionLayout() {
             <small>Session explorer</small>
           </div>
         </div>
-        <span className="snapshot">Read-only snapshot</span>
+        <div className="header-actions">
+          <ThemeToggle />
+          <span className="snapshot">Read-only snapshot</span>
+        </div>
       </header>
       <nav aria-label="Main navigation">
         {views.map(([id, title]) => (

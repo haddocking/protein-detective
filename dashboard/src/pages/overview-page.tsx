@@ -1,9 +1,53 @@
+import { lazy, Suspense } from "react";
 import { PageTitle } from "../components/page-title";
 import { Link } from "@tanstack/react-router";
-import { filterRows, grouped, sorted, positivePage, tablePageSize } from "../data";
+import {
+  display,
+  fileUrl,
+  filterRows,
+  grouped,
+  sorted,
+  positivePage,
+  tablePageSize,
+  type Row,
+} from "../data";
 import { ResultsTable } from "../components/results-table";
 import { useSession } from "../hooks/use-session-data";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
+const StructureViewer = lazy(() =>
+  import("../viewer").then((m) => ({ default: m.StructureViewer })),
+);
+
+function BestStructure({ refinements }: { refinements: Row[] }) {
+  const { select } = useDashboardNavigation();
+  const best = sorted(
+    refinements.filter((r) => r.viewer_available),
+    "refined_score",
+    false,
+  )[0];
+  if (!best) return null;
+  return (
+    <section className="best-structure">
+      <div className="section-heading">
+        <h2>Best refined structure by CAPRI score</h2>
+        <button className="text-link" onClick={() => select(best, "refinements")}>
+          {display(best.structure)} · {display(best.refine_run_id)} · CAPRI score{" "}
+          {display(best.refined_score)} →
+        </button>
+      </div>
+      <Suspense fallback={<p>Loading 3D viewer…</p>}>
+        <StructureViewer
+          structureUrl={fileUrl(best.model_path)}
+          densityUrl={fileUrl(best.density_path)}
+          refinedKnownStructureUrl={fileUrl(best.refined_known_structure)}
+          refined
+          label={display(best.structure)}
+        />
+      </Suspense>
+    </section>
+  );
+}
+
 export function OverviewPage() {
   const { data, summary } = useSession();
   const { p, navigate } = useDashboardNavigation();
@@ -19,24 +63,27 @@ export function OverviewPage() {
       <p className="muted">
         Explore candidate structures, fitting solutions, and refinement outcomes.
       </p>
-      <div className="stats">
-        {[
-          "candidate_structures",
-          "uniprot_accessions",
-          "filtering_passed",
-          "filtering_rejected",
-          "fitting_solutions",
-          "fitted_structures",
-          "refinement_runs",
-          "refined_structures",
-        ]
-          .filter((k) => summary[k] != null)
-          .map((k) => (
-            <div className="stat" key={k}>
-              <strong>{Number(summary[k]).toLocaleString()}</strong>
-              <span>{k.replaceAll("_", " ")}</span>
-            </div>
-          ))}
+      <div className="overview-top">
+        <div className="stats">
+          {[
+            "candidate_structures",
+            "uniprot_accessions",
+            "filtering_passed",
+            "filtering_rejected",
+            "fitting_solutions",
+            "fitted_structures",
+            "refinement_runs",
+            "refined_structures",
+          ]
+            .filter((k) => summary[k] != null)
+            .map((k) => (
+              <div className="stat" key={k}>
+                <strong>{Number(summary[k]).toLocaleString()}</strong>
+                <span>{k.replaceAll("_", " ")}</span>
+              </div>
+            ))}
+        </div>
+        {data.refinements && <BestStructure refinements={data.refinements} />}
       </div>
       <div className="overview-results">
         <section>
