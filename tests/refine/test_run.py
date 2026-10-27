@@ -1,11 +1,15 @@
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
+from powerfit_em import Structure, Volume, structure_to_shape_like
 from protein_quest.structure.formats import read_structure, write_structure
 from protein_quest.structure.metadata import structure_metadata
 from protein_quest.structure.uniprot_extraction import structure2uniprot_accessions
+from rocrate.model.contextentity import ContextEntity
+from rocrate.rocrate import ROCrate
 
 from protein_detective.refine.haddock import RefineOptions
 from protein_detective.refine.report import refinement_report
@@ -81,12 +85,41 @@ def setup_refinement_session(tmp_path: Path, fitted_structure: Path) -> Path:
         ]
     ).to_csv(powerfit_root_dir / "fitted_models.csv", index=False)
 
+    structure = Structure.fromfile(str(fitted_model))
+    origin = structure.coor.min(axis=1) - 12
+    shape = np.ceil((structure.coor.max(axis=1) - origin + 12) / 2).astype(int)[::-1]
+    target = Volume(np.zeros(shape), voxelspacing=2, origin=origin)
+    density = structure_to_shape_like(target, structure.coor, resolution=8, weights=structure.atomnumber)
+    density.tofile(powerfit_root_dir / "run_001/map.mrc")
+    crate = ROCrate()
+    map_entity = crate.add_file(
+        powerfit_root_dir / "run_001/map.mrc",
+        dest_path="powerfit/run_001/map.mrc",
+        properties={"description": "Density map used for fitting."},
+    )
+    run_entity = crate.add_dataset(powerfit_root_dir / "run_001", dest_path="powerfit/run_001")
+    crate.add(
+        ContextEntity(
+            crate,
+            "protein-detective powerfit run map.mrc 8 session --powerfit-run-id run_001",
+            properties={"@type": "CreateAction", "object": [map_entity], "result": [run_entity]},
+        )
+    )
+    crate.write(session_dir)
     return session_dir
 
 
 def assert_refinement_results(session_dir: Path, expected_results: dict[str, pd.DataFrame]):
     baseline = session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/baseline"
     baseline_scores = pd.read_csv(baseline / "2_caprieval/capri_ss.tsv", sep="\t", comment="#")
+    rescored = pd.read_csv(baseline.parent / "powerfit-recscores.csv")
+    assert rescored["before_cc"].eq(rescored.iloc[0]["before_cc"]).all()
+    assert (
+        rescored[["before_cc", "before_fishz", "before_relative_z", "after_cc", "after_fishz", "after_relative_z"]]
+        .notna()
+        .all()
+        .all()
+    )
     report = refinement_report(session_dir)
     assert report["unrefined_score"].notna().all()
     assert report["unrefined_score"].eq(baseline_scores.iloc[0]["score"]).all()
@@ -137,6 +170,7 @@ def assert_refinement_rocrate(session_dir: Path, known_structure: Path):
         session_dir,
         input_ids=crate_input_ids,
         output_ids=crate_output_ids,
+        nr_actions=2,
     )
     assert {i["@id"] for i in actual_action["object"]} == crate_input_ids
     assert {o["@id"] for o in actual_action["result"]} == crate_output_ids

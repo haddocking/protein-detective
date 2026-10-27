@@ -41,6 +41,13 @@ def write_reconstruction_index(refinement_dir: Path) -> None:
                 ]
             )
 
+    with (refinement_dir.parent / "powerfit-recscores.csv").open("w", newline="") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(
+            ["model", "before_cc", "before_fishz", "before_relative_z", "after_cc", "after_fishz", "after_relative_z"]
+        )
+        writer.writerows([model, 0.8, 1.1, 10.0, 0.85, 1.2, 11.0] for model in models)
+
 
 @contextmanager
 def cli_args(tokens: list[str]) -> Generator[None]:

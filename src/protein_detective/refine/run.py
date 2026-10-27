@@ -20,6 +20,7 @@ from protein_detective.refine.haddock import (
     prepare_known_structure,
     run_haddock3,
 )
+from protein_detective.refine.powerfit import rescore_refinement
 from protein_detective.refine.provenance import write_refinement_ro_crate
 from protein_detective.refine.reconstruct import reconstruct_refined_structures
 
@@ -92,6 +93,8 @@ def refine_structure_task(
         known_structure.original_known_structure,
         remove_known_chains=known_structure.remove_known_chains,
     )
+
+    rescore_refinement(session_dir, abs_fitted_model, refine_run_dir)
 
     return abs_fitted_model, refine_run_dir
 
