@@ -31,10 +31,24 @@ raises an error instead of being regenerated.
 Overview includes searched and rejected candidates alongside fitted candidates.
 Fitting results initially show the best solution per structure and PowerFit run.
 Refinement results initially show the best member per cluster, fitted input, and
-refinement run. Filters, sorting, and selection are retained in navigation URLs.
-CSV exports include the filtered, sorted selection across all pages; choose All
-solutions or All members before exporting every filtered result. Score charts
-show all filtered rows before the top-N selection and pagination.
+refinement run, using CAPRI member rank for this selection. Results initially
+sort by PowerFit CC after refinement, highest first. The table names CAPRI and
+PowerFit scores explicitly and includes PowerFit CC before and after refinement
+and their change (after minus before). Positive PowerFit CC change and negative
+CAPRI score change indicate improvement; member details also show Fisher z and
+relative z. During `refine run`, each fitted input gets a
+`powerfit-recscores.csv` in its model run directory, with one row per refined
+candidate. Both poses are scored at their supplied coordinates against the
+recorded source map with the original resolution and scoring settings. These
+fixed-coordinate scores can differ from the original search CC because the
+density and mask are rebuilt from the coordinates. Higher CC is better. Generate
+session metadata after refinement to include the scores in the dashboard. If
+`meta.duckdb` already exists, move it aside before running
+`protein-detective meta SESSION`. Filters, sorting, and selection are retained
+in navigation URLs. CSV exports include the filtered, sorted selection across
+all pages; choose All solutions or All members before exporting every filtered
+result. Score charts show all filtered rows before the top-N selection and
+pagination.
 
 Select a result to inspect its details. Use View structure to load a saved model
 and its associated source density map on demand. Unsaved fitted solutions remain

@@ -26,8 +26,10 @@ export function useResults(kind: ResultKind) {
     ? p.get("sort")!
     : kind === "fitting"
       ? "cc"
-      : "refined_score";
-  const desc = p.get("dir") ? p.get("dir") === "desc" : kind === "fitting";
+      : "after_cc";
+  const desc = p.get("dir")
+    ? p.get("dir") === "desc"
+    : kind === "fitting" || sort === "after_cc" || sort === "cc_change";
   const limit = topSelection(p.get("top"));
   const selectedRows = sorted(grouped(filtered, kind, limit), sort, desc);
   const pageSize = tablePageSize(p.get("size"));

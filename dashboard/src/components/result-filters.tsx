@@ -62,9 +62,11 @@ export function ResultFilters({
         </label>
       ))}
       <label>
-        {kind === "fitting" ? "Solutions per structure / run" : "Members per cluster / input / run"}
+        {kind === "fitting"
+          ? "Solutions per structure / run"
+          : "Members by CAPRI rank per cluster / input / run"}
         <select value={limit} onChange={(e) => navigate({ top: e.target.value, page: "1" })}>
-          <option value="1">Best only</option>
+          <option value="1">{kind === "fitting" ? "Best only" : "Best CAPRI score"}</option>
           <option value="3">Top 3</option>
           <option value="5">Top 5</option>
           <option value="10">Top 10</option>

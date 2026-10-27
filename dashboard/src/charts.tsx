@@ -3,7 +3,7 @@ import { Chart } from "@tanstack/charts/react";
 import { scaleBand } from "@tanstack/charts/scales/band";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
-import { histogram, type Row } from "./data";
+import { histogram, labels, type Row } from "./data";
 
 export function Histogram({ rows, metric }: { rows: Row[]; metric: string }) {
   const bins = histogram(rows, metric).map((b) => ({
@@ -13,7 +13,10 @@ export function Histogram({ rows, metric }: { rows: Row[]; metric: string }) {
   const definition = defineChart({
     marks: [barY(bins, { x: "range", y: "count", fill: "#26858c" })],
     scales: {
-      x: { scale: () => scaleBand().padding(0.1), axis: { label: metric, ticks: { count: 4 } } },
+      x: {
+        scale: () => scaleBand().padding(0.1),
+        axis: { label: labels[metric] ?? metric, ticks: { count: 4 } },
+      },
       y: { scale: scaleLinear, axis: { label: "Solutions" }, grid: true },
     },
     tooltip,
@@ -22,7 +25,7 @@ export function Histogram({ rows, metric }: { rows: Row[]; metric: string }) {
     <Chart
       definition={definition}
       height={225}
-      ariaLabel={`${metric} histogram of all filtered solutions; tooltip shows score range and count`}
+      ariaLabel={`${labels[metric] ?? metric} histogram of all filtered solutions; tooltip shows score range and count`}
     />
   );
 }
@@ -50,12 +53,12 @@ export function Scatter({ rows, onSelect }: { rows: Row[]; onSelect: (r: Row) =>
     scales: {
       x: {
         scale: () => scaleLinear().domain(domain),
-        axis: { label: "Baseline score" },
+        axis: { label: "CAPRI score before refinement" },
         grid: true,
       },
       y: {
         scale: () => scaleLinear().domain(domain),
-        axis: { label: "Refined score" },
+        axis: { label: "CAPRI score after refinement" },
         grid: true,
       },
     },
@@ -67,7 +70,7 @@ export function Scatter({ rows, onSelect }: { rows: Row[]; onSelect: (r: Row) =>
         definition={definition}
         aspectRatio={1}
         initialWidth={300}
-        ariaLabel="Baseline versus refined score, equal axis scales"
+        ariaLabel="CAPRI score before versus after refinement, equal axis scales"
         onSelect={(point) => {
           if (point && "id" in point.datum) onSelect(point.datum);
         }}

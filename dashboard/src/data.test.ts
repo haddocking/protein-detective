@@ -35,7 +35,7 @@ describe("snapshot result operations", () => {
     const result = csv(ordered, ["structure", "cc"]);
     expect(result.split("\r\n")).toHaveLength(111);
     expect(result.split("\r\n")[1]).toBe('"a,109","109"');
-    expect(result.startsWith('"Structure","CC"')).toBe(true);
+    expect(result.startsWith('"Structure","PowerFit CC"')).toBe(true);
   });
   it("bins every finite score including maximum and retains chart scope", () => {
     const rows = [{ cc: 0 }, { cc: 1 }, { cc: 0.5 }, { cc: null }];

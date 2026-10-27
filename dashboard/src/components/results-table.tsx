@@ -40,7 +40,15 @@ export function ResultsTable({ items, cols, type, sort, desc = false }: ResultsT
               onClick={() => select(r, type)}
             >
               {cols.map((c, j) => (
-                <td key={c} className={c === "score_change" && Number(r[c]) < 0 ? "improved" : ""}>
+                <td
+                  key={c}
+                  className={
+                    (c === "score_change" && Number(r[c]) < 0) ||
+                    (c === "cc_change" && Number(r[c]) > 0)
+                      ? "improved"
+                      : ""
+                  }
+                >
                   {j === 0 ? (
                     <button
                       className="text-link"

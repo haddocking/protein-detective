@@ -40,7 +40,7 @@ export function OverviewPage() {
       </div>
       <div className="overview-results">
         <section>
-          <h2>Highest fitting CC</h2>
+          <h2>Highest PowerFit fitting CC</h2>
           {data.fitting ? (
             <ResultsTable
               items={sorted(grouped(data.fitting, "fitting", "1"), "cc", true).slice(0, 5)}
@@ -55,7 +55,7 @@ export function OverviewPage() {
           </Link>
         </section>
         <section>
-          <h2>Lowest refinement scores</h2>
+          <h2>Lowest CAPRI scores after refinement</h2>
           {data.refinements ? (
             <ResultsTable
               items={sorted(

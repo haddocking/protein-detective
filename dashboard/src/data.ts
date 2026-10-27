@@ -28,30 +28,40 @@ export const refinementColumns = [
   "refined_score",
   "baseline_score",
   "score_change",
+  "before_cc",
+  "after_cc",
+  "cc_change",
 ];
 
 export const labels: Record<string, string> = {
   filtering_status: "Filtering status",
   rejection_reason: "Rejection reason",
-  cluster_score_std: "Cluster score standard deviation",
+  cluster_score_std: "CAPRI cluster score standard deviation",
   population: "Cluster population",
-  cluster_score: "Cluster score",
+  cluster_score: "CAPRI cluster score",
   structure: "Structure",
   uniprot_accessions: "UniProt",
   source: "Source",
   powerfit_run_id: "PowerFit run",
   refine_run_id: "Refinement run",
   rank: "Solution rank",
-  cc: "CC",
-  fishz: "FishZ",
-  relative_z: "Relative Z",
+  cc: "PowerFit CC",
+  before_cc: "PowerFit CC before refinement",
+  after_cc: "PowerFit CC after refinement",
+  cc_change: "PowerFit CC change (after − before)",
+  before_fishz: "PowerFit Fisher z before refinement",
+  after_fishz: "PowerFit Fisher z after refinement",
+  before_relative_z: "PowerFit relative z before refinement",
+  after_relative_z: "PowerFit relative z after refinement",
+  fishz: "PowerFit Fisher z",
+  relative_z: "PowerFit relative z",
   model_available: "Fitted structure saved",
   fitted_rank: "Fitted rank",
-  cluster_rank: "Cluster rank",
-  member_rank: "Member rank",
-  refined_score: "Refined score",
-  baseline_score: "Baseline score",
-  score_change: "Score change",
+  cluster_rank: "CAPRI cluster rank",
+  member_rank: "CAPRI member rank",
+  refined_score: "CAPRI score after refinement",
+  baseline_score: "CAPRI score before refinement",
+  score_change: "CAPRI score change (after − before)",
 };
 
 export function display(v: unknown): string {
@@ -208,6 +218,13 @@ export interface RefinementResult extends StructureResult {
   cluster_id: number;
   cluster_rank: number;
   member_rank: number;
+  before_cc: number;
+  after_cc: number;
+  cc_change: number;
+  before_fishz: number;
+  after_fishz: number;
+  before_relative_z: number;
+  after_relative_z: number;
   refined_score: number;
   baseline_score: number | null;
   score_change: number | null;

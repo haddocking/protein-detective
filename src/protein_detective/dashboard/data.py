@@ -477,6 +477,13 @@ class DashboardData:
                 cl.n AS population,
                 cl.score AS cluster_score,
                 cl.score_std AS cluster_score_std,
+                p.before_cc,
+                p.after_cc,
+                p.after_cc - p.before_cc AS cc_change,
+                p.before_fishz,
+                p.after_fishz,
+                p.before_relative_z,
+                p.after_relative_z,
                 b.score AS baseline_score,
                 m.score - b.score AS score_change,
                 pr.used_target,
@@ -486,6 +493,7 @@ class DashboardData:
                 $session_dir || '/' || m.refined_fitted_structure AS refined_fitted_structure_absolute_path,
                 $session_dir || '/' || m.refined_known_structure AS refined_known_structure_absolute_path
             FROM refinements_capri_ss m
+            JOIN refinements_powerfit p ON m.refine_run_dir = p.refine_run_dir AND m.model = p.model
             LEFT JOIN refinements_io io ON m.refine_run_dir = io.refine_run_dir
             LEFT JOIN (SELECT DISTINCT * FROM fitted_models) fm ON io.fitted_model = fm.fitted_model_file
             LEFT JOIN fittable_structures fs ON m.unfitted_structure = fs.structure
@@ -495,7 +503,7 @@ class DashboardData:
             LEFT JOIN powerfit_runs pr ON m.powerfit_run_id = pr.powerfit_run_id
             LEFT JOIN refinements_runs r ON m.refine_run_id = r.refine_run_id
             WHERE m.score IS NOT NULL
-            ORDER BY m.score, m.refined_fitted_structure
+            ORDER BY p.after_cc DESC, m.refined_fitted_structure
             """,
             {"session_dir": str(self.session_dir)},
         )
@@ -510,8 +518,9 @@ class DashboardData:
         """Return final refinement members across independent refinement runs.
 
         Returns:
-            Rows ordered by individual score, with cluster scores kept separate.
-                Score change is refined minus baseline; negative means improvement.
+            Rows ordered by PowerFit CC after refinement descending. CAPRI cluster
+                scores are kept separate. Both changes are after minus before;
+                positive CC change and negative CAPRI score change mean improvement.
                 Group members by refinement run, fitted input, and cluster. Returns
                 an empty list when required metadata tables are absent.
         """

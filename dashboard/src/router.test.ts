@@ -121,11 +121,20 @@ it("authenticates a direct provenance link and keeps its selected result across 
         ...fitting[0],
         id: "refined-1",
         refine_run_id: "refine-1",
+        after_cc: 0.8,
+        refined_score: -12,
         fitted_model_absolute_path: "/session/powerfit/unrefined.pdb",
         original_known_structure_absolute_path: "/session/original-known.pdb",
         refined_fitted_structure_absolute_path: "/session/refine/refined-fitted.pdb.gz",
         refined_known_structure: "refine/9_reconstruct/mdref_1_known.pdb.gz",
         refined_known_structure_absolute_path: "/other files/known #1.pdb",
+      },
+      {
+        id: "refined-2",
+        structure: "highest-cc",
+        refine_run_id: "refine-2",
+        after_cc: 0.95,
+        refined_score: 100,
       },
     ],
   };
@@ -233,6 +242,16 @@ it("authenticates a direct provenance link and keeps its selected result across 
         search: { selected: "refined-1", selection: "refinements", tab: "details" },
       });
     });
+    expect(container.querySelector("main tbody tr")?.textContent).toContain("highest-cc");
+    expect(container.querySelector("main thead")?.textContent).toContain(
+      "PowerFit CC after refinement ↓",
+    );
+    expect(container.querySelector("main thead")?.textContent).toContain(
+      "PowerFit CC change (after − before)",
+    );
+    expect(container.querySelector("main thead")?.textContent).toContain(
+      "CAPRI score change (after − before)",
+    );
     await act(async () => {
       await router.navigate({
         to: "/refinements",

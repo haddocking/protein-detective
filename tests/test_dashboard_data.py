@@ -51,6 +51,13 @@ def session(tmp_path: Path):
                 ('refine-b','fit-a','a.cif.gz','refine/refine-b/input',1,1,-25.0,'refine/b.pdb.gz')
             ) t(refine_run_id, powerfit_run_id, unfitted_structure, refine_run_dir,
                 cluster_id, modelcluster_ranking, score, refined_fitted_structure);
+            ALTER TABLE refinements_capri_ss ADD COLUMN model VARCHAR;
+            UPDATE refinements_capri_ss SET model = refined_fitted_structure;
+            CREATE TABLE refinements_powerfit AS SELECT
+                refine_run_dir, model, 0.8 AS before_cc, 0.85 AS after_cc,
+                1.1 AS before_fishz, 1.2 AS after_fishz,
+                10.0 AS before_relative_z, 11.0 AS after_relative_z
+            FROM refinements_capri_ss;
             ALTER TABLE refinements_capri_ss ADD COLUMN refined_known_structure VARCHAR;
             UPDATE refinements_capri_ss SET refined_known_structure = replace(refined_fitted_structure, '.pdb.gz', '_known.pdb.gz');
             CREATE TABLE refinements_capri_clt AS SELECT * FROM (VALUES
@@ -537,3 +544,23 @@ def test_refinements_require_all_joined_tables(session: Path, table: str):
     with duckdb.connect(str(session / "meta.duckdb")) as con:
         con.execute(f'DROP TABLE "{table}"')
     assert DashboardData(session).refinements() == []
+
+
+def test_refinement_powerfit_scores(session: Path):
+    rows = DashboardData(session).refinements()
+    assert len(rows) == 3
+    assert all(row["before_cc"] == 0.8 and row["after_cc"] == 0.85 for row in rows)
+    assert all(row["cc_change"] == pytest.approx(0.05) for row in rows)
+    assert all(row["before_fishz"] == 1.1 and row["after_relative_z"] == 11.0 for row in rows)
+
+
+def test_refinements_sort_by_powerfit_cc_and_keep_changes_distinct(session: Path):
+    with duckdb.connect(str(session / "meta.duckdb")) as con:
+        con.execute("UPDATE refinements_powerfit SET after_cc = 0.95 WHERE model = 'refine/a.pdb.gz'")
+        con.execute("UPDATE refinements_powerfit SET after_cc = 0.7 WHERE model = 'refine/b.pdb.gz'")
+    rows = DashboardData(session).refinements()
+    assert [row["id"] for row in rows] == ["refine/a.pdb.gz", "refine/a2.pdb.gz", "refine/b.pdb.gz"]
+    assert rows[0]["cc_change"] == pytest.approx(0.15)
+    assert rows[-1]["cc_change"] == pytest.approx(-0.1)
+    assert rows[0]["score_change"] == -2
+    assert rows[-1]["score_change"] == -5

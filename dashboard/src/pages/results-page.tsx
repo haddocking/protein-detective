@@ -50,7 +50,9 @@ export function ResultsPage({ kind }: { kind: ResultKind }) {
           <>
             <section className="chart-section">
               <div>
-                <h2>{kind === "fitting" ? "Score distribution" : "Refinement comparison"}</h2>
+                <h2>
+                  {kind === "fitting" ? "PowerFit score distribution" : "CAPRI score comparison"}
+                </h2>
                 <p className="muted">
                   All {filtered.length.toLocaleString()} matching{" "}
                   {kind === "fitting" ? "solutions" : "members"}, before top-N selection and
@@ -63,14 +65,14 @@ export function ResultsPage({ kind }: { kind: ResultKind }) {
                       value={p.get("metric") || "cc"}
                       onChange={(e) => navigate({ metric: e.target.value })}
                     >
-                      <option value="cc">CC</option>
-                      <option value="fishz">FishZ</option>
-                      <option value="relative_z">Relative Z</option>
+                      <option value="cc">PowerFit CC</option>
+                      <option value="fishz">PowerFit Fisher z</option>
+                      <option value="relative_z">PowerFit relative z</option>
                     </select>
                   </label>
                 ) : (
                   <p>
-                    Points below the diagonal improved.
+                    Points below the diagonal have a lower (better) CAPRI score.
                     <br />
                     Select a point to inspect its result.
                   </p>
@@ -96,8 +98,8 @@ export function ResultsPage({ kind }: { kind: ResultKind }) {
                 </h2>
                 <span className="muted">
                   {kind === "fitting"
-                    ? "Higher CC is better"
-                    : "Score change = refined − baseline; negative is better"}
+                    ? "Higher PowerFit CC is better"
+                    : "Changes = after − before. PowerFit CC: positive is better. CAPRI score: negative is better."}
                 </span>
               </div>
               <ResultsTable

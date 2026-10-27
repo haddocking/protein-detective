@@ -23,6 +23,13 @@ const detailsFields = new Set([
   "refined_score",
   "baseline_score",
   "score_change",
+  "before_cc",
+  "after_cc",
+  "cc_change",
+  "before_fishz",
+  "after_fishz",
+  "before_relative_z",
+  "after_relative_z",
   "population",
   "cluster_score",
   "cluster_score_std",
@@ -151,8 +158,8 @@ export function ResultDetails({
                 <button className="related" key={key(r)} onClick={() => select(r, type)}>
                   {display(r.powerfit_run_id)} ·{" "}
                   {type === "fitting"
-                    ? `rank ${display(r.rank)} · CC ${display(r.cc)}`
-                    : `${display(r.refine_run_id)} · score ${display(r.refined_score)}`}
+                    ? `rank ${display(r.rank)} · PowerFit CC ${display(r.cc)}`
+                    : `${display(r.refine_run_id)} · CAPRI score ${display(r.refined_score)}`}
                 </button>
               ))}
               {related.length > 20 && (

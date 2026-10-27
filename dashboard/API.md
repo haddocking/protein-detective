@@ -100,11 +100,15 @@ Refinement fields include `refine_run_id`, `refine_run_dir`, `fitted_model`,
 `baseline_score`, `score_change`, `population`, `cluster_score`, and
 `cluster_score_std`. Default member selection retains the lowest `member_rank`
 within each independent refinement run, fitted input, and cluster. Default
-sorting uses individual refined score ascending. Cluster scores and standard
-deviations describe clusters. `score_change` is
-`refined_score - baseline_score`; negative values indicate improvement. Missing
-baseline/cluster measurements are null. Refinement run IDs are independent of
-source PowerFit run IDs, and multiple refinement runs can reuse a fitted input.
+sorting uses `after_cc` (PowerFit CC after refinement) descending. `before_cc`
+and `after_cc` are fixed-coordinate PowerFit scores; `cc_change` is
+`after_cc - before_cc`, where positive values indicate improvement.
+`refined_score`, `baseline_score`, `cluster_score`, and `cluster_score_std` are
+CAPRI scores. `score_change` is `refined_score - baseline_score`; negative
+values indicate improvement. Dashboard and CSV labels explicitly name each
+scoring system. Missing baseline/cluster measurements are null. Refinement run
+IDs are independent of source PowerFit run IDs, and multiple refinement runs can
+reuse a fitted input.
 
 Provenance fields include `command`, nullable `start_time` and `end_time`, and
 `inputs` and `outputs` arrays of recorded paths. Additional `files` metadata
