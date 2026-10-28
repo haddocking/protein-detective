@@ -258,6 +258,44 @@ def test_stdout_is_csv_and_no_crate_write(
     assert metadata.read_bytes() == original_metadata
 
 
+def test_powerfit_scores_match_run_and_member(session_with_baseline: Path):
+    session = session_with_baseline
+    scores = session / "refine/first/run_001/protein/fit_1.pdb/powerfit-recscores.csv"
+    with scores.open("w", newline="") as stream:
+        csv.writer(stream).writerows(
+            [
+                [
+                    "model",
+                    "before_cc",
+                    "before_fishz",
+                    "before_relative_z",
+                    "after_cc",
+                    "after_fishz",
+                    "after_relative_z",
+                ],
+                ["../6_mdref/mdref_9.pdb", 0.1, 0.3, 5.0, 0.25, 0.45, 7.0],
+                ["../6_mdref/mdref_8.pdb", 0.1, 0.3, 5.0, 0.2, 0.4, 6.0],
+            ]
+        )
+    output = session / "report.csv"
+    cli(["refine", "report", str(session), "--top", "2", "--output", str(output)])
+    with output.open() as stream:
+        report = list(csv.DictReader(stream))
+    assert report[0]["refined_complex"].endswith("mdref_8.pdb.gz")
+    assert report[0]["before_cc"] == "0.1"
+    assert report[0]["after_cc"] == "0.2"
+    assert float(report[0]["cc_change"]) == pytest.approx(0.1)
+    assert report[0]["before_fishz"] == "0.3"
+    assert report[0]["after_fishz"] == "0.4"
+    assert float(report[0]["before_relative_z"]) == 5
+    assert float(report[0]["after_relative_z"]) == 6
+    assert report[1]["refined_complex"].endswith("mdref_9.pdb.gz")
+    assert report[1]["after_cc"] == "0.25"
+    assert report[2]["refine_run_id"] == "second"
+    assert report[2]["before_cc"] == "0.8"
+    assert report[2]["after_cc"] == "0.85"
+
+
 @pytest.mark.parametrize("top", [0, -1])
 def test_invalid_top(tmp_path: Path, top: int):
     with pytest.raises(ValidationError):

@@ -11,6 +11,7 @@ from protein_detective.meta import (
     refinements_capri_clt_as_duckdb_ddl,
     refinements_capri_ss_as_duckdb_ddl,
     refinements_io_as_duckdb_ddl,
+    refinements_powerfit_as_duckdb_ddl,
     refinements_runs_as_duckdb_ddl,
 )
 
@@ -30,6 +31,13 @@ SELECT
     m.modelcluster_ranking,
     u.score AS unrefined_score,
     m.score AS refined_score,
+    p.before_cc,
+    p.after_cc,
+    p.after_cc - p.before_cc AS cc_change,
+    p.before_fishz,
+    p.after_fishz,
+    p.before_relative_z,
+    p.after_relative_z,
     CASE WHEN pr.used_target IS NOT NULL THEN concat_ws('/', $session_prefix, pr.used_target) END AS density,
     concat_ws('/', $session_prefix, io.fitted_model) AS unrefined_fitted_model,
     concat_ws('/', $session_prefix, r.original_known_structure) AS original_known_structure,
@@ -45,6 +53,7 @@ JOIN (SELECT DISTINCT * FROM fitted_models) fm ON io.fitted_model = fm.fitted_mo
 JOIN fittable_structures fs ON m.unfitted_structure = fs.structure
 JOIN refinements_capri_clt cl USING (refine_run_dir, cluster_id)
 JOIN refinements_baseline u USING (refine_run_dir)
+JOIN refinements_powerfit p ON m.refine_run_dir = p.refine_run_dir AND m.model = p.model
 LEFT JOIN powerfit_runs pr ON m.powerfit_run_id = pr.powerfit_run_id
 WHERE m.score IS NOT NULL
     AND ($refine_run_id IS NULL OR m.refine_run_id = $refine_run_id)
@@ -165,6 +174,11 @@ def refinement_report(
     - modelcluster_ranking: capri_ss.tsv column modelcluster_ranking.
     - refined_score: capri_ss.tsv column score.
     - unrefined_score: CAPRI score of unrefined structure and the known structure.
+    - before_cc, after_cc: fixed-coordinate PowerFit CC before and after refinement.
+    - cc_change: after_cc minus before_cc.
+    - before_fishz, after_fishz: PowerFit Fisher z before and after refinement.
+    - before_relative_z, after_relative_z: PowerFit relative z before and after refinement.
+      PowerFit scores are read from each model run's powerfit-recscores.csv.
     - density: path to the density map used to fit the model; empty when it was not recorded.
     - unrefined_fitted_model: path to the fitted model before refinement.
     - original_known_structure: path to the supplied known structure before chain removal or renaming.
@@ -212,6 +226,7 @@ def refinement_report(
             refinements_capri_ss_as_duckdb_ddl,
             refinements_capri_clt_as_duckdb_ddl,
             refinements_baseline,
+            refinements_powerfit_as_duckdb_ddl,
         ):
             for statement, params in loader(session_dir):
                 con.execute(statement, params)
