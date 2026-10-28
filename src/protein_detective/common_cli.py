@@ -83,4 +83,5 @@ def write_ro_crate(
         dataset_license="CC-BY-4.0",
         start_time=start_time,
         crate_dir=session_dir,
+        record_cwd=True,
     )

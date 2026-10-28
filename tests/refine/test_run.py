@@ -1,11 +1,15 @@
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
+from powerfit_em import Structure, Volume, structure_to_shape_like
 from protein_quest.structure.formats import read_structure, write_structure
 from protein_quest.structure.metadata import structure_metadata
 from protein_quest.structure.uniprot_extraction import structure2uniprot_accessions
+from rocrate.model.contextentity import ContextEntity
+from rocrate.rocrate import ROCrate
 
 from protein_detective.refine.haddock import RefineOptions
 from protein_detective.refine.report import refinement_report
@@ -20,30 +24,30 @@ from tests.helpers import assert_crate, assert_lines
 def test_refine_with_haddock3_single_member_clusters(
     tmp_path: Path,
     fitted_structure: Path,
-    fixed_structure: Path,
+    known_structure: Path,
     single_member_cluster_refinement_results: dict[str, pd.DataFrame],
 ):
     session_dir = setup_refinement_session(tmp_path, fitted_structure)
     options = RefineOptions(rigidbody_sampling=10, ncores=6, top_clusters=4, top_models=1)
 
-    refine_with_haddock3(session_dir, fixed_structure, refine_options=options, scheduler_address="sequential")
+    refine_with_haddock3(session_dir, known_structure, refine_options=options, scheduler_address="sequential")
 
-    assert_refinement_rocrate(session_dir, fixed_structure)
+    assert_refinement_rocrate(session_dir, known_structure)
     assert_refinement_results(session_dir, single_member_cluster_refinement_results)
 
 
 @pytest.mark.manual
 def test_refine_with_haddock3_clustered(
-    tmp_path: Path, fitted_structure: Path, fixed_structure: Path, clustered_refinement_results: dict[str, pd.DataFrame]
+    tmp_path: Path, fitted_structure: Path, known_structure: Path, clustered_refinement_results: dict[str, pd.DataFrame]
 ):
     session_dir = setup_refinement_session(tmp_path, fitted_structure)
     options = RefineOptions(
         rigidbody_sampling=10, ncores=6, top_clusters=4, top_models=1, water_refinement_sampling_factor=3
     )
 
-    refine_with_haddock3(session_dir, fixed_structure, refine_options=options, scheduler_address="sequential")
+    refine_with_haddock3(session_dir, known_structure, refine_options=options, scheduler_address="sequential")
 
-    assert_refinement_rocrate(session_dir, fixed_structure)
+    assert_refinement_rocrate(session_dir, known_structure)
     assert_refinement_results(session_dir, clustered_refinement_results)
 
 
@@ -81,12 +85,41 @@ def setup_refinement_session(tmp_path: Path, fitted_structure: Path) -> Path:
         ]
     ).to_csv(powerfit_root_dir / "fitted_models.csv", index=False)
 
+    structure = Structure.fromfile(str(fitted_model))
+    origin = structure.coor.min(axis=1) - 12
+    shape = np.ceil((structure.coor.max(axis=1) - origin + 12) / 2).astype(int)[::-1]
+    target = Volume(np.zeros(shape), voxelspacing=2, origin=origin)
+    density = structure_to_shape_like(target, structure.coor, resolution=8, weights=structure.atomnumber)
+    density.tofile(powerfit_root_dir / "run_001/map.mrc")
+    crate = ROCrate()
+    map_entity = crate.add_file(
+        powerfit_root_dir / "run_001/map.mrc",
+        dest_path="powerfit/run_001/map.mrc",
+        properties={"description": "Density map used for fitting."},
+    )
+    run_entity = crate.add_dataset(powerfit_root_dir / "run_001", dest_path="powerfit/run_001")
+    crate.add(
+        ContextEntity(
+            crate,
+            "protein-detective powerfit run map.mrc 8 session --powerfit-run-id run_001",
+            properties={"@type": "CreateAction", "object": [map_entity], "result": [run_entity]},
+        )
+    )
+    crate.write(session_dir)
     return session_dir
 
 
 def assert_refinement_results(session_dir: Path, expected_results: dict[str, pd.DataFrame]):
     baseline = session_dir / "refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb/baseline"
     baseline_scores = pd.read_csv(baseline / "2_caprieval/capri_ss.tsv", sep="\t", comment="#")
+    rescored = pd.read_csv(baseline.parent / "powerfit-recscores.csv")
+    assert rescored["before_cc"].eq(rescored.iloc[0]["before_cc"]).all()
+    assert (
+        rescored[["before_cc", "before_fishz", "before_relative_z", "after_cc", "after_fishz", "after_relative_z"]]
+        .notna()
+        .all()
+        .all()
+    )
     report = refinement_report(session_dir)
     assert report["unrefined_score"].notna().all()
     assert report["unrefined_score"].eq(baseline_scores.iloc[0]["score"]).all()
@@ -114,13 +147,17 @@ def assert_refinement_results(session_dir: Path, expected_results: dict[str, pd.
     assert_frame_equal(results["clusters"], expected_results["clusters"], check_exact=True)
 
 
-def assert_refinement_rocrate(session_dir: Path, fixed_structure: Path):
+def assert_refinement_rocrate(session_dir: Path, known_structure: Path):
     expected_io_csv_lines = {
-        "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir",
-        "refine_run_001,run_001,powerfit/run_001/fakestructure.cif/fit_1.pdb,refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb",
+        "refine_run_id,powerfit_run_id,fitted_model,refine_run_dir,original_known_structure,processed_known_structure",
+        (
+            "refine_run_001,run_001,powerfit/run_001/fakestructure.cif/fit_1.pdb,refine/refine_run_001/run_001/fakestructure.cif/fit_1.pdb,"
+            f"refine/refine_run_001/{known_structure.name},refine/refine_run_001/known_structure.pdb"
+        ),
     }
     crate_input_ids = {
-        "refine/refine_run_001/fixed_structure.pdb",
+        "refine/refine_run_001/known_structure.pdb",
+        f"refine/refine_run_001/{known_structure.name}",
         "powerfit/run_001/fakestructure.cif/fit_1.pdb",
     }
     crate_output_ids = {
@@ -133,14 +170,15 @@ def assert_refinement_rocrate(session_dir: Path, fixed_structure: Path):
         session_dir,
         input_ids=crate_input_ids,
         output_ids=crate_output_ids,
+        nr_actions=2,
     )
     assert {i["@id"] for i in actual_action["object"]} == crate_input_ids
     assert {o["@id"] for o in actual_action["result"]} == crate_output_ids
 
-    fixed_item = crate.get("refine/refine_run_001/fixed_structure.pdb")
+    known_item = crate.get("refine/refine_run_001/known_structure.pdb")
 
-    assert fixed_item is not None
-    assert str(fixed_structure.resolve()) in fixed_item["description"]
+    assert known_item is not None
+    assert str(known_structure.resolve()) in known_item["description"]
 
 
 def test_deleted_ids_and_exclusive_creation(session_with_powerfit_results: Path):
@@ -166,12 +204,12 @@ def test_rejects_unsafe_ids_before_creating_directory(session_with_powerfit_resu
 
 
 def assert_refinement_rejected_before_creating_run(
-    session_dir: Path, fixed_structure: Path, error: type[Exception], *, powerfit_run_id: str | None = None
+    session_dir: Path, known_structure: Path, error: type[Exception], *, powerfit_run_id: str | None = None
 ):
     with pytest.raises(error):
         refine_with_haddock3(
             session_dir,
-            fixed_structure,
+            known_structure,
             scheduler_address="sequential",
             powerfit_run_id=powerfit_run_id,
         )
@@ -179,13 +217,13 @@ def assert_refinement_rejected_before_creating_run(
     assert not (session_dir / "refine").exists()
 
 
-def test_rejects_empty_selection_before_creating_run(session_with_powerfit_results: Path, fixed_structure_file: Path):
+def test_rejects_empty_selection_before_creating_run(session_with_powerfit_results: Path, known_structure_file: Path):
     (session_with_powerfit_results / "powerfit/fitted_models.csv").write_text("powerfit_run_id,fitted_model_file\n")
 
-    assert_refinement_rejected_before_creating_run(session_with_powerfit_results, fixed_structure_file, ValueError)
+    assert_refinement_rejected_before_creating_run(session_with_powerfit_results, known_structure_file, ValueError)
 
 
-def test_rejects_unknown_source_before_creating_run(session_with_powerfit_results: Path, fixed_structure_file: Path):
+def test_rejects_unknown_source_before_creating_run(session_with_powerfit_results: Path, known_structure_file: Path):
     assert_refinement_rejected_before_creating_run(
-        session_with_powerfit_results, fixed_structure_file, ValueError, powerfit_run_id="unknown"
+        session_with_powerfit_results, known_structure_file, ValueError, powerfit_run_id="unknown"
     )

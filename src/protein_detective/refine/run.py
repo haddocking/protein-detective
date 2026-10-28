@@ -3,6 +3,7 @@
 import csv
 import logging
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -15,11 +16,22 @@ from protein_detective.refine.haddock import (
     RefineOptions,
     generate_haddock3_config_body,
     generate_unrefined_config_body,
-    prepare_fitted_and_fixed,
-    prepare_fixed_structure,
+    prepare_fitted_and_known,
+    prepare_known_structure,
     run_haddock3,
 )
+from protein_detective.refine.powerfit import rescore_refinement
 from protein_detective.refine.provenance import write_refinement_ro_crate
+from protein_detective.refine.reconstruct import reconstruct_refined_structures
+
+
+@dataclass
+class KnownStructure:
+    """Known partner inputs and the original chains omitted from refinement."""
+
+    processed_known_structure: Path
+    original_known_structure: Path
+    remove_known_chains: set[str] | None
 
 
 def refine_structure_task(
@@ -28,7 +40,7 @@ def refine_structure_task(
     *,
     session_dir: Path,
     root_refine_dir: Path,
-    fixed_structure: Path,
+    known_structure: KnownStructure,
     options: RefineOptions,
     haddock_log_level: int = logging.INFO,
 ) -> tuple[Path, Path]:
@@ -38,7 +50,7 @@ def refine_structure_task(
         fitted_model: Fitted input, absolute or relative to the session directory.
         session_dir: Absolute session directory containing PowerFit results.
         root_refine_dir: Directory for the independent refinement run.
-        fixed_structure: Prepared fixed partner with chains renamed to B.
+        known_structure: Prepared and original partner paths with omitted chain IDs.
         options: Refinement parameters for HADDOCK3.
         haddock_log_level: Logging level of HADDOCK3 messages.
 
@@ -59,7 +71,7 @@ def refine_structure_task(
     refine_run_dir.mkdir(parents=True)
     baseline_dir = refine_run_dir / "baseline"
     baseline_dir.mkdir()
-    complex_file = prepare_fitted_and_fixed(abs_fitted_model, fixed_structure, baseline_dir)
+    complex_file = prepare_fitted_and_known(abs_fitted_model, known_structure.processed_known_structure, baseline_dir)
     baseline_config = baseline_dir / "workflow.cfg"
     baseline_config.write_text(generate_unrefined_config_body(baseline_dir, complex_file, options.ncores))
     run_haddock3(baseline_config, haddock_log_level)
@@ -70,12 +82,19 @@ def refine_structure_task(
     config_body = generate_haddock3_config_body(
         run_dir=refinement_dir,
         fitted_model=abs_fitted_model,
-        fixed_structure=fixed_structure,
+        processed_known_structure=known_structure.processed_known_structure,
         options=options,
     )
     config_file.write_text(config_body)
 
     run_haddock3(config_file, haddock_log_level)
+    reconstruct_refined_structures(
+        refinement_dir,
+        known_structure.original_known_structure,
+        remove_known_chains=known_structure.remove_known_chains,
+    )
+
+    rescore_refinement(session_dir, abs_fitted_model, refine_run_dir)
 
     return abs_fitted_model, refine_run_dir
 
@@ -85,7 +104,7 @@ def refine_structures(
     session_dir: Path,
     refine_dir: Path,
     fitted_models: list[Path],
-    fixed_structure: Path,
+    known_structure: KnownStructure,
     options: RefineOptions,
     scheduler_address: str,
     haddock_log_level: int = logging.INFO,
@@ -96,7 +115,7 @@ def refine_structures(
         session_dir: Absolute session directory containing PowerFit results.
         refine_dir: Directory for the independent refinement run.
         fitted_models: Fitted inputs, absolute or relative to the session directory.
-        fixed_structure: Prepared fixed partner with chains renamed to B.
+        known_structure: Prepared and original partner paths with omitted chain IDs.
         options: Refinement parameters for HADDOCK3.
         scheduler_address: Dask scheduler address, or sequential execution mode.
         haddock_log_level: Logging level of HADDOCK3 messages.
@@ -110,7 +129,7 @@ def refine_structures(
         fitted_models,
         options=options,
         session_dir=session_dir,
-        fixed_structure=fixed_structure,
+        known_structure=known_structure,
         root_refine_dir=refine_dir,
         haddock_log_level=haddock_log_level,
         map_with_progress_options={
@@ -120,11 +139,27 @@ def refine_structures(
     )
 
 
-def _write_io_csv(*, session_dir: Path, refine_dir: Path, refined: list[tuple[Path, Path]]) -> Path:
+def _write_io_csv(
+    *,
+    session_dir: Path,
+    refine_dir: Path,
+    refined: list[tuple[Path, Path]],
+    original_known_structure: Path,
+    processed_known_structure: Path,
+) -> Path:
     io_csv = refine_dir / "io.csv"
     with io_csv.open("w") as f:
         writer = csv.writer(f)
-        writer.writerow(["refine_run_id", "powerfit_run_id", "fitted_model", "refine_run_dir"])
+        writer.writerow(
+            [
+                "refine_run_id",
+                "powerfit_run_id",
+                "fitted_model",
+                "refine_run_dir",
+                "original_known_structure",
+                "processed_known_structure",
+            ]
+        )
         for fitted_model, refine_run_dir in refined:
             writer.writerow(
                 [
@@ -132,6 +167,8 @@ def _write_io_csv(*, session_dir: Path, refine_dir: Path, refined: list[tuple[Pa
                     fitted_model.relative_to(session_dir / "powerfit").parts[0],
                     fitted_model.relative_to(session_dir),
                     refine_run_dir.relative_to(session_dir),
+                    original_known_structure.relative_to(session_dir),
+                    processed_known_structure.relative_to(session_dir),
                 ]
             )
     return io_csv
@@ -173,26 +210,26 @@ def create_refinement_run(session_dir: Path, refine_run_id: str | None = None) -
 
 def refine_with_haddock3(
     session_dir: Path,
-    fixed_structure: Path,
+    input_known_structure: Path,
     /,
     *,
     refine_options: RefineOptions | None = None,
-    remove_fixed_chains: set[str] | None = None,  # TODO use frozenset and empty frozenset as default?
+    remove_known_chains: set[str] | None = None,  # TODO use frozenset and empty frozenset as default?
     refine_run_id: str | None = None,
     powerfit_run_id: str | None = None,
     scheduler_address: str | None = None,
     haddock_log_level: int = logging.INFO,
 ):
-    """Refine selected fitted models against a fixed structure with HADDOCK3.
+    """Refine selected fitted models against a known structure with HADDOCK3.
 
     Store the input/output mapping before launching work and record successful
     results, configurations and effective options in the session's RO-Crate.
 
     Args:
         session_dir: Session directory containing fitted PowerFit results.
-        fixed_structure: Fixed partner in the fitted models' coordinate system.
+        input_known_structure: Known partner in the fitted models' coordinate system.
         refine_options: HADDOCK3 parameters; defaults to the standard refinement options.
-        remove_fixed_chains: Original chain identifiers to remove before renaming
+        remove_known_chains: Original chain identifiers to remove before renaming
             remaining chains to B. Use author chain identifiers for mmCIF inputs.
         refine_run_id: Independent refinement ID; defaults to the next numeric ID
             above the existing maximum, using the refine_run_ prefix.
@@ -205,7 +242,7 @@ def refine_with_haddock3(
     Raises:
         ValueError: No models are selected, an input path or run ID is invalid,
             or the requested chain removal is invalid.
-        FileNotFoundError: A selected fitted input or fixed partner is missing.
+        FileNotFoundError: A selected fitted input or known partner is missing.
         FileExistsError: The refinement run directory already exists.
     """
     if refine_options is None:
@@ -226,10 +263,10 @@ def refine_with_haddock3(
         raise ValueError(msg)
 
     refine_dir = create_refinement_run(session_dir=session_dir, refine_run_id=refine_run_id)
-    session_fixed_structure = prepare_fixed_structure(
-        fixed_structure=fixed_structure,
+    processed_known_structure, original_known_structure = prepare_known_structure(
+        input_known_structure=input_known_structure,
         refine_dir=refine_dir,
-        remove_fixed_chains=remove_fixed_chains,
+        remove_known_chains=remove_known_chains,
     )
 
     if scheduler_address == "sequential":
@@ -241,14 +278,24 @@ def refine_with_haddock3(
         )
 
     expected = [(model, refine_dir / model.relative_to(session_dir / "powerfit")) for model in structures_to_refine]
-    io_csv = _write_io_csv(session_dir=session_dir, refine_dir=refine_dir, refined=expected)
+    io_csv = _write_io_csv(
+        session_dir=session_dir,
+        refine_dir=refine_dir,
+        refined=expected,
+        original_known_structure=original_known_structure,
+        processed_known_structure=processed_known_structure,
+    )
     with context as cluster:
         real_scheduler_address = cluster if isinstance(cluster, str) else cluster.scheduler_address
         refined = refine_structures(
             session_dir=session_dir,
             refine_dir=refine_dir,
             fitted_models=structures_to_refine,
-            fixed_structure=session_fixed_structure,
+            known_structure=KnownStructure(
+                processed_known_structure=processed_known_structure,
+                original_known_structure=original_known_structure,
+                remove_known_chains=remove_known_chains,
+            ),
             options=refine_options,
             scheduler_address=real_scheduler_address,
             haddock_log_level=haddock_log_level,
@@ -257,12 +304,13 @@ def refine_with_haddock3(
     write_refinement_ro_crate(
         session_dir=session_dir,
         start_time=start_time,
-        session_fixed_structure=session_fixed_structure,
-        fixed_structure=fixed_structure,
+        processed_known_structure=processed_known_structure,
+        input_known_structure=input_known_structure,
+        original_known_structure=original_known_structure,
         refined=refined,
         io_csv=io_csv,
         options=refine_options,
-        remove_fixed_chains=remove_fixed_chains,
+        remove_known_chains=remove_known_chains,
         powerfit_run_id=powerfit_run_id,
     )
     rprint(f"Refinement run completed with ID: {refine_dir.name}")

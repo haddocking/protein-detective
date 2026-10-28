@@ -36,15 +36,16 @@ dependencies = [
     "molviewspec>=1.6.0",
     "numpy>=2.3.1",
     "pandas>=2.3.0",
-    "powerfit-em[opencl]>=5.0.0",
+    "powerfit-em[opencl]>=6.1.0",
     "protein-quest>=1.7.0",
     "pyopencl>=2025.2.5",
     "rich>=14.0.0",
-    "rocrate-action-recorder>=0.5.3",
+    "rocrate-action-recorder>=0.8.1",
     "tqdm>=4.67.1",
     "rocrate>=0.15.0",
     "haddock3>=2026.10.0",
     "gemmi>=0.7.5",
+    "aiohttp>=3.12",
 ]
 
 [project.urls]
@@ -57,8 +58,8 @@ Source = "https://github.com/haddocking/protein-detective"
 protein-detective = "protein_detective.cli:app"
 
 [project.optional-dependencies]
-cuda13 = ["powerfit-em[cuda13x]>=5.0.0"]
-cuda12 = ["powerfit-em[cuda12x]>=5.0.0"]
+cuda13 = ["powerfit-em[cuda13x]>=6.1.0"]
+cuda12 = ["powerfit-em[cuda12x]>=6.1.0"]
 
 [dependency-groups]
 type = [
@@ -92,6 +93,12 @@ docs = [
 [build-system]
 requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/protein_detective"]
 
 [tool.hatch.version]
 path = "src/protein_detective/__version__.py"
@@ -222,7 +229,10 @@ branch = true
 include = ["tests/**/*.py"]
 exclude = ["**/fixtures/**", "**/cassettes/**"]
 
-
 [tool.zorilla.rules]
 ZR004 = { enabled = false }  # disabled as sometimes you need many asserts
 ZR005 = { enabled = false }  # disabled as sometimes you need absolute paths
+
+# TODO remove once powerfit 6.1.0 is released
+[tool.uv.sources]
+powerfit-em = { git = "https://github.com/haddocking/powerfit", rev = "e4e9d00f642462d1425deba2362d0e877ab9146e" }

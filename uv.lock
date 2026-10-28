@@ -1199,6 +1199,18 @@ wheels = [
 ]
 
 [[package]]
+name = "mako"
+version = "1.4.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markupsafe" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5a/09/e07c4b5579a79f4b16f8d4f29f6c54514ac787c4ad506b8c4f28a0e6b0bf/mako-1.4.3.tar.gz", hash = "sha256:cd6537fe88d5fec315c55c2f8529bc4ce7a9a352ad7db3eeaa6a66e2dd4ec37a", size = 412799, upload-time = "2026-09-22T20:54:31.509Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6d/a0/053d6af3e8f871e0073b4a36732d9e65be77a72e5434c31b94f6af78a6bb/mako-1.4.3-py3-none-any.whl", hash = "sha256:723296007c870bfd6b3f0c3230dba7198096e5269297ebf5e4eff9e7ffa39d4f", size = 80164, upload-time = "2026-09-22T20:54:33.128Z" },
+]
+
+[[package]]
 name = "markdown"
 version = "3.8.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1921,8 +1933,8 @@ wheels = [
 
 [[package]]
 name = "powerfit-em"
-version = "5.0.0"
-source = { registry = "https://pypi.org/simple" }
+version = "6.1.0"
+source = { git = "https://github.com/haddocking/powerfit?rev=e4e9d00f642462d1425deba2362d0e877ab9146e#e4e9d00f642462d1425deba2362d0e877ab9146e" }
 dependencies = [
     { name = "molviewspec" },
     { name = "numpy" },
@@ -1930,14 +1942,6 @@ dependencies = [
     { name = "rich" },
     { name = "scipy" },
     { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/09/e4/3b9457b205378e1fdc12aec01b4650ae5e058338e3d578bac936cfdb79a3/powerfit_em-5.0.0.tar.gz", hash = "sha256:64511a417419d75125c7eb788e85d8c2cf9dba0eb89876efca3c7fe7383d8b18", size = 5768969, upload-time = "2026-05-12T12:12:25.295Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2d/9b/ca271926ed1db4377b7bfacb558888d1f0a17738b02564eafa6d2f354bc4/powerfit_em-5.0.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:c0b7a5d9bd5d1a6007b9305e2ca6b82514304165b8478e8eb325dfa8d7b13b7f", size = 5891841, upload-time = "2026-05-12T12:12:15.106Z" },
-    { url = "https://files.pythonhosted.org/packages/13/ab/ca348552325ddce65c7257c59670302eb0362cb0610418197e2b37fc4ac8/powerfit_em-5.0.0-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:9262b706b289ccb12c6e473be4511a8414ce8f7a250fc65d2fdd14123b0099fa", size = 6043724, upload-time = "2026-05-12T12:12:17.382Z" },
-    { url = "https://files.pythonhosted.org/packages/af/2c/c577ebb6b0c77cdc69ffdf1ee507d4cede819943462bc9c653b5140d9fbd/powerfit_em-5.0.0-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b253ee4309b0e554cb00c18c1992fc9e0da4b444a132c278f3cefdffba677043", size = 6042612, upload-time = "2026-05-12T12:12:19.364Z" },
-    { url = "https://files.pythonhosted.org/packages/33/9f/d68083e74276de61cd206687267ef58df70f189525223f5a11f416281a64/powerfit_em-5.0.0-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:a4aa07528857482b3c9e64ee425c10e70d2ec699f5130a55c575375cf0406ec3", size = 6038178, upload-time = "2026-05-12T12:12:21.03Z" },
-    { url = "https://files.pythonhosted.org/packages/aa/7c/025d0c6bfbcbf7ece7692fd183b300d4b51c59d72422c1c630719148f9b7/powerfit_em-5.0.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:88d9643a79a4ed4ca57ade7ae3014762767cfd1d414bc3bf715295c2f2e6b883", size = 6039318, upload-time = "2026-05-12T12:12:23.531Z" },
 ]
 
 [package.optional-dependencies]
@@ -1952,6 +1956,7 @@ cuda13x = [
     { name = "siphash24" },
 ]
 opencl = [
+    { name = "mako" },
     { name = "pyopencl" },
     { name = "pyvkfft" },
     { name = "siphash24" },
@@ -2076,6 +2081,7 @@ wheels = [
 name = "protein-detective"
 source = { editable = "." }
 dependencies = [
+    { name = "aiohttp" },
     { name = "cyclopts" },
     { name = "dask" },
     { name = "distributed" },
@@ -2143,6 +2149,7 @@ type = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp", specifier = ">=3.12" },
     { name = "cyclopts", specifier = ">=4.16.1" },
     { name = "dask", specifier = ">=2025.5.1" },
     { name = "distributed", specifier = ">=2025.5.1" },
@@ -2152,14 +2159,14 @@ requires-dist = [
     { name = "molviewspec", specifier = ">=1.6.0" },
     { name = "numpy", specifier = ">=2.3.1" },
     { name = "pandas", specifier = ">=2.3.0" },
-    { name = "powerfit-em", extras = ["cuda12x"], marker = "extra == 'cuda12'", specifier = ">=5.0.0" },
-    { name = "powerfit-em", extras = ["cuda13x"], marker = "extra == 'cuda13'", specifier = ">=5.0.0" },
-    { name = "powerfit-em", extras = ["opencl"], specifier = ">=5.0.0" },
+    { name = "powerfit-em", extras = ["cuda12x"], marker = "extra == 'cuda12'", git = "https://github.com/haddocking/powerfit?rev=e4e9d00f642462d1425deba2362d0e877ab9146e" },
+    { name = "powerfit-em", extras = ["cuda13x"], marker = "extra == 'cuda13'", git = "https://github.com/haddocking/powerfit?rev=e4e9d00f642462d1425deba2362d0e877ab9146e" },
+    { name = "powerfit-em", extras = ["opencl"], git = "https://github.com/haddocking/powerfit?rev=e4e9d00f642462d1425deba2362d0e877ab9146e" },
     { name = "protein-quest", specifier = ">=1.7.0" },
     { name = "pyopencl", specifier = ">=2025.2.5" },
     { name = "rich", specifier = ">=14.0.0" },
     { name = "rocrate", specifier = ">=0.15.0" },
-    { name = "rocrate-action-recorder", specifier = ">=0.5.3" },
+    { name = "rocrate-action-recorder", specifier = ">=0.8.1" },
     { name = "tqdm", specifier = ">=4.67.1" },
 ]
 provides-extras = ["cuda12", "cuda13"]
@@ -2696,14 +2703,14 @@ wheels = [
 
 [[package]]
 name = "rocrate-action-recorder"
-version = "0.7.1"
+version = "0.8.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "rocrate" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/32/94/1dad373acd0d7858316b303e65df38fef17f15257a5aa3682bc1e02d4977/rocrate_action_recorder-0.7.1.tar.gz", hash = "sha256:0dedaa6a701e1e922da766a20bc7bc5997d3d808fe555afea332562733db551d", size = 92666, upload-time = "2026-08-04T11:54:39.521Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/16/f3/526984c44c1e13c1cdb93579044fe8260ac2649ed6c739275ff949e87b38/rocrate_action_recorder-0.8.1.tar.gz", hash = "sha256:34e1ddf155d2146a02ee15d0ce927b2388be8b190b613110090ec2278fd0655b", size = 94101, upload-time = "2026-10-21T11:08:13.999Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/13/c3/850b8d34cf5448b4a3a17af71b8b73cbc04eeb29ab8024af86057fd497d0/rocrate_action_recorder-0.7.1-py3-none-any.whl", hash = "sha256:674c10e4cca5bce9162b8afc3f9dd2c3082d7db5a12c765504161a71e2af3a10", size = 30043, upload-time = "2026-08-04T11:54:38.476Z" },
+    { url = "https://files.pythonhosted.org/packages/95/aa/c19a5905281333e106af08be2382bc9f92b5df007e535726ee7295e35b55/rocrate_action_recorder-0.8.1-py3-none-any.whl", hash = "sha256:69f241ef5484f13489a08f19b4a31a48ac107d52edff3e03b61875e35f791c38", size = 30498, upload-time = "2026-10-21T11:08:12.828Z" },
 ]
 
 [[package]]
