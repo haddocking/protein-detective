@@ -508,7 +508,7 @@ class DashboardData:
                 $session_dir || '/' || m.refined_fitted_structure AS refined_fitted_structure_absolute_path,
                 $session_dir || '/' || m.refined_known_structure AS refined_known_structure_absolute_path
             FROM refinements_capri_ss m
-            JOIN refinements_powerfit p ON m.refine_run_dir = p.refine_run_dir AND m.model = p.model
+            JOIN refinements_powerfit_rescores p ON m.refine_run_dir = p.refine_run_dir AND m.model = p.model
             LEFT JOIN refinements_io io ON m.refine_run_dir = io.refine_run_dir
             LEFT JOIN (SELECT DISTINCT * FROM fitted_models) fm ON io.fitted_model = fm.fitted_model_file
             {solutions_join}

@@ -541,23 +541,25 @@ def refinements_capri_ss_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     ]
 
 
-def refinements_powerfit_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
+def refinements_powerfit_rescores_as_duckdb_ddl(session_dir: Path) -> list[DDLStatement]:
     """Load before/after fixed-coordinate PowerFit scores for each refined member."""
-    indexes = sorted((session_dir / "refine").glob("*/*/*/*/refinement/9_reconstruct/io.csv"))
-    if not indexes:
+    session_dir = session_dir.absolute()
+    # */*/*/* == refine_run_id / powerfit_run_id / unfitted structure / fitted structure
+    pattern = session_dir / "refine/*/*/*/*/powerfit-recscores.csv"
+    if not any(session_dir.glob(str(pattern.relative_to(session_dir)))):
         return []
     return [
         (
             _PATH_MACROS  # noqa: S608 - concatenating only constant SQL.
             + """
-            CREATE TABLE refinements_powerfit AS
+            CREATE TABLE refinements_powerfit_rescores AS
             SELECT * EXCLUDE (filename),
                 session_relative_path(parse_dirpath(filename), $session_dir) AS refine_run_dir
             FROM read_csv($pattern, filename = true)
             """,
             {
-                "session_dir": str(session_dir.absolute()),
-                "pattern": [str(index.parents[2].absolute() / "powerfit-recscores.csv") for index in indexes],
+                "session_dir": str(session_dir),
+                "pattern": str(pattern),
             },
         ),
     ]
@@ -659,7 +661,7 @@ def refinement_tables(session_dir: Path) -> list[DDLStatement]:
     statements.extend(refinements_capri_ss_as_duckdb_ddl(session_dir))
     statements.extend(refinements_capri_clt_as_duckdb_ddl(session_dir))
     statements.extend(refinements_baseline(session_dir))
-    statements.extend(refinements_powerfit_as_duckdb_ddl(session_dir))
+    statements.extend(refinements_powerfit_rescores_as_duckdb_ddl(session_dir))
     statements.extend(refinements_io_as_duckdb_ddl(session_dir))
     statements.extend(refinements_runs_as_duckdb_ddl(session_dir))
     return statements

@@ -11,7 +11,7 @@ from protein_detective.meta import (
     refinements_capri_clt_as_duckdb_ddl,
     refinements_capri_ss_as_duckdb_ddl,
     refinements_io_as_duckdb_ddl,
-    refinements_powerfit_as_duckdb_ddl,
+    refinements_powerfit_rescores_as_duckdb_ddl,
     refinements_runs_as_duckdb_ddl,
 )
 
@@ -53,7 +53,7 @@ JOIN (SELECT DISTINCT * FROM fitted_models) fm ON io.fitted_model = fm.fitted_mo
 JOIN fittable_structures fs ON m.unfitted_structure = fs.structure
 JOIN refinements_capri_clt cl USING (refine_run_dir, cluster_id)
 JOIN refinements_baseline u USING (refine_run_dir)
-JOIN refinements_powerfit p ON m.refine_run_dir = p.refine_run_dir AND m.model = p.model
+JOIN refinements_powerfit_rescores p ON m.refine_run_dir = p.refine_run_dir AND m.model = p.model
 LEFT JOIN powerfit_runs pr ON m.powerfit_run_id = pr.powerfit_run_id
 WHERE m.score IS NOT NULL
     AND ($refine_run_id IS NULL OR m.refine_run_id = $refine_run_id)
@@ -226,7 +226,7 @@ def refinement_report(
             refinements_capri_ss_as_duckdb_ddl,
             refinements_capri_clt_as_duckdb_ddl,
             refinements_baseline,
-            refinements_powerfit_as_duckdb_ddl,
+            refinements_powerfit_rescores_as_duckdb_ddl,
         ):
             for statement, params in loader(session_dir):
                 con.execute(statement, params)

@@ -53,7 +53,7 @@ def session(tmp_path: Path):
                 cluster_id, modelcluster_ranking, score, refined_fitted_structure);
             ALTER TABLE refinements_capri_ss ADD COLUMN model VARCHAR;
             UPDATE refinements_capri_ss SET model = refined_fitted_structure;
-            CREATE TABLE refinements_powerfit AS SELECT
+            CREATE TABLE refinements_powerfit_rescores AS SELECT
                 refine_run_dir, model, 0.8 AS before_cc, 0.85 AS after_cc,
                 1.1 AS before_fishz, 1.2 AS after_fishz,
                 10.0 AS before_relative_z, 11.0 AS after_relative_z
@@ -567,8 +567,8 @@ def test_refinement_powerfit_scores(session: Path):
 
 def test_refinements_sort_by_powerfit_cc_and_keep_changes_distinct(session: Path):
     with duckdb.connect(str(session / "meta.duckdb")) as con:
-        con.execute("UPDATE refinements_powerfit SET after_cc = 0.95 WHERE model = 'refine/a.pdb.gz'")
-        con.execute("UPDATE refinements_powerfit SET after_cc = 0.7 WHERE model = 'refine/b.pdb.gz'")
+        con.execute("UPDATE refinements_powerfit_rescores SET after_cc = 0.95 WHERE model = 'refine/a.pdb.gz'")
+        con.execute("UPDATE refinements_powerfit_rescores SET after_cc = 0.7 WHERE model = 'refine/b.pdb.gz'")
     rows = DashboardData(session).refinements()
     assert [row["id"] for row in rows] == ["refine/a.pdb.gz", "refine/a2.pdb.gz", "refine/b.pdb.gz"]
     assert rows[0]["cc_change"] == pytest.approx(0.15)

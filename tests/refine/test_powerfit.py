@@ -12,7 +12,7 @@ from powerfit_em import Structure, Volume, structure_to_shape_like
 from rocrate.model.contextentity import ContextEntity
 from rocrate.rocrate import ROCrate
 
-from protein_detective.meta import execute_ddl_statements, refinements_powerfit_as_duckdb_ddl
+from protein_detective.meta import execute_ddl_statements, refinements_powerfit_rescores_as_duckdb_ddl
 from protein_detective.refine.powerfit import rescore_refinement
 
 
@@ -88,9 +88,9 @@ def test_rescore_refinement(tmp_path: Path, scoring_options: list[str]):
         assert rows[0][f"before_{metric}"] == rows[1][f"before_{metric}"]
         assert float(rows[1][f"after_{metric}"]) < float(rows[1][f"before_{metric}"])
     with duckdb.connect() as con:
-        execute_ddl_statements(con, refinements_powerfit_as_duckdb_ddl(session))
+        execute_ddl_statements(con, refinements_powerfit_rescores_as_duckdb_ddl(session))
         saved = con.execute(
-            "SELECT refine_run_dir, model, before_cc, after_cc FROM refinements_powerfit ORDER BY model"
+            "SELECT refine_run_dir, model, before_cc, after_cc FROM refinements_powerfit_rescores ORDER BY model"
         ).fetchall()
     assert len(saved) == 2
     assert saved[0][:2] == (str(model_run.relative_to(session)), "../6_mdref/moved.pdb")
@@ -100,3 +100,21 @@ def test_rescore_refinement(tmp_path: Path, scoring_options: list[str]):
 def test_rescore_requires_source_provenance(tmp_path: Path):
     with pytest.raises(ValueError, match="missing recorded PowerFit target"):
         rescore_refinement(tmp_path, tmp_path / "powerfit/missing/candidate/fit_1.pdb", tmp_path / "refine")
+
+
+def test_load_rescores_without_reconstruction_index(tmp_path: Path):
+    model_run = tmp_path / "refine/refinement/source/candidate/fit_1.pdb"
+    model_run.mkdir(parents=True)
+    # A reconstruction without scores must not prevent loading the available CSVs.
+    reconstruction = model_run.with_name("fit_2.pdb") / "refinement/9_reconstruct"
+    reconstruction.mkdir(parents=True)
+    (reconstruction / "io.csv").write_text("model,refined_fitted_structure\n")
+    assert refinements_powerfit_rescores_as_duckdb_ddl(tmp_path) == []
+    (model_run / "powerfit-recscores.csv").write_text("model,before_cc,after_cc\n../6_mdref/model.pdb,0.5,0.6\n")
+
+    with duckdb.connect() as con:
+        execute_ddl_statements(con, refinements_powerfit_rescores_as_duckdb_ddl(tmp_path))
+        saved = con.execute(
+            "SELECT refine_run_dir, model, before_cc, after_cc FROM refinements_powerfit_rescores"
+        ).fetchall()
+    assert saved == [(str(model_run.relative_to(tmp_path)), "../6_mdref/model.pdb", 0.5, 0.6)]
