@@ -186,7 +186,7 @@ def assert_refinement_rocrate(session_dir: Path, known_structure: Path):
     known_item = crate.get("refine/refine_run_001/known_structure.pdb")
 
     assert known_item is not None
-    assert str(known_structure.resolve()) in known_item["description"]
+    assert f"refine/refine_run_001/{known_structure.name}" in known_item["description"]
 
 
 def test_deleted_ids_and_exclusive_creation(session_with_powerfit_results: Path):

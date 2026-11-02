@@ -23,6 +23,8 @@ def test_recorded_refinement_arguments_and_known_structure_origin(session_with_p
     run_dir = create_refinement_run(session_with_powerfit_results)
     original = tmp_path / "original known.pdb"
     original.write_text("END\n")
+    saved_original = run_dir / original.name
+    saved_original.write_bytes(original.read_bytes())
     known_structure = run_dir / "known_structure.pdb"
     known_structure.write_text("END\n")
     fitted = session_with_powerfit_results / "powerfit/run_001/same_structure/fit_1.pdb"
@@ -64,6 +66,7 @@ def test_recorded_refinement_arguments_and_known_structure_origin(session_with_p
             start_time=start_time,
             processed_known_structure=known_structure,
             input_known_structure=original,
+            original_known_structure=saved_original,
             refined=[(fitted, refinement_run)],
             io_csv=io_csv,
             options=options,
@@ -95,6 +98,7 @@ def test_recorded_refinement_arguments_and_known_structure_origin(session_with_p
                 "output by protein-detective.",
                 "hasPart": [
                     {"@id": "refine/refine_run_001/known_structure.pdb"},
+                    {"@id": "refine/refine_run_001/original%20known.pdb"},
                     {"@id": "powerfit/run_001/same_structure/fit_1.pdb"},
                     {"@id": "refine/refine_run_001/io.csv"},
                     {"@id": "refine/refine_run_001/run_001/same_structure/fit_1.pdb/"},
@@ -126,11 +130,24 @@ def test_recorded_refinement_arguments_and_known_structure_origin(session_with_p
                 "@type": "File",
                 "contentSize": 4,
                 "description": (
-                    f"Known structure prepared from {original.resolve()}; "
-                    "removed chains ['A']; renamed remaining chains to B."
+                    "Known structure prepared from the saved original input "
+                    "refine/refine_run_001/original known.pdb; "
+                    "removed chains ['A']; renumbered remaining residues sequentially from 1 "
+                    "and renamed remaining chains to B. "
                 ),
                 "encodingFormat": "chemical/x-pdb",
                 "name": "refine/refine_run_001/known_structure.pdb",
+            },
+            {
+                "@id": "refine/refine_run_001/original%20known.pdb",
+                "@type": "File",
+                "contentSize": 4,
+                "description": (
+                    f"Unmodified copy of the supplied known structure at {original.resolve()}. "
+                    "source for refine/refine_run_001/known_structure.pdb."
+                ),
+                "encodingFormat": "chemical/x-pdb",
+                "name": "refine/refine_run_001/original known.pdb",
             },
             {
                 "@id": "powerfit/run_001/same_structure/fit_1.pdb",
@@ -165,6 +182,7 @@ def test_recorded_refinement_arguments_and_known_structure_origin(session_with_p
                 "name": command,
                 "object": [
                     {"@id": "refine/refine_run_001/known_structure.pdb"},
+                    {"@id": "refine/refine_run_001/original%20known.pdb"},
                     {"@id": "powerfit/run_001/same_structure/fit_1.pdb"},
                 ],
                 "result": [

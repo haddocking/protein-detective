@@ -66,7 +66,7 @@ def write_refinement_ro_crate(
     options: RefineOptions,
     remove_known_chains: set[str] | None,
     powerfit_run_id: str | None,
-    original_known_structure: Path | None = None,
+    original_known_structure: Path,
 ):
     """Record refinement inputs, outputs and effective options in RO-Crate.
 
@@ -88,21 +88,21 @@ def write_refinement_ro_crate(
                 name="processed_known_structure",
                 path=processed_known_structure,
                 help=(
-                    f"Known structure prepared from {input_known_structure.resolve()}; "
+                    "Known structure prepared from the saved original input "
+                    f"{original_known_structure.relative_to(session_dir).as_posix()}; "
                     f"removed chains {sorted(remove_known_chains or [])}; "
-                    "renamed remaining chains to B."
+                    "renumbered remaining residues sequentially from 1 and renamed remaining chains to B. "
+                ),
+            ),
+            IOArgumentPath(
+                name="original_known_structure",
+                path=original_known_structure,
+                help=(
+                    f"Unmodified copy of the supplied known structure at {input_known_structure.resolve()}. "
+                    f"source for {processed_known_structure.relative_to(session_dir).as_posix()}."
                 ),
             ),
         ]
-        + (
-            [
-                IOArgumentPath(
-                    name="original_known_structure", path=original_known_structure, help="Original known input."
-                )
-            ]
-            if original_known_structure is not None
-            else []
-        )
         + [
             IOArgumentPath(
                 name=f"refined_{i}",
