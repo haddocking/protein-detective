@@ -17,7 +17,7 @@ from protein_detective.refine.run import (
     create_refinement_run,
     refine_with_haddock3,
 )
-from tests.helpers import assert_crate, assert_lines
+from tests.helpers import assert_crate, assert_lines, cli_args
 
 
 @pytest.mark.manual
@@ -30,40 +30,33 @@ def test_refine_with_haddock3_single_member_clusters(
     session_dir = setup_refinement_session(tmp_path, fitted_structure)
     options = RefineOptions(rigidbody_sampling=10, ncores=6, top_clusters=4, top_models=1)
 
-    refine_with_haddock3(session_dir, known_structure, refine_options=options, scheduler_address="sequential")
+    with cli_args(["refine", "run", str(session_dir), str(known_structure)]):
+        refine_with_haddock3(session_dir, known_structure, refine_options=options, scheduler_address="sequential")
 
     assert_refinement_rocrate(session_dir, known_structure)
     assert_refinement_results(session_dir, single_member_cluster_refinement_results)
 
 
 @pytest.mark.manual
-def test_refine_with_haddock3_clustered_sequential(
-    tmp_path: Path, fitted_structure: Path, known_structure: Path, clustered_refinement_results: dict[str, pd.DataFrame]
+@pytest.mark.parametrize("scheduler_address", ["sequential", None], ids=["sequential", "dask"])
+def test_refine_with_haddock3_clustered(
+    tmp_path: Path,
+    fitted_structure: Path,
+    known_structure: Path,
+    clustered_refinement_results: dict[str, pd.DataFrame],
+    scheduler_address: str | None,
 ):
     session_dir = setup_refinement_session(tmp_path, fitted_structure)
     options = RefineOptions(
         rigidbody_sampling=10, ncores=6, top_clusters=4, top_models=1, water_refinement_sampling_factor=3
     )
 
-    refine_with_haddock3(session_dir, known_structure, refine_options=options, scheduler_address="sequential")
+    with cli_args(["refine", "run", str(session_dir), str(known_structure)]):
+        refine_with_haddock3(session_dir, known_structure, refine_options=options, scheduler_address=scheduler_address)
 
     assert_refinement_rocrate(session_dir, known_structure)
     assert_refinement_results(session_dir, clustered_refinement_results)
 
-
-@pytest.mark.manual
-def test_refine_with_haddock3_clustered_daskparallel(
-    tmp_path: Path, fitted_structure: Path, known_structure: Path, clustered_refinement_results: dict[str, pd.DataFrame]
-):
-    session_dir = setup_refinement_session(tmp_path, fitted_structure)
-    options = RefineOptions(
-        rigidbody_sampling=10, ncores=6, top_clusters=4, top_models=1, water_refinement_sampling_factor=3
-    )
-
-    refine_with_haddock3(session_dir, known_structure, refine_options=options)
-
-    assert_refinement_rocrate(session_dir, known_structure)
-    assert_refinement_results(session_dir, clustered_refinement_results)
 
 def setup_refinement_session(tmp_path: Path, fitted_structure: Path) -> Path:
     session_dir = tmp_path / "session"
@@ -135,6 +128,7 @@ def assert_refinement_results(session_dir: Path, expected_results: dict[str, pd.
         .all()
     )
     report = refinement_report(session_dir)
+    assert not report.empty
     assert report["unrefined_score"].notna().all()
     assert report["unrefined_score"].eq(baseline_scores.iloc[0]["score"]).all()
     assert (baseline / "1_emscoring/emscoring_1.pdb.gz").is_file()
