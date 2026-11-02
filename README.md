@@ -406,11 +406,8 @@ protein-detective dashboard mysession --host localhost --port 8765
 
 The command prints a launch URL by default. Add `--browser` to open the browser
 automatically. Open the printed launch URL to authenticate. **Do not modify the
-session directory while the dashboard is running.** Missing metadata is
-generated with a warning before startup; existing metadata is read as supplied.
-The installed package includes the frontend, so no Node.js installation is
-needed. The on-demand Mol\* 3D viewer requires internet access; other dashboard
-views work offline. See [dashboard usage and development](docs/dashboard.md).
+session directory while the dashboard is running.** The on-demand Mol\* 3D
+viewer requires internet access; other dashboard views work offline.
 
 ## Contributing
 

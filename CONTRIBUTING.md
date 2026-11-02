@@ -145,6 +145,35 @@ The Jupyter notebooks (docs/\*.ipynb) can be run with
 uv run --group docs jupyter nbconvert --to notebook --execute --inplace docs/tutorial.ipynb
 ```
 
+## Dashboard development
+
+Install Node.js, then install frontend dependencies from the repository root:
+
+```shell
+cd dashboard
+npm ci
+cd ..
+uv run protein-detective dashboard SESSION_DIR --dev --browser
+```
+
+Dev mode runs Vite with hot reloading alongside the authenticated Python API.
+Restart the command after Python changes. `npm run dev` starts only the
+frontend. See [dashboard/API.md](dashboard/API.md) for the API contract.
+
+Run frontend checks and build from `dashboard/`:
+
+```shell
+npm run format
+npm run check
+npm test
+npm run build
+```
+
+After building the frontend, run `uv build` from the repository root to package
+it. Compiled assets are required for packaging and included in wheels and source
+distributions. CI builds them before packaging; generated assets and
+`node_modules` are ignored by Git.
+
 ## Running tests
 
 To run the test suite, use `pytest`:
