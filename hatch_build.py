@@ -12,7 +12,7 @@ class CustomBuildHook(BuildHookInterface):
         if not (assets / "index.html").is_file():
             if version == "editable":
                 return
-            msg = "Dashboard assets are missing. Run `cd dashboard && npm ci && npx vp build` before packaging."
+            msg = "Dashboard assets are missing. Run `cd dashboard && npm ci && npm run build` before packaging."
             raise RuntimeError(msg)
         destination = "protein_detective/dashboard/static" if self.target_name == "wheel" else "dashboard/dist"
         build_data.setdefault("force_include", {})[str(assets)] = destination
