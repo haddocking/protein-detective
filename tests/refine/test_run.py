@@ -37,7 +37,7 @@ def test_refine_with_haddock3_single_member_clusters(
 
 
 @pytest.mark.manual
-def test_refine_with_haddock3_clustered(
+def test_refine_with_haddock3_clustered_sequential(
     tmp_path: Path, fitted_structure: Path, known_structure: Path, clustered_refinement_results: dict[str, pd.DataFrame]
 ):
     session_dir = setup_refinement_session(tmp_path, fitted_structure)
@@ -50,6 +50,20 @@ def test_refine_with_haddock3_clustered(
     assert_refinement_rocrate(session_dir, known_structure)
     assert_refinement_results(session_dir, clustered_refinement_results)
 
+
+@pytest.mark.manual
+def test_refine_with_haddock3_clustered_daskparallel(
+    tmp_path: Path, fitted_structure: Path, known_structure: Path, clustered_refinement_results: dict[str, pd.DataFrame]
+):
+    session_dir = setup_refinement_session(tmp_path, fitted_structure)
+    options = RefineOptions(
+        rigidbody_sampling=10, ncores=6, top_clusters=4, top_models=1, water_refinement_sampling_factor=3
+    )
+
+    refine_with_haddock3(session_dir, known_structure, refine_options=options)
+
+    assert_refinement_rocrate(session_dir, known_structure)
+    assert_refinement_results(session_dir, clustered_refinement_results)
 
 def setup_refinement_session(tmp_path: Path, fitted_structure: Path) -> Path:
     session_dir = tmp_path / "session"

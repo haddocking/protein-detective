@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import dask
 import pandas as pd
 from protein_quest.parallel import configure_dask_scheduler, map_with_progress, nr_cpus
 
@@ -285,7 +286,8 @@ def refine_with_haddock3(
         original_known_structure=original_known_structure,
         processed_known_structure=processed_known_structure,
     )
-    with context as cluster:
+    # HADDOCK starts child processes, which daemon Dask workers cannot create so use normal (non-daemon) workers.
+    with dask.config.set({"distributed.worker.daemon": False}), context as cluster:
         real_scheduler_address = cluster if isinstance(cluster, str) else cluster.scheduler_address
         refined = refine_structures(
             session_dir=session_dir,
