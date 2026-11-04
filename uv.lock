@@ -1934,7 +1934,7 @@ wheels = [
 [[package]]
 name = "powerfit-em"
 version = "6.1.0"
-source = { git = "https://github.com/haddocking/powerfit?rev=e4e9d00f642462d1425deba2362d0e877ab9146e#e4e9d00f642462d1425deba2362d0e877ab9146e" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "molviewspec" },
     { name = "numpy" },
@@ -1942,6 +1942,25 @@ dependencies = [
     { name = "rich" },
     { name = "scipy" },
     { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/af/89/aeb30087f3b5f1f69a6bbebebc7ec5e5abbea9126d7141ca3d4c59f973e1/powerfit_em-6.1.0.tar.gz", hash = "sha256:8adfa4db6149e490c80a7dbb44da0c365d78d455518de38cde048caf517a2687", size = 5767107, upload-time = "2026-11-04T11:43:29.311Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/0b/033aa905c786497dc5dac5bdec98c361423645958401ebaac87302a02d54/powerfit_em-6.1.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:51ac3389b6f01a2bf926ee05feae0816fa54894e61ca3a644ac0d9a3082d5c63", size = 6255163, upload-time = "2026-11-04T11:43:01.209Z" },
+    { url = "https://files.pythonhosted.org/packages/cd/3f/b530c47b519a1e6dcf180e9c8a5176e1926915748ef5386769b132c6726e/powerfit_em-6.1.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:d29d8926cd7f9f7eb076456bb0e3c10e69d17ff667f04a7e4c1950e68649e7f2", size = 6285505, upload-time = "2026-11-04T11:43:03.24Z" },
+    { url = "https://files.pythonhosted.org/packages/57/93/8cdd2b1ece3954ce99f4dc4c0b984b5e88a21437a8a4eb528fb3d50bde17/powerfit_em-6.1.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:5eaa92b669328405c4ebbbdba07750da030a0b97bf44e352173fae504eaaedad", size = 6526376, upload-time = "2026-11-04T11:43:05.125Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/46/9a30191db34bbb500590d885fee6bac6c817fe66570943e3725abe9d26cd/powerfit_em-6.1.0-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:6e2fc568517692c4c3237ed49eb9b5ed17e51c1e67a4eaaa152d9ac30766cf71", size = 6350731, upload-time = "2026-11-04T11:43:06.744Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/81/b297177ec9b9064d9f6af1994a314d7d8b457679163f414472a9fa1603ef/powerfit_em-6.1.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:d66ca343a10e50df92f3f2afcba02160ab88b7c4eaca9747a41f561ebcc92888", size = 6609319, upload-time = "2026-11-04T11:43:08.41Z" },
+    { url = "https://files.pythonhosted.org/packages/1a/f0/3d42c65988a7ccd464b2406572f46fef69640f818350e3ea203fd71d2627/powerfit_em-6.1.0-cp313-cp313-win_amd64.whl", hash = "sha256:554593ae53c8754f6efe65ae242ebabde7ff56588af75da0391042ca312843ac", size = 6448879, upload-time = "2026-11-04T11:43:10.245Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/cb/f2d0e2ab1074abb2bfd3c3a3ecee198e1716a88ffde6da5d4584d7da2eac/powerfit_em-6.1.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:a3cc1a54a9dda67367fad23e326ce552eb8ca52c9c2ea152c5fae5f3a042d03f", size = 6255154, upload-time = "2026-11-04T11:43:11.814Z" },
+    { url = "https://files.pythonhosted.org/packages/c0/d3/26343302847457e94e141710f8adc4e52efa353fb6eb61c344b4aa8953c9/powerfit_em-6.1.0-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:f09267444308711612b9fd69a057d444c192edd3a75bc9235a2d407a182fc144", size = 6285561, upload-time = "2026-11-04T11:43:13.661Z" },
+    { url = "https://files.pythonhosted.org/packages/74/31/48a0930b35b22c0e50cfbdd4b53e8b318f33825a05339aea9914cf7fb48c/powerfit_em-6.1.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:05f2ad5de11b70f07b792f2ca308d958b0946f824b7992b78d8482d01fdd1bde", size = 6526283, upload-time = "2026-11-04T11:43:15.45Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/52/10debfd8667670dcb34ff44cd120736b1e400e92cdf00c1b94f9b763ac90/powerfit_em-6.1.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl", hash = "sha256:f50aef2da00dce35cc23626f4eccfef2c55c9175f8686d3d28366ea5164b6b38", size = 5972726, upload-time = "2026-11-04T11:43:16.947Z" },
+    { url = "https://files.pythonhosted.org/packages/61/e2/416b2a0710f485f578ccbbc2f803160102eb495ae9b429aee179902e3d89/powerfit_em-6.1.0-cp314-cp314-win_amd64.whl", hash = "sha256:23c19c2199499f5ae0cc4c5187a83e76b655c6910874b67f334d9709fb3134a1", size = 6448543, upload-time = "2026-11-04T11:43:18.753Z" },
+    { url = "https://files.pythonhosted.org/packages/66/b6/20511d10404e8a5f57705cfbf5437d01e0f09befcecc59503d1e684aa4da/powerfit_em-6.1.0-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:8476ecfd8bdd2b2b6575e29678904428bfa65bf38cbebc233aaf85fad5b8a9b1", size = 6252964, upload-time = "2026-11-04T11:43:20.39Z" },
+    { url = "https://files.pythonhosted.org/packages/25/19/0e27901da3b7d6c7982a320b10ea94f5308d26daee8140c947d94f857986/powerfit_em-6.1.0-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:4a1b926217b28f14649b4c596342427a84215070ff1afcdf2d25f4e142ae3531", size = 6283962, upload-time = "2026-11-04T11:43:22.076Z" },
+    { url = "https://files.pythonhosted.org/packages/e3/f9/43341146c782a81026847def934cf3ebf448ab9069520319ff6e1bf4e587/powerfit_em-6.1.0-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:b940f57e91d59bbe1356e7a9f68ec527291e230b95137b43cf9fc91ed54daeff", size = 6524924, upload-time = "2026-11-04T11:43:24.104Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/8e/36004d5a78d8519793b33defcaa89f759b8c0d71f1979e6e5ea10485c0fc/powerfit_em-6.1.0-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:135de01149133a7f42a7a82761544fad775a18f3b1810d45cc37c57ab00ca789", size = 6349218, upload-time = "2026-11-04T11:43:25.709Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/b0/374e5450a485e5b128d097956a5b15f03d520d7bc1da9bbce2e1f9953ff9/powerfit_em-6.1.0-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:bd09473300be44e362c450a9dd823d5fb7d2cc442a9200cb833e28c126c41bfc", size = 6607807, upload-time = "2026-11-04T11:43:27.678Z" },
 ]
 
 [package.optional-dependencies]
@@ -2159,9 +2178,9 @@ requires-dist = [
     { name = "molviewspec", specifier = ">=1.6.0" },
     { name = "numpy", specifier = ">=2.3.1" },
     { name = "pandas", specifier = ">=2.3.0" },
-    { name = "powerfit-em", extras = ["cuda12x"], marker = "extra == 'cuda12'", git = "https://github.com/haddocking/powerfit?rev=e4e9d00f642462d1425deba2362d0e877ab9146e" },
-    { name = "powerfit-em", extras = ["cuda13x"], marker = "extra == 'cuda13'", git = "https://github.com/haddocking/powerfit?rev=e4e9d00f642462d1425deba2362d0e877ab9146e" },
-    { name = "powerfit-em", extras = ["opencl"], git = "https://github.com/haddocking/powerfit?rev=e4e9d00f642462d1425deba2362d0e877ab9146e" },
+    { name = "powerfit-em", extras = ["cuda12x"], marker = "extra == 'cuda12'", specifier = ">=6.1.0" },
+    { name = "powerfit-em", extras = ["cuda13x"], marker = "extra == 'cuda13'", specifier = ">=6.1.0" },
+    { name = "powerfit-em", extras = ["opencl"], specifier = ">=6.1.0" },
     { name = "protein-quest", specifier = ">=1.7.0" },
     { name = "pyopencl", specifier = ">=2025.2.5" },
     { name = "rich", specifier = ">=14.0.0" },
