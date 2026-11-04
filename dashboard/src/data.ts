@@ -72,7 +72,9 @@ export function display(v: unknown): string {
   if (typeof v === "number") return Number.isInteger(v) ? String(v) : v.toFixed(4);
   if (Array.isArray(v)) return v.join(", ");
   if (typeof v === "object") return JSON.stringify(v);
-  return typeof v === "string" ? v : typeof v === "boolean" ? (v ? "true" : "false") : "";
+  if (typeof v === "string") return v;
+  if (typeof v === "boolean") return String(v);
+  return "";
 }
 
 export function key(row: Row): string {

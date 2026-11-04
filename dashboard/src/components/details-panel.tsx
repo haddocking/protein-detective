@@ -60,6 +60,19 @@ export function DetailsPanel() {
     setWidth,
   } = useDetailsPanel();
   if (!selectedId) return null;
+  let resultDetails = null;
+  if (!selected) {
+    resultDetails = <p className="empty">Loading selected result…</p>;
+  } else if (!viewerVisible) {
+    resultDetails = (
+      <ResultDetails
+        selected={selected}
+        selectedKind={selectedKind}
+        candidate={candidate}
+        accessions={accessions}
+      />
+    );
+  }
   return (
     <aside className={viewerVisible ? "viewer-panel" : undefined} style={{ width }}>
       <div
@@ -192,16 +205,7 @@ export function DetailsPanel() {
           </Suspense>
         </div>
       )}
-      {!selected ? (
-        <p className="empty">Loading selected result…</p>
-      ) : viewerVisible ? null : (
-        <ResultDetails
-          selected={selected}
-          selectedKind={selectedKind}
-          candidate={candidate}
-          accessions={accessions}
-        />
-      )}
+      {resultDetails}
     </aside>
   );
 }

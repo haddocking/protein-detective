@@ -9,6 +9,25 @@ import { ThemeToggle } from "./components/theme-toggle";
 function SessionLayout() {
   const { ready, error } = useSession();
   const { view } = useDashboardNavigation();
+  let content;
+  if (error) {
+    content = (
+      <div className="error" role="alert">
+        {error}
+      </div>
+    );
+  } else if (!ready) {
+    content = <p className="empty">Authenticating and loading session…</p>;
+  } else {
+    content = (
+      <div className="workspace">
+        <main>
+          <Outlet />
+        </main>
+        <DetailsPanel />
+      </div>
+    );
+  }
   return (
     <>
       <header>
@@ -31,20 +50,7 @@ function SessionLayout() {
           </Link>
         ))}
       </nav>
-      {error ? (
-        <div className="error" role="alert">
-          {error}
-        </div>
-      ) : !ready ? (
-        <p className="empty">Authenticating and loading session…</p>
-      ) : (
-        <div className="workspace">
-          <main>
-            <Outlet />
-          </main>
-          <DetailsPanel />
-        </div>
-      )}
+      {content}
       <footer>
         Stable session snapshot · Do not modify the session directory while this dashboard is
         running.

@@ -64,15 +64,16 @@ export function ResultDetails({
   for (const field of secondaryScoreFields) {
     if (metadata[field] != null) fields.push([field, metadata[field]]);
   }
+  let resultLabel = "REFINEMENT MEMBER";
+  if (selectedKind === "candidates") resultLabel = "CANDIDATE STRUCTURE";
+  else if (selectedKind === "fitting") resultLabel = "FITTING SOLUTION";
+
+  let viewerMessage = "Structure or associated density is unavailable.";
+  if (display(selected.viewer_error) !== "—") viewerMessage = display(selected.viewer_error);
+  else if (selected.model_available === false) viewerMessage = "Fitted structure not saved";
   return (
     <div className="details-content">
-      <p className="eyebrow">
-        {selectedKind === "candidates"
-          ? "CANDIDATE STRUCTURE"
-          : selectedKind === "fitting"
-            ? "FITTING SOLUTION"
-            : "REFINEMENT MEMBER"}
-      </p>
+      <p className="eyebrow">{resultLabel}</p>
       <h2>{display(selected.structure)}</h2>
       <div className="links">
         {accessions.map((id) => (
@@ -124,17 +125,7 @@ export function ResultDetails({
           View structure
         </button>
       ) : (
-        selectedKind !== "candidates" && (
-          <p className="notice">
-            {String(
-              display(selected.viewer_error) !== "—"
-                ? display(selected.viewer_error)
-                : selected.model_available === false
-                  ? "Fitted structure not saved"
-                  : "Structure or associated density is unavailable.",
-            )}
-          </p>
-        )
+        selectedKind !== "candidates" && <p className="notice">{viewerMessage}</p>
       )}
       <dl>
         {fields

@@ -22,11 +22,10 @@ export function useResults(kind: ResultKind) {
   const rows = data[kind] ?? [];
   const filtered = filterRows(rows, p);
   const columns = kind === "fitting" ? fittingColumns : refinementColumns;
-  const sort = columns.includes(p.get("sort") ?? "")
-    ? p.get("sort")!
-    : kind === "fitting"
-      ? "cc"
-      : "after_cc";
+  let sort = "after_cc";
+  if (kind === "fitting") sort = "cc";
+  const requestedSort = p.get("sort");
+  if (requestedSort && columns.includes(requestedSort)) sort = requestedSort;
   const desc = p.get("dir")
     ? p.get("dir") === "desc"
     : kind === "fitting" || sort === "after_cc" || sort === "cc_change";

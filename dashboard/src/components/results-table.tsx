@@ -1,3 +1,4 @@
+import { type ReactNode } from "react";
 import { display, key, labels, type Dataset, type Row } from "../data";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
 interface ResultsTableProps {
@@ -14,22 +15,25 @@ export function ResultsTable({ items, cols, type, sort, desc = false }: ResultsT
       <table>
         <thead>
           <tr>
-            {cols.map((c) => (
-              <th key={c}>
-                {sort ? (
-                  <button
-                    onClick={() =>
-                      navigate({ sort: c, dir: sort === c && desc ? "asc" : "desc", page: "1" })
-                    }
-                  >
+            {cols.map((c) => {
+              let heading: ReactNode = labels[c] ?? c;
+              if (sort) {
+                let sortIndicator = "";
+                if (sort === c) {
+                  sortIndicator = " ↑";
+                  if (desc) sortIndicator = " ↓";
+                }
+                let nextDirection = "desc";
+                if (sort === c && desc) nextDirection = "asc";
+                heading = (
+                  <button onClick={() => navigate({ sort: c, dir: nextDirection, page: "1" })}>
                     {labels[c] ?? c}
-                    {sort === c ? (desc ? " ↓" : " ↑") : ""}
+                    {sortIndicator}
                   </button>
-                ) : (
-                  (labels[c] ?? c)
-                )}
-              </th>
-            ))}
+                );
+              }
+              return <th key={c}>{heading}</th>;
+            })}
           </tr>
         </thead>
         <tbody>
@@ -39,17 +43,10 @@ export function ResultsTable({ items, cols, type, sort, desc = false }: ResultsT
               className={selectedId === key(r) ? "selected" : ""}
               onClick={() => select(r, type)}
             >
-              {cols.map((c, j) => (
-                <td
-                  key={c}
-                  className={
-                    (c === "score_change" && Number(r[c]) < 0) ||
-                    (c === "cc_change" && Number(r[c]) > 0)
-                      ? "improved"
-                      : ""
-                  }
-                >
-                  {j === 0 ? (
+              {cols.map((c, j) => {
+                let content: ReactNode = display(r[c]);
+                if (j === 0) {
+                  content = (
                     <button
                       className="text-link"
                       onClick={(e) => {
@@ -59,17 +56,23 @@ export function ResultsTable({ items, cols, type, sort, desc = false }: ResultsT
                     >
                       {display(r[c])}
                     </button>
-                  ) : c === "model_available" ? (
-                    r[c] ? (
-                      "Saved"
-                    ) : (
-                      "Not saved"
-                    )
-                  ) : (
-                    display(r[c])
-                  )}
-                </td>
-              ))}
+                  );
+                } else if (c === "model_available") {
+                  content = "Not saved";
+                  if (r[c]) content = "Saved";
+                }
+                let className = "";
+                if (
+                  (c === "score_change" && Number(r[c]) < 0) ||
+                  (c === "cc_change" && Number(r[c]) > 0)
+                )
+                  className = "improved";
+                return (
+                  <td key={c} className={className}>
+                    {content}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
