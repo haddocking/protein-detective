@@ -165,6 +165,7 @@ export function StructureViewer({
   const [opacity, setOpacity] = useState(0.25);
   const [contour, setContour] = useState(1.5);
   const dark = useDarkTheme();
+  const sceneColors = dark ? DARK : LIGHT;
   const palette = useRef(LIGHT);
 
   // The plugin belongs to this panel, rather than to an individual selection.
@@ -406,8 +407,23 @@ export function StructureViewer({
   return (
     <section className="molecular-viewer" aria-label="3D structure viewer">
       <p className="muted">
-        Candidate in blue{refined ? "; refined known partner in orange" : ""}. Density contour is in
-        standard deviations (σ).
+        Candidate in blue{" "}
+        <span
+          className="structure-color-swatch"
+          aria-hidden="true"
+          style={{ backgroundColor: `#${sceneColors.candidate.toString(16).padStart(6, "0")}` }}
+        />
+        {refined && (
+          <>
+            ; refined known partner in orange{" "}
+            <span
+              className="structure-color-swatch"
+              aria-hidden="true"
+              style={{ backgroundColor: `#${sceneColors.partner.toString(16).padStart(6, "0")}` }}
+            />
+          </>
+        )}
+        . Density contour is in standard deviations (σ).
       </p>
       {status && <p role="status">{status}</p>}
       {error && (

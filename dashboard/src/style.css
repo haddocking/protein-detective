@@ -724,6 +724,14 @@ footer {
 .molecular-viewer .viewer-controls {
   align-items: center;
 }
+.structure-color-swatch {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+}
 .molecular-viewer .viewer-controls label {
   white-space: nowrap;
 }
