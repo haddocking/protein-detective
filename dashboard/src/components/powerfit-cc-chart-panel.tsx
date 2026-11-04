@@ -13,8 +13,7 @@ export function PowerfitCcChartPanel({
       <div>
         <h2>PowerFit CC comparison</h2>
         <p className="muted">
-          All {rows.length.toLocaleString()} matching members, before top-N selection and
-          pagination.
+          {rows.length.toLocaleString()} members from the table, across all pages.
         </p>
         <p>Points above the diagonal have a higher (better) PowerFit CC.</p>
       </div>

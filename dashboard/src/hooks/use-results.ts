@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   csv,
   filterRows,
@@ -18,7 +17,6 @@ import { useDashboardNavigation } from "./use-dashboard-navigation";
 export function useResults(kind: ResultKind) {
   const { data } = useSession();
   const { p, navigate } = useDashboardNavigation();
-  const [notice, setNotice] = useState("");
   const rows = data[kind] ?? [];
   const filtered = filterRows(rows, p);
   const columns = kind === "fitting" ? fittingColumns : refinementColumns;
@@ -46,15 +44,13 @@ export function useResults(kind: ResultKind) {
     URL.revokeObjectURL(href);
   }
   function chartSelect(row: Row) {
-    const included = selectedRows.some((r) => key(r) === key(row));
-    const all = sorted(grouped(filtered, kind, included ? limit : "all"), sort, desc);
-    if (!included) setNotice("Switched to All members to reveal the selected chart point.");
+    const index = selectedRows.findIndex((r) => key(r) === key(row));
+    if (index < 0) return;
     navigate({
       selected: key(row),
-      selection: "refinements",
+      selection: kind,
       tab: row.viewer_available ? "viewer" : "details",
-      top: included ? limit : "all",
-      page: String(Math.floor(all.findIndex((r) => key(r) === key(row)) / pageSize) + 1),
+      page: String(Math.floor(index / pageSize) + 1),
     });
   }
   /** Select the result `delta` rows away from the current one, across pages. */
@@ -77,7 +73,6 @@ export function useResults(kind: ResultKind) {
   return {
     step,
     rows,
-    filtered,
     columns,
     sort,
     desc,
@@ -85,8 +80,6 @@ export function useResults(kind: ResultKind) {
     selectedRows,
     pageSize,
     page,
-    notice,
-    setNotice,
     exportCsv,
     chartSelect,
   };

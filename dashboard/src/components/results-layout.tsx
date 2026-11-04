@@ -26,20 +26,8 @@ export function ResultsLayout({
 }) {
   const { data, summary } = useSession();
   const { p, navigate } = useDashboardNavigation();
-  const {
-    rows,
-    columns,
-    sort,
-    desc,
-    limit,
-    selectedRows,
-    pageSize,
-    page,
-    notice,
-    setNotice,
-    exportCsv,
-    step,
-  } = results;
+  const { rows, columns, sort, desc, limit, selectedRows, pageSize, page, exportCsv, step } =
+    results;
   // j/k or arrow keys step through results, unless typing or interacting with the viewer.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -152,14 +140,6 @@ export function ResultsLayout({
           Export CSV ↓
         </button>
       </PageTitle>
-      {notice && (
-        <p className="notice" role="status">
-          {notice}
-          <button onClick={() => setNotice("")} aria-label="Dismiss notification">
-            ×
-          </button>
-        </p>
-      )}
       <>
         <ResultFilters kind={kind} rows={rows} limit={limit} />
         {content}

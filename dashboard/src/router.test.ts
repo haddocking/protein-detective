@@ -492,3 +492,69 @@ it("authenticates a direct provenance link and keeps its selected result across 
     vi.unstubAllGlobals();
   }
 });
+
+it("charts use the table's top-N results across all pages", async () => {
+  const rows = Array.from({ length: 60 }, (_, i) => ({
+    id: `row-${i}`,
+    candidate_id: `structure-${Math.floor(i / 2)}`,
+    structure: `structure-${Math.floor(i / 2)}`,
+    powerfit_run_id: "fit",
+    refine_run_id: "refine",
+    fitted_rank: 1,
+    cluster_id: 1,
+    rank: (i % 2) + 1,
+    member_rank: (i % 2) + 1,
+    cc: 0.1 + i / 1000,
+    before_cc: 0.1 + i / 1000,
+    after_cc: 0.2 + i / 1000,
+    baseline_score: -i,
+    refined_score: -i - 10,
+  }));
+  const responses: Record<string, unknown> = {
+    "/api/auth": {},
+    "/api/summary": { fitted_structures: 60 },
+    "/api/candidates": [],
+    "/api/fitting": rows,
+    "/api/refinements": rows,
+  };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) => new Response(JSON.stringify(responses[url]))),
+  );
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const router = createDashboardRouter(createMemoryHistory({ initialEntries: ["/fitting"] }));
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await router.load();
+    await act(async () => root.render(createElement(RouterProvider, { router })));
+    for (const view of ["fitting", "refinements"] as const) {
+      for (const [top, page, tableCount, chartCount] of [
+        ["1", "1", 25, 30],
+        ["1", "2", 5, 30],
+        ["all", "1", 25, 60],
+      ] as const) {
+        await act(async () => {
+          await router.navigate({
+            to: `/${view}`,
+            search: { top, page, size: "25", selected: "row-0", selection: view, tab: "details" },
+          });
+        });
+        expect(container.querySelectorAll(".results-section tbody tr")).toHaveLength(tableCount);
+        for (const panel of container.querySelectorAll(".chart-section")) {
+          expect(panel.querySelector(".muted")?.textContent).toContain(
+            `${chartCount} ${view === "fitting" ? "solutions" : "members"} from the table, across all pages.`,
+          );
+          if (view === "refinements")
+            expect(panel.querySelectorAll("circle")).toHaveLength(chartCount);
+
+        }
+      }
+    }
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
+});

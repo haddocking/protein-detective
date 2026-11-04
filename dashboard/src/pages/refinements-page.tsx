@@ -13,8 +13,8 @@ export function RefinementsPage() {
       scoreHint="PowerFit CC: positive is better. HADDOCK score: negative is better."
     >
       <div className="comparison-charts">
-        <HaddockChartPanel rows={results.filtered} onSelect={results.chartSelect} />
-        <PowerfitCcChartPanel rows={results.filtered} onSelect={results.chartSelect} />
+        <HaddockChartPanel rows={results.selectedRows} onSelect={results.chartSelect} />
+        <PowerfitCcChartPanel rows={results.selectedRows} onSelect={results.chartSelect} />
       </div>
     </ResultsLayout>
   );

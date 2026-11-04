@@ -21,7 +21,7 @@ export function FittingPage() {
         )
       }
     >
-      <FittingChartPanel rows={results.filtered} />
+      <FittingChartPanel rows={results.selectedRows} />
     </ResultsLayout>
   );
 }

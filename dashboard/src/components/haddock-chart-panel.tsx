@@ -13,8 +13,7 @@ export function HaddockChartPanel({
       <div>
         <h2>HADDOCK score comparison</h2>
         <p className="muted">
-          All {rows.length.toLocaleString()} matching members, before top-N selection and
-          pagination.
+          {rows.length.toLocaleString()} members from the table, across all pages.
         </p>
         <p>Points below the diagonal have a lower (better) HADDOCK score.</p>
       </div>

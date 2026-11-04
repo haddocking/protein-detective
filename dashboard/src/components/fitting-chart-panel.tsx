@@ -10,8 +10,7 @@ export function FittingChartPanel({ rows }: { rows: Row[] }) {
       <div>
         <h2>PowerFit score distribution</h2>
         <p className="muted">
-          All {rows.length.toLocaleString()} matching solutions, before top-N selection and
-          pagination.
+          {rows.length.toLocaleString()} solutions from the table, across all pages.
         </p>
         <label>
           Metric{" "}
