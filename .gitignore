@@ -72,3 +72,8 @@ venv.bak/
 /mysession/
 docs/meta.duckdb
 docs/tutorial-6j5w/
+
+# Dashboard frontend
+/dashboard/node_modules/
+/dashboard/.vite/
+/dashboard/.vite-plus/

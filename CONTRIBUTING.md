@@ -160,6 +160,32 @@ Some tests are skipped
   minutes, they can be run with `uv run pytest -m manual` or all tests with
   `uv run pytest -m ""`.
 
+## Dashboard development
+
+Install Node.js (>=24), then install frontend dependencies from the repository
+root:
+
+```shell
+cd dashboard
+npm ci
+cd ..
+uv run protein-detective dashboard SESSION_DIR --dev --browser
+```
+
+Dev mode runs Vite with hot reloading alongside the authenticated Python API.
+Restart the command after Python changes.
+
+Run frontend checks and build from `dashboard/`:
+
+```shell
+npm run format
+npm run check
+npm test
+npm run build
+```
+
+The build dashboard assets get included during PyPI publication in CI jobs.
+
 ## Automated code quality checks on git commit
 
 This step is **optional** but recommended for developers who want to

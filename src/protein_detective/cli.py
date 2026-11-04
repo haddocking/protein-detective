@@ -6,6 +6,7 @@ from rich.traceback import install as install_rich_traceback
 
 from protein_detective.__version__ import __version__
 from protein_detective.common_cli import console
+from protein_detective.dashboard.server import dashboard
 from protein_detective.filter import run_filter
 from protein_detective.import_structures import import_structures
 from protein_detective.meta import create_meta_duckdb
@@ -42,3 +43,5 @@ refine_app.sort_key = 2
 app.command(refine_app)
 app.command(import_structures, group=utilities_group, sort_key=1)
 app.command(create_meta_duckdb, name="meta", group=utilities_group, sort_key=0)
+
+app.command(dashboard, group=utilities_group)
