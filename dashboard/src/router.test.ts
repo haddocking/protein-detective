@@ -300,16 +300,16 @@ it("authenticates a direct provenance link and keeps its selected result across 
       const plot = comparisons[index]!.querySelector(".scatter-plot")!;
       const originalAxes = plot.textContent;
       const point = plot.querySelector("circle")!;
-      const originalX = point.getAttribute("cx");
-      const originalY = point.getAttribute("cy");
+      const originalPointX = point.getAttribute("cx");
+      const originalPointY = point.getAttribute("cy");
       expect(reset.disabled).toBe(true);
       await act(async () => {
         zoomSurface.dispatchEvent(new KeyboardEvent("keydown", { key: "+", bubbles: true }));
       });
       expect(reset.disabled).toBe(false);
       expect(plot.textContent).not.toBe(originalAxes);
-      expect(point.getAttribute("cx")).not.toBe(originalX);
-      expect(point.getAttribute("cy")).not.toBe(originalY);
+      expect(point.getAttribute("cx")).not.toBe(originalPointX);
+      expect(point.getAttribute("cy")).not.toBe(originalPointY);
       const zoomedX = point.getAttribute("cx");
       const zoomedY = point.getAttribute("cy");
       await act(async () => {
@@ -321,8 +321,8 @@ it("authenticates a direct provenance link and keeps its selected result across 
       expect(point.getAttribute("cy")).not.toBe(zoomedY);
       await act(async () => reset.click());
       expect(reset.disabled).toBe(true);
-      expect(point.getAttribute("cx")).toBe(originalX);
-      expect(point.getAttribute("cy")).toBe(originalY);
+      expect(point.getAttribute("cx")).toBe(originalPointX);
+      expect(point.getAttribute("cy")).toBe(originalPointY);
       expect(plot.textContent).toBe(originalAxes);
       const svg = point.ownerSVGElement!;
       const [, , width, height] = svg.getAttribute("viewBox")!.split(" ").map(Number);
@@ -333,8 +333,8 @@ it("authenticates a direct provenance link and keeps its selected result across 
         zoomSurface.dispatchEvent(
           new PointerEvent("pointermove", {
             bubbles: true,
-            clientX: Number(originalX),
-            clientY: Number(originalY),
+            clientX: Number(originalPointX),
+            clientY: Number(originalPointY),
           }),
         );
       });

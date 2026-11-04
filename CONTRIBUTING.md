@@ -162,7 +162,8 @@ Some tests are skipped
 
 ## Dashboard development
 
-Install Node.js (>=24), then install frontend dependencies from the repository root:
+Install Node.js (>=24), then install frontend dependencies from the repository
+root:
 
 ```shell
 cd dashboard
