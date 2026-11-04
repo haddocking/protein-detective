@@ -211,12 +211,14 @@ def test_refinements_without_solutions_table_fall_back_to_fittable_structures(se
     assert all(row["uniprot_accessions"] == "P12345" for row in rows)
 
 
-def test_file_paths_resolve_after_relocation_and_reject_escapes(session: Path, tmp_path: Path):
+def test_session_relative_file_paths_reject_escapes(session: Path, tmp_path: Path):
     path = "powerfit/fit-a/map.mrc"
     expected = session / path
     assert _resolve_session_file(session, path) == expected
-    assert _resolve_session_file(session, f"/old/location/session/{path}") == expected
-    assert _resolve_session_file(session, f"docs/session/{path}") == expected
+    with pytest.raises(ValueError):
+        _resolve_session_file(session, f"/old/location/session/{path}")
+    with pytest.raises(FileNotFoundError):
+        _resolve_session_file(session, f"docs/session/{path}")
     with pytest.raises(ValueError):
         _resolve_session_file(session, "../outside")
     with pytest.raises(ValueError):
@@ -291,46 +293,6 @@ def test_search_structures_sharing_pdb_or_uniprot_are_independent(tmp_path: Path
     assert rejected["chain"] == "B"
     assert rejected["filtering_status"] == "rejected"
     assert rejected["rejection_reason"] == "Too short"
-
-
-@pytest.mark.parametrize(
-    "stage",
-    [
-        "powerfit",
-        "refine",
-        "combined_input",
-        "combined_output",
-        "downloads",
-        "imported_structures",
-        "secondary_structure",
-        "single_chain",
-        "uniprots_verified",
-    ],
-)
-@pytest.mark.parametrize("prefix", ["/old/project/docs/tutorial-6j5w", "docs/tutorial-6j5w", "tutorial-6j5w"])
-def test_recorded_paths_resolve_in_renamed_session(tmp_path: Path, stage: str, prefix: str):
-    session = tmp_path / "renamed-session"
-    relative = f"{stage}/run/model.pdb"
-    expected = session / relative
-    expected.parent.mkdir(parents=True)
-    expected.write_bytes(b"model")
-    assert _resolve_session_file(session, f"{prefix}/{relative}") == expected
-    assert _resolve_session_file(session, relative) == expected
-
-
-def test_renamed_session_rebasing_preserves_file_boundaries(tmp_path: Path):
-    session = tmp_path / "renamed-session"
-    session.mkdir()
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    (outside / "private.pdb").write_bytes(b"private")
-    (session / "powerfit").symlink_to(outside, target_is_directory=True)
-    with pytest.raises(ValueError, match="outside"):
-        _resolve_session_file(session, "/old/tutorial-6j5w/powerfit/private.pdb")
-    with pytest.raises(ValueError, match="Invalid"):
-        _resolve_session_file(session, "docs/tutorial-6j5w/powerfit/../../outside/private.pdb")
-    with pytest.raises(ValueError, match="outside"):
-        _resolve_session_file(session, str(outside / "private.pdb"))
 
 
 def test_single_chain_candidates_retain_rejected_and_unfiltered_chains(tmp_path: Path):
@@ -456,11 +418,7 @@ def test_search_candidates_combine_accessions_without_duplicating_chains_or_frag
     assert rows["1ABC:B"]["uniprot_accessions"] == "P1"
 
 
-@pytest.mark.parametrize("recorded_prefix", ["", "/old/location/"])
-def test_absolute_paths_follow_relocated_session(session: Path, recorded_prefix: str):
-    with duckdb.connect(str(session / "meta.duckdb")) as con:
-        con.execute("UPDATE fitted_models SET fitted_model_file = ? || fitted_model_file", [recorded_prefix])
-        con.execute("UPDATE powerfit_runs SET used_target = ? || used_target", [recorded_prefix])
+def test_absolute_paths_follow_relocated_session(session: Path):
     relocated = session.with_name("relocated session")
     session.rename(relocated)
     row = next(row for row in DashboardData(relocated).fitting() if row["model_available"])

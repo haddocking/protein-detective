@@ -29,38 +29,11 @@ def _normalize_json(value: Any) -> Any:
     return value
 
 
-_SESSION_STAGE_DIRS = frozenset(
-    {
-        "powerfit",
-        "refine",
-        "combined_input",
-        "combined_output",
-        "downloads",
-        "imported_structures",
-        "secondary_structure",
-        "single_chain",
-        "uniprots_verified",
-    }
-)
-
-
-def _relative_path(session_dir: Path, recorded_path: str) -> Path:
+def _relative_path(recorded_path: str) -> Path:
     path = Path(recorded_path)
     if not recorded_path or ".." in path.parts or "\x00" in recorded_path:
         msg = "Invalid session file path"
         raise ValueError(msg)
-    root = session_dir.resolve()
-    if path.is_absolute() and path.is_relative_to(root):
-        return path.relative_to(root)
-    # A relocated session can retain its old absolute or repository-relative prefix.
-    # Recognized workflow directories remain meaningful even if the session was renamed.
-    # Rebase only the suffix; the final resolution still enforces the session boundary.
-    if root.name in path.parts and (path.is_absolute() or path.parts[0] in {"docs", root.name}):
-        index = len(path.parts) - 1 - path.parts[::-1].index(root.name)
-        return Path(*path.parts[index + 1 :])
-    for index, part in enumerate(path.parts):
-        if part in _SESSION_STAGE_DIRS:
-            return Path(*path.parts[index:])
     if path.is_absolute():
         msg = "File is outside the session directory"
         raise ValueError(msg)
@@ -69,7 +42,7 @@ def _relative_path(session_dir: Path, recorded_path: str) -> Path:
 
 def _resolve_session_file(session_dir: Path, recorded_path: str) -> Path:
     root = session_dir.resolve()
-    resolved = (root / _relative_path(root, recorded_path)).resolve()
+    resolved = (root / _relative_path(recorded_path)).resolve()
     if not resolved.is_relative_to(root):
         msg = "File is outside the session directory"
         raise ValueError(msg)
@@ -124,7 +97,7 @@ class DashboardData:
         if not isinstance(value, str):
             return None
         try:
-            return _relative_path(self.session_dir, value).as_posix()
+            return _relative_path(value).as_posix()
         except ValueError:
             return None
 
