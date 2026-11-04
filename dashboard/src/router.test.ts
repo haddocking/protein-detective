@@ -546,8 +546,12 @@ it("charts use the table's top-N results across all pages", async () => {
           expect(panel.querySelector(".muted")?.textContent).toContain(
             `${chartCount} ${view === "fitting" ? "solutions" : "members"} from the table, across all pages.`,
           );
-          if (view === "refinements")
-            expect(panel.querySelectorAll("circle")).toHaveLength(chartCount);
+          if (view === "refinements") {
+            expect(panel.querySelectorAll('circle[fill="#26858c"]')).toHaveLength(chartCount);
+            const highlight = panel.querySelectorAll('circle[fill="#e8a33d"]');
+            expect(highlight).toHaveLength(1);
+            expect(highlight[0].getAttribute("r")).toBe("5");
+          }
           if (view === "fitting") {
             const heading = panel.querySelector(".chart-panel-heading")!;
             expect(heading.querySelector("h2")?.textContent).toBe("PowerFit score distribution");
@@ -559,6 +563,22 @@ it("charts use the table's top-N results across all pages", async () => {
         }
       }
     }
+    const highlightPositions = () =>
+      Array.from(container.querySelectorAll('.chart-section circle[fill="#e8a33d"]')).map(
+        (point) => [point.getAttribute("cx"), point.getAttribute("cy")],
+      );
+    const previous = highlightPositions();
+    expect(previous).toHaveLength(2);
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("tbody tr:nth-child(2) button")!.click();
+    });
+    const next = highlightPositions();
+    expect(next).toHaveLength(2);
+    next.forEach((position, i) => expect(position).not.toEqual(previous[i]));
+    await act(async () => {
+      await router.navigate({ to: "/refinements", search: { top: "all" } });
+    });
+    expect(highlightPositions()).toHaveLength(0);
   } finally {
     await act(async () => root.unmount());
     container.remove();

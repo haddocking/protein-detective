@@ -7,7 +7,8 @@ import { scaleBand } from "@tanstack/charts/scales/band";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { PanelHelp } from "./components/panel-help";
-import { display, histogram, labels, type Row } from "./data";
+import { display, histogram, key, labels, type Row } from "./data";
+import { useDashboardNavigation } from "./hooks/use-dashboard-navigation";
 
 export function Histogram({ rows, metric }: { rows: Row[]; metric: string }) {
   const bins = histogram(rows, metric).map((b) => ({
@@ -45,6 +46,7 @@ export function Scatter({
   onSelect: (r: Row) => void;
   metric?: "haddock" | "cc";
 }) {
+  const { selectedId } = useDashboardNavigation();
   const interaction = useRef<ChartInteractionController<ScatterPoint, number, number> | null>(null);
   const [zoom, setZoom] = useState<{
     extent: string;
@@ -88,6 +90,16 @@ export function Scatter({
     marks: [
       lineY(diagonal, { x: (r) => r.x, y: (r) => r.y, stroke: "#8e979e" }),
       dot(data, { x: (r) => r.x, y: (r) => r.y, r: 5, fill: "#26858c", key: (r) => String(r.id) }),
+      dot(
+        data.filter((r) => key(r) === selectedId),
+        {
+          x: (r) => r.x,
+          y: (r) => r.y,
+          r: 5,
+          fill: "#e8a33d",
+          key: (r) => key(r),
+        },
+      ),
     ],
     scales: {
       x: {
