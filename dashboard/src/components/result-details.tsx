@@ -58,8 +58,8 @@ export function ResultDetails({
   const ccIndex = fields.findIndex(([name]) => name === "after_cc");
   if (ccIndex >= 0) {
     const [cc] = fields.splice(ccIndex, 1);
-    const capriIndex = fields.findIndex(([name]) => name === "refined_score");
-    fields.splice(capriIndex >= 0 ? capriIndex : fields.length, 0, cc);
+    const scoreIndex = fields.findIndex(([name]) => name === "refined_score");
+    fields.splice(scoreIndex >= 0 ? scoreIndex : fields.length, 0, cc);
   }
   for (const field of secondaryScoreFields) {
     if (metadata[field] != null) fields.push([field, metadata[field]]);
@@ -175,7 +175,7 @@ export function ResultDetails({
                   {display(r.powerfit_run_id)} ·{" "}
                   {type === "fitting"
                     ? `rank ${display(r.rank)} · PowerFit CC ${display(r.cc)}`
-                    : `${display(r.refine_run_id)} · CAPRI score ${display(r.refined_score)}`}
+                    : `${display(r.refine_run_id)} · HADDOCK score ${display(r.refined_score)}`}
                 </button>
               ))}
               {related.length > 20 && (

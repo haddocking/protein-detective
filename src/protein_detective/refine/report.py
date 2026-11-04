@@ -173,7 +173,7 @@ def refinement_report(
     - cluster_score_std: capri_clt.tsv column score_std.
     - modelcluster_ranking: capri_ss.tsv column modelcluster_ranking.
     - refined_score: capri_ss.tsv column score.
-    - unrefined_score: CAPRI score of unrefined structure and the known structure.
+    - unrefined_score: HADDOCK score of unrefined structure and the known structure.
     - before_cc, after_cc: fixed-coordinate PowerFit CC before and after refinement.
     - cc_change: after_cc minus before_cc.
     - before_fishz, after_fishz: PowerFit Fisher z before and after refinement.

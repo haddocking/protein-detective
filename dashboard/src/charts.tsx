@@ -53,12 +53,12 @@ export function Scatter({ rows, onSelect }: { rows: Row[]; onSelect: (r: Row) =>
     scales: {
       x: {
         scale: () => scaleLinear().domain(domain),
-        axis: { label: "CAPRI score before refinement" },
+        axis: { label: "HADDOCK score before refinement" },
         grid: true,
       },
       y: {
         scale: () => scaleLinear().domain(domain),
-        axis: { label: "CAPRI score after refinement" },
+        axis: { label: "HADDOCK score after refinement" },
         grid: true,
       },
     },
@@ -70,7 +70,7 @@ export function Scatter({ rows, onSelect }: { rows: Row[]; onSelect: (r: Row) =>
         definition={definition}
         aspectRatio={1}
         initialWidth={300}
-        ariaLabel="CAPRI score before versus after refinement, equal axis scales"
+        ariaLabel="HADDOCK score before versus after refinement, equal axis scales"
         onSelect={(point) => {
           if (point && "id" in point.datum) onSelect(point.datum);
         }}

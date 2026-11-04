@@ -93,7 +93,7 @@ export function ResultsPage({ kind }: { kind: ResultKind }) {
             <section className="chart-section">
               <div>
                 <h2>
-                  {kind === "fitting" ? "PowerFit score distribution" : "CAPRI score comparison"}
+                  {kind === "fitting" ? "PowerFit score distribution" : "HADDOCK score comparison"}
                 </h2>
                 <p className="muted">
                   All {filtered.length.toLocaleString()} matching{" "}
@@ -114,7 +114,7 @@ export function ResultsPage({ kind }: { kind: ResultKind }) {
                   </label>
                 ) : (
                   <p>
-                    Points below the diagonal have a lower (better) CAPRI score.
+                    Points below the diagonal have a lower (better) HADDOCK score.
                     <br />
                     Select a point to inspect its result.
                   </p>
@@ -141,7 +141,7 @@ export function ResultsPage({ kind }: { kind: ResultKind }) {
                 <span className="muted">
                   {kind === "fitting"
                     ? "Higher PowerFit CC is better"
-                    : "Changes = after − before. PowerFit CC: positive is better. CAPRI score: negative is better."}
+                    : "Changes = after − before. PowerFit CC: positive is better. HADDOCK score: negative is better."}
                   {" · "}
                   <kbd>j</kbd>/<kbd>k</kbd> or <kbd>↓</kbd>/<kbd>↑</kbd> step through{" "}
                   {kind === "fitting" ? "solutions" : "members"}

@@ -104,7 +104,7 @@ cluster. Default sorting uses `after_cc` (PowerFit CC after refinement)
 descending. `before_cc` and `after_cc` are fixed-coordinate PowerFit scores;
 `cc_change` is `after_cc - before_cc`, where positive values indicate
 improvement. `refined_score`, `baseline_score`, `cluster_score`, and
-`cluster_score_std` are CAPRI scores. `score_change` is
+`cluster_score_std` are HADDOCK scores. `score_change` is
 `refined_score - baseline_score`; negative values indicate improvement.
 Dashboard and CSV labels explicitly name each scoring system. Missing
 baseline/cluster measurements are null. Refinement run IDs are independent of

@@ -534,9 +534,9 @@ class DashboardData:
         """Return final refinement members across independent refinement runs.
 
         Returns:
-            Rows ordered by PowerFit CC after refinement descending. CAPRI cluster
+            Rows ordered by PowerFit CC after refinement descending. HADDOCK cluster
                 scores are kept separate. Both changes are after minus before;
-                positive CC change and negative CAPRI score change mean improvement.
+                positive CC change and negative HADDOCK score change mean improvement.
                 Group members by refinement run, fitted input, and cluster. Returns
                 an empty list when required metadata tables are absent.
         """

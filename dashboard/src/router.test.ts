@@ -270,19 +270,19 @@ it("authenticates a direct provenance link and keeps its selected result across 
       "PowerFit CC change (after − before)",
     );
     expect(container.querySelector("main thead")?.textContent).toContain(
-      "CAPRI score change (after − before)",
+      "HADDOCK score change (after − before)",
     );
     const detailLabels = Array.from(container.querySelectorAll("aside dt"), (dt) => dt.textContent);
-    const capriIndex = detailLabels.indexOf("CAPRI score after refinement");
-    expect(capriIndex).toBeGreaterThan(0);
-    expect(detailLabels[capriIndex - 1]).toBe("PowerFit CC after refinement");
+    const scoreIndex = detailLabels.indexOf("HADDOCK score after refinement");
+    expect(scoreIndex).toBeGreaterThan(0);
+    expect(detailLabels[scoreIndex - 1]).toBe("PowerFit CC after refinement");
     expect(detailLabels.slice(-6)).toEqual([
       "PowerFit CC before refinement",
       "PowerFit CC change (after − before)",
-      "CAPRI score before refinement",
-      "CAPRI score change (after − before)",
-      "CAPRI cluster score",
-      "CAPRI cluster score standard deviation",
+      "HADDOCK score before refinement",
+      "HADDOCK score change (after − before)",
+      "HADDOCK cluster score",
+      "HADDOCK cluster score standard deviation",
     ]);
     await act(async () => {
       await router.navigate({

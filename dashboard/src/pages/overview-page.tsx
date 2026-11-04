@@ -102,7 +102,7 @@ export function OverviewPage() {
           </Link>
         </section>
         <section>
-          <h2>Lowest CAPRI scores after refinement</h2>
+          <h2>Lowest HADDOCK scores after refinement</h2>
           {data.refinements ? (
             <ResultsTable
               items={sorted(
