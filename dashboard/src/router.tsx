@@ -7,7 +7,8 @@ import {
 import { App } from "./app";
 import { OverviewPage } from "./pages/overview-page";
 import { ProvenancePage } from "./pages/provenance-page";
-import { ResultsPage } from "./pages/results-page";
+import { FittingPage } from "./pages/fitting-page";
+import { RefinementsPage } from "./pages/refinements-page";
 import { parseSearch, stringifySearch, type DashboardSearch } from "./navigation";
 
 const rootRoute = createRootRoute({
@@ -33,12 +34,12 @@ const overviewRoute = createRoute({
 const fittingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/fitting",
-  component: () => <ResultsPage kind="fitting" />,
+  component: FittingPage,
 });
 const refinementsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/refinements",
-  component: () => <ResultsPage kind="refinements" />,
+  component: RefinementsPage,
 });
 const provenanceRoute = createRoute({
   getParentRoute: () => rootRoute,

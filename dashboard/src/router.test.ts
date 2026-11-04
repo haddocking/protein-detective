@@ -120,6 +120,8 @@ it("authenticates a direct provenance link and keeps its selected result across 
       {
         ...fitting[0],
         id: "refined-1",
+        fitted_rank: 2,
+        member_rank: 3,
         refine_run_id: "refine-1",
         after_cc: 0.8,
         before_cc: 0.9,
@@ -262,6 +264,101 @@ it("authenticates a direct provenance link and keeps its selected result across 
         search: { selected: "refined-1", selection: "refinements", tab: "details" },
       });
     });
+    expect(container.querySelector(".filter-summary")?.textContent).toBe(
+      '(active filter: "Best HADDOCK score")',
+    );
+    expect(container.querySelector<HTMLDetailsElement>(".result-filters")?.open).toBe(false);
+    const helpButtons = container.querySelectorAll<HTMLButtonElement>("main .panel-help > button");
+    expect(helpButtons).toHaveLength(3);
+    for (const button of helpButtons) {
+      const popover = button.nextElementSibling!;
+      expect(button.getAttribute("popovertarget")).toBe(popover.id);
+      expect(popover.getAttribute("popover")).toBe("auto");
+      expect(button.getAttribute("aria-label")).toContain("controls");
+    }
+    expect(container.querySelector(".results-section .section-heading kbd")).toBeNull();
+    expect(container.querySelector(".results-section .panel-help-content")?.textContent).toContain(
+      "step through members",
+    );
+    const comparisons = container.querySelectorAll(".comparison-charts section");
+    expect(Array.from(comparisons, (panel) => panel.querySelector("h2")?.textContent)).toEqual([
+      "HADDOCK score comparison",
+      "PowerFit CC comparison",
+    ]);
+    for (const [index, metric] of ["HADDOCK score", "PowerFit CC"].entries()) {
+      expect(
+        comparisons[index]?.querySelector(
+          `[aria-label="${metric} before versus after refinement"]`,
+        ),
+      ).not.toBeNull();
+      expect(comparisons[index]?.textContent).toContain(`${metric} before refinement`);
+      expect(comparisons[index]?.textContent).toContain(`${metric} after refinement`);
+      const zoomSurface = comparisons[index]!.querySelector<SVGElement>(
+        `[aria-label="${metric} zoom and pan"]`,
+      )!;
+      const reset = comparisons[index]!.querySelector<HTMLButtonElement>(".chart-reset")!;
+      const plot = comparisons[index]!.querySelector(".scatter-plot")!;
+      const originalAxes = plot.textContent;
+      const point = plot.querySelector("circle")!;
+      const originalX = point.getAttribute("cx");
+      const originalY = point.getAttribute("cy");
+      expect(reset.disabled).toBe(true);
+      await act(async () => {
+        zoomSurface.dispatchEvent(new KeyboardEvent("keydown", { key: "+", bubbles: true }));
+      });
+      expect(reset.disabled).toBe(false);
+      expect(plot.textContent).not.toBe(originalAxes);
+      expect(point.getAttribute("cx")).not.toBe(originalX);
+      expect(point.getAttribute("cy")).not.toBe(originalY);
+      const zoomedX = point.getAttribute("cx");
+      const zoomedY = point.getAttribute("cy");
+      await act(async () => {
+        zoomSurface.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+        );
+      });
+      expect(point.getAttribute("cx")).not.toBe(zoomedX);
+      expect(point.getAttribute("cy")).not.toBe(zoomedY);
+      await act(async () => reset.click());
+      expect(reset.disabled).toBe(true);
+      expect(point.getAttribute("cx")).toBe(originalX);
+      expect(point.getAttribute("cy")).toBe(originalY);
+      expect(plot.textContent).toBe(originalAxes);
+      const svg = point.ownerSVGElement!;
+      const [, , width, height] = svg.getAttribute("viewBox")!.split(" ").map(Number);
+      const bounds = vi
+        .spyOn(svg, "getBoundingClientRect")
+        .mockReturnValue(new DOMRect(0, 0, width, height));
+      await act(async () => {
+        zoomSurface.dispatchEvent(
+          new PointerEvent("pointermove", {
+            bubbles: true,
+            clientX: Number(originalX),
+            clientY: Number(originalY),
+          }),
+        );
+      });
+      const tooltip = plot.querySelector<HTMLElement>('[role="status"]')!;
+      expect(tooltip.hidden).toBe(false);
+      expect(tooltip.textContent).not.toContain("Structure");
+      expect(tooltip.textContent).toContain("1abc");
+      expect(tooltip.textContent).toContain("Fitted rank2");
+      expect(tooltip.textContent).toContain("HADDOCK member rank3");
+      expect(tooltip.textContent).toContain("Before");
+      expect(tooltip.textContent).toContain("After");
+      const expectedChange = ["-2", "-0.1000"][index];
+      expect(tooltip.textContent).toContain(`Change${expectedChange}`);
+      const expectedValues = [
+        ["-10", "-12"],
+        ["0.9000", "0.8000"],
+      ][index]!;
+      for (const value of expectedValues) expect(tooltip.textContent).toContain(value);
+      await act(async () => {
+        zoomSurface.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, buttons: 1 }));
+      });
+      expect(tooltip.hidden).toBe(true);
+      bounds.mockRestore();
+    }
     expect(container.querySelector("main tbody tr")?.textContent).toContain("highest-cc");
     expect(container.querySelector("main thead")?.textContent).toContain(
       "PowerFit CC after refinement ↓",
@@ -363,6 +460,7 @@ it("authenticates a direct provenance link and keeps its selected result across 
     await act(async () => {
       await router.navigate({ to: "/fitting", search: { top: "all" } });
     });
+    expect(container.querySelector(".filter-summary")?.textContent).toBe("(no active filters)");
     const press = (key: string) =>
       act(async () => {
         dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
@@ -375,6 +473,17 @@ it("authenticates a direct provenance link and keeps its selected result across 
     expect(router.state.location.search.selected).toBe("fit-2");
     await press("k");
     expect(router.state.location.search).toMatchObject({ selected: "fit-1", tab: "viewer" });
+    await act(async () => {
+      await router.navigate({
+        to: "/refinements",
+        search: { top: "3", q: "1abc", source: "PDB", refine_run_id: "refine-1" },
+      });
+    });
+    const activeFilters = container.querySelector(".filter-summary")!;
+    expect(activeFilters.textContent).toBe(
+      '(active filters: "Top 3", Search: "1abc", Source: "PDB", Refinement run: "refine-1")',
+    );
+    expect(activeFilters.getAttribute("title")).toBe(activeFilters.textContent);
     expect(fetchMock.mock.calls.filter(([url]) => url === "/api/auth")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([url]) => url === "/api/summary")).toHaveLength(1);
   } finally {
