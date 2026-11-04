@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+import shlex
 from dataclasses import fields
 from pathlib import Path
 from typing import NamedTuple
@@ -12,7 +13,6 @@ from powerfit_em.score import score_pose, setup_structure_with_laplace, setup_ta
 
 from protein_detective.powerfit.options import PowerfitOptions
 from protein_detective.powerfit.provenance import powerfit_run_arguments_from_rocrate
-from protein_detective.provenance import command_arguments
 
 SCORE_COLUMNS = [f"{stage}_{metric}" for stage in ("before", "after") for metric in ("cc", "fishz", "relative_z")]
 
@@ -33,6 +33,28 @@ class RefinementScore(NamedTuple):
     after: PowerfitScore
 
 
+def _recorded_powerfit_run_arguments_parser() -> argparse.ArgumentParser:
+    """Build a parser for recorded PowerFit run arguments without opening files."""
+    parser = argparse.ArgumentParser(
+        add_help=False, allow_abbrev=False, exit_on_error=False, conflict_handler="resolve"
+    )
+    for field in fields(PowerfitOptions):
+        parser.add_argument(
+            "--" + field.name.replace("_", "-"), action="store_true" if isinstance(field.default, bool) else "store"
+        )
+    add_scoring_arguments2parser(parser)
+    parser.add_argument("--powerfit-run-id")
+    parser.add_argument("--scheduler-address")
+    parser.add_argument("--verbose", "-v", action="store_true")
+    parser.add_argument("--quiet", "-q", action="store_true")
+    # add_common_arguments2parser opens target/template with FileType, but historical
+    # paths may no longer exist and the third positional here is a session directory.
+    parser.add_argument("target")
+    parser.add_argument("resolution", type=float)
+    parser.add_argument("session_dir")
+    return parser
+
+
 def _prepare_target(session_dir: Path, fitted_model: Path) -> tuple[Volume, float, argparse.Namespace]:
     """Load the source map using its recorded resolution and scoring options."""
     run_id = fitted_model.relative_to(session_dir / "powerfit").parts[0]
@@ -40,19 +62,13 @@ def _prepare_target(session_dir: Path, fitted_model: Path) -> tuple[Volume, floa
     if recorded is None or recorded["used_target"] is None or recorded["options"] is None:
         msg = f"Cannot rescore refinement: missing recorded PowerFit target or arguments for {run_id}"
         raise ValueError(msg)
-    arity = {
-        "--" + field.name.replace("_", "-"): not isinstance(field.default, bool) for field in fields(PowerfitOptions)
-    }
-    arity.update({"--powerfit-run-id": True, "--scheduler-address": True})
-    arity.update(dict.fromkeys(("--verbose", "--quiet", "-v", "-q"), False))
-    parsed = command_arguments("powerfit " + recorded["options"], ("powerfit",), arity)
-    if parsed is None or len(parsed[0]) != 3:
+    parser = _recorded_powerfit_run_arguments_parser()
+    try:
+        options = parser.parse_intermixed_args(shlex.split(recorded["options"]))
+    except (argparse.ArgumentError, ValueError) as error:
         msg = f"Cannot read recorded PowerFit resolution and scoring options for {run_id}"
-        raise ValueError(msg)
-    resolution = float(parsed[0][1])
-    parser = argparse.ArgumentParser(add_help=False, allow_abbrev=False)
-    add_scoring_arguments2parser(parser)
-    options, _ = parser.parse_known_args(parsed[1])
+        raise ValueError(msg) from error
+    resolution = options.resolution
     with (session_dir / recorded["used_target"]).open("rb") as stream:
         target = setup_target_with_laplace(
             target_volume=stream,
