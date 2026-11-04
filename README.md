@@ -32,10 +32,17 @@ It uses
   [rocrate-action-recorder](https://rocrate-action-recorder.readthedocs.io/) to
   keep track of commands and their input/output files/directories.
 - [duckdb](https://duckdb.org/) to query CSV files like
-  powerfit/\*/\*/solutions.out files.
+  powerfit/\*/\*/solutions.out files, store session metadata and results in the
+  metadata database, and query them for the dashboard.
 - [gemmi](https://gemmi.readthedocs.io/en/latest/) to convert mmCIF files to PDB
   format for haddock3, which requires PDB formatted input. It is also used by
   protein-quest.
+- [React](https://react.dev/) for the dashboard, with
+  [aiohttp](https://docs.aiohttp.org/) as the server,
+  [TanStack Router](https://tanstack.com/router) for
+  navigation and [TanStack Charts](https://tanstack.com/charts) for interactive
+  plots, and [Mol*](https://molstar.org/) for the 3D structure and density map
+  viewer.
 
 Diagram how protein-detective calls protein-quest, powerfit and haddock3's
 refine:
@@ -89,13 +96,15 @@ flowchart TB
     refine -- "**/8_caprieval/capri_*.tsv" --> E2
 
     META[protein-detective meta]
-    refine -- session/ --> META
+    DASHBOARD[protein-detective dashboard]
+    refine -- session/ --> META & DASHBOARD
 
     classDef dashedBorder stroke-dasharray: 5 5;
     S6:::dashedBorder
     F5:::dashedBorder
     I1:::dashedBorder
     META:::dashedBorder
+    DASHBOARD:::dashedBorder
 ```
 
 (Dashed nodes are optional) (The Mermaid figure might not be rendered, see
