@@ -702,6 +702,13 @@ details pre {
 .provenance details {
   margin-top: 16px;
 }
+.provenance-timeline {
+  max-height: 520px;
+  overflow: auto;
+}
+.provenance-timeline > div {
+  min-width: 800px;
+}
 footer {
   border-top: 1px solid var(--border);
   padding: 18px 36px;

@@ -113,7 +113,19 @@ it("authenticates a direct provenance link and keeps its selected result across 
   const responses: Record<string, unknown> = {
     "/api/auth": {},
     "/api/summary": { fitting_solutions: 1 },
-    "/api/provenance": [],
+    "/api/provenance": [
+      {
+        command: "protein-detective powerfit run",
+        start_time: "2026-11-04T10:00:00Z",
+        end_time: "2026-11-04T10:01:30Z",
+      },
+      {
+        command: "protein-detective powerfit run",
+        start_time: "2026-11-04T10:00:30Z",
+        end_time: "2026-11-04T10:00:30Z",
+      },
+      { command: "protein-detective refine", start_time: "2026-11-04T10:01:00Z", end_time: null },
+    ],
     "/api/candidates": [{ candidate_id: "candidate-1", structure: "1abc", source: "PDB" }],
     "/api/fitting": fitting,
     "/api/refinements": [
@@ -182,6 +194,62 @@ it("authenticates a direct provenance link and keeps its selected result across 
     expect(router.state.location.hash).toBe("");
     expect(router.state.location.search.selected).toBe("fit-1");
     expect(container.querySelector("h1")?.textContent).toBe("Provenance");
+    expect(container.querySelector("#command-timeline-title")?.textContent).toBe(
+      "Command timeline",
+    );
+    expect(container.querySelector(".provenance-timeline svg")).not.toBeNull();
+    expect(container.querySelectorAll(".provenance")).toHaveLength(3);
+    expect(container.querySelectorAll(".provenance")[0]?.textContent).toContain(
+      "Duration: 1 min 30 s",
+    );
+    expect(container.querySelectorAll(".provenance")[1]?.textContent).toContain("Duration: 0 s");
+    expect(container.querySelectorAll(".provenance")[2]?.textContent).toContain(
+      "Unavailable (missing or invalid timestamps)",
+    );
+    expect(container.textContent).not.toContain("Hover or focus a command");
+    const timeline = container.querySelector(".provenance-timeline")!;
+    const reset = timeline.querySelector<HTMLButtonElement>(".chart-reset")!;
+    const surface = () => timeline.querySelector("[data-chart-zoom-surface]")!;
+    const bar = () => timeline.querySelector('rect[fill="#26858c"]')!;
+    const originalWidth = Number(bar().getAttribute("width"));
+    const originalY = bar().getAttribute("y");
+    expect(reset.disabled).toBe(true);
+    await act(async () => {
+      surface().dispatchEvent(new KeyboardEvent("keydown", { key: "+", bubbles: true }));
+    });
+    expect(reset.disabled).toBe(false);
+    expect(Number(bar().getAttribute("width"))).toBeGreaterThan(originalWidth);
+    expect(bar().getAttribute("y")).toBe(originalY);
+    const zoomedX = bar().getAttribute("x");
+    await act(async () => {
+      surface().dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    });
+    expect(bar().getAttribute("x")).not.toBe(zoomedX);
+    expect(bar().getAttribute("y")).toBe(originalY);
+    await act(async () => {
+      reset.click();
+    });
+    expect(reset.disabled).toBe(true);
+    expect(Number(bar().getAttribute("width"))).toBe(originalWidth);
+    const svg = timeline.querySelector("svg")!;
+    const [, , width, height] = svg.getAttribute("viewBox")!.split(" ").map(Number);
+    vi.spyOn(svg, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, width, height));
+    const marker = timeline.querySelector('circle[fill="#26858c"]')!;
+    const targetSection = container.querySelector<HTMLElement>("#command-2")!;
+    const scroll = vi.spyOn(targetSection, "scrollIntoView").mockImplementation(() => {});
+    await act(async () => {
+      surface().dispatchEvent(
+        new MouseEvent("click", {
+          bubbles: true,
+          clientX: Number(marker.getAttribute("cx")),
+          clientY: Number(marker.getAttribute("cy")),
+        }),
+      );
+    });
+    expect(targetSection.querySelector("details")?.open).toBe(true);
+    expect(container.querySelector("#command-1 details")?.hasAttribute("open")).toBe(false);
+    expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "smooth" });
+    expect(document.activeElement).toBe(targetSection);
     expect(container.querySelector("aside h2")?.textContent).toBe("1abc");
     await act(async () => {
       await router.navigate({ to: "/overview", search: true });

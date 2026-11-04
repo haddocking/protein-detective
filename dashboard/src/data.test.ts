@@ -1,6 +1,29 @@
-import { datasetsForView, positivePage, tablePageSize, topSelection } from "./data";
+import {
+  datasetsForView,
+  positivePage,
+  provenanceTiming,
+  tablePageSize,
+  topSelection,
+} from "./data";
 import { describe, it, expect } from "vite-plus/test";
 import { csv, filterRows, grouped, histogram, sorted } from "./data";
+
+it("computes command durations across dates and time zones, rejecting incomplete or reversed times", () => {
+  const start_time = "2026-11-04T23:59:59.500+01:00";
+  expect(provenanceTiming({ start_time, end_time: "2026-11-05T00:00:00+01:00" })?.duration).toBe(
+    "0.5 s",
+  );
+  expect(
+    provenanceTiming({ start_time, end_time: "2026-11-05T01:01:01.500+01:00" })?.duration,
+  ).toBe("1 h 1 min 2 s");
+  expect(provenanceTiming({ start_time, end_time: "2026-11-04T22:59:59.500Z" })?.duration).toBe(
+    "0 s",
+  );
+  for (const end_time of [null, "", "invalid", "2026-11-04T00:00:00Z"]) {
+    expect(provenanceTiming({ start_time, end_time })).toBeNull();
+  }
+  expect(provenanceTiming({ start_time: null, end_time: start_time })).toBeNull();
+});
 
 describe("snapshot result operations", () => {
   it("keeps structure identity and PowerFit runs separate", () => {

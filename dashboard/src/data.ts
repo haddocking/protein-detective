@@ -246,6 +246,18 @@ export interface ProvenanceAction extends Row {
   outputs: string[];
 }
 
+export function provenanceTiming(row: Row) {
+  const start = typeof row.start_time === "string" ? Date.parse(row.start_time) : NaN;
+  const end = typeof row.end_time === "string" ? Date.parse(row.end_time) : NaN;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  const seconds = (end - start) / 1000;
+  const duration =
+    seconds < 60
+      ? `${Number(seconds.toFixed(3))} s`
+      : `${seconds >= 3600 ? `${Math.floor(seconds / 3600)} h ` : ""}${Math.floor((seconds % 3600) / 60)} min ${Number((seconds % 60).toFixed(3))} s`;
+  return { start, end, duration };
+}
+
 /** URL restoration determines all datasets needed by the page and its details panel. */
 export function datasetsForView(view: string, selection: string | null): Dataset[] {
   const names: Dataset[] =
