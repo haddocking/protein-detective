@@ -415,7 +415,7 @@ export function StructureViewer({
         />
         {refined && (
           <>
-            ; refined known partner in orange{" "}
+            and refined known partner in orange{" "}
             <span
               className="structure-color-swatch"
               aria-hidden="true"
