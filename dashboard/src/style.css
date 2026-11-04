@@ -445,6 +445,21 @@ input {
 .chart-section h2 {
   margin-bottom: 8px;
 }
+.chart-panel-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.chart-panel-heading .panel-help {
+  position: static;
+  flex-shrink: 0;
+}
+.chart-section .chart-panel-heading h2 {
+  margin: 0;
+  padding: 0;
+}
 .chart-section > div > p {
   margin: 6px 0;
 }

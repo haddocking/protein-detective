@@ -548,7 +548,14 @@ it("charts use the table's top-N results across all pages", async () => {
           );
           if (view === "refinements")
             expect(panel.querySelectorAll("circle")).toHaveLength(chartCount);
-
+          if (view === "fitting") {
+            const heading = panel.querySelector(".chart-panel-heading")!;
+            expect(heading.querySelector("h2")?.textContent).toBe("PowerFit score distribution");
+            const help = heading.querySelector<HTMLButtonElement>(".panel-help > button")!;
+            expect(help.getAttribute("aria-label")).toBe("Histogram controls");
+            expect(help.getAttribute("popovertarget")).toBe(help.nextElementSibling?.id);
+            expect(panel.querySelector(".ts-chart-host .panel-help")).toBeNull();
+          }
         }
       }
     }

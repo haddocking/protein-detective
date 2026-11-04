@@ -26,16 +26,11 @@ export function Histogram({ rows, metric }: { rows: Row[]; metric: string }) {
     tooltip,
   });
   return (
-    <>
-      <PanelHelp label="Histogram controls">
-        <p>Focus the chart and use arrow keys to inspect score ranges and counts.</p>
-      </PanelHelp>
-      <Chart
-        definition={definition}
-        height={225}
-        ariaLabel={`${labels[metric] ?? metric} histogram of all filtered solutions; tooltip shows score range and count`}
-      />
-    </>
+    <Chart
+      definition={definition}
+      height={225}
+      ariaLabel={`${labels[metric] ?? metric} histogram of all filtered solutions; tooltip shows score range and count`}
+    />
   );
 }
 
