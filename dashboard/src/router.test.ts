@@ -212,20 +212,20 @@ it("authenticates a direct provenance link and keeps its selected result across 
     const surface = () => timeline.querySelector("[data-chart-zoom-surface]")!;
     const bar = () => timeline.querySelector('rect[fill="#26858c"]')!;
     const originalWidth = Number(bar().getAttribute("width"));
-    const originalY = bar().getAttribute("y");
+    const initialVerticalPosition = bar().getAttribute("y");
     expect(reset.disabled).toBe(true);
     await act(async () => {
       surface().dispatchEvent(new KeyboardEvent("keydown", { key: "+", bubbles: true }));
     });
     expect(reset.disabled).toBe(false);
     expect(Number(bar().getAttribute("width"))).toBeGreaterThan(originalWidth);
-    expect(bar().getAttribute("y")).toBe(originalY);
+    expect(bar().getAttribute("y")).toBe(initialVerticalPosition);
     const zoomedX = bar().getAttribute("x");
     await act(async () => {
       surface().dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
     });
     expect(bar().getAttribute("x")).not.toBe(zoomedX);
-    expect(bar().getAttribute("y")).toBe(originalY);
+    expect(bar().getAttribute("y")).toBe(initialVerticalPosition);
     await act(async () => {
       reset.click();
     });
