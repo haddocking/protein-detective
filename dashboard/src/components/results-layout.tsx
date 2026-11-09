@@ -47,10 +47,6 @@ export function ResultsLayout({
     addEventListener("keydown", onKeyDown);
     return () => removeEventListener("keydown", onKeyDown);
   });
-  const selectedId = p.get("selected");
-  useEffect(() => {
-    document.querySelector("tr.selected")?.scrollIntoView?.({ block: "nearest" });
-  }, [selectedId, page]);
   // Show the first visible result in the viewer once, unless the URL already selects one.
   const autoSelected = useRef(Boolean(p.get("selected")));
   const first = data[kind] ? selectedRows[(page - 1) * pageSize] : undefined;
@@ -91,6 +87,7 @@ export function ResultsLayout({
             <span className="muted">{scoreHint}</span>
           </div>
           <ResultsTable
+            scrollSelected
             items={selectedRows.slice((page - 1) * pageSize, page * pageSize)}
             cols={columns}
             navigation={results.navigation}

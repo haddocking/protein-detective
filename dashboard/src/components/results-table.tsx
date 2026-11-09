@@ -7,8 +7,21 @@ interface ResultsTableProps {
   navigation: ResultNavigation;
   sort?: string;
   desc?: boolean;
+  scrollSelected?: boolean;
 }
-export function ResultsTable({ items, cols, navigation, sort, desc = false }: ResultsTableProps) {
+
+function scrollSelectedIntoView(row: HTMLTableRowElement | null) {
+  row?.scrollIntoView?.({ block: "nearest" });
+}
+
+export function ResultsTable({
+  items,
+  cols,
+  navigation,
+  sort,
+  desc = false,
+  scrollSelected = false,
+}: ResultsTableProps) {
   const { navigate, select, selectedId } = navigation;
   return (
     <div className="table-scroll">
@@ -41,6 +54,7 @@ export function ResultsTable({ items, cols, navigation, sort, desc = false }: Re
             <tr
               key={key(r) + "-" + i}
               className={selectedId === key(r) ? "selected" : ""}
+              ref={scrollSelected && selectedId === key(r) ? scrollSelectedIntoView : undefined}
               onClick={() => select(r)}
             >
               {cols.map((c, j) => {

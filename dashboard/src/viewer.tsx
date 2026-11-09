@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useDarkTheme } from "./hooks/use-theme";
 
 // This runtime is deliberately external: no Mol* code enters the application bundle.
 const CDN = "https://cdn.jsdelivr.net/npm/molstar@5.4.2/build/viewer/";
@@ -22,34 +23,6 @@ declare global {
 // colors so they stay contrasty on the dark canvas background.
 const LIGHT = { background: 0xfcfbf9, candidate: 0x2c7fb8, partner: 0xe89c36, density: 0x8294a7 };
 const DARK = { background: 0x131d23, candidate: 0x5aa9e6, partner: 0xf2a64a, density: 0xa3b8cc };
-
-function resolveDark(): boolean {
-  const attr = document.documentElement.getAttribute("data-theme");
-  if (attr === "dark") return true;
-  if (attr === "light") return false;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
-// The theme toggle and this lazy-loaded panel hold separate React state, so
-// follow the root element's data-theme attribute and the system preference.
-function useDarkTheme(): boolean {
-  const [dark, setDark] = useState(resolveDark);
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const update = () => setDark(resolveDark());
-    const observer = new MutationObserver(update);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    media.addEventListener("change", update);
-    return () => {
-      observer.disconnect();
-      media.removeEventListener("change", update);
-    };
-  }, []);
-  return dark;
-}
 
 let runtimePromise: Promise<Runtime> | undefined;
 let stylesheetReady = false;

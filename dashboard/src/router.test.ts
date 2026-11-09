@@ -538,12 +538,18 @@ it("authenticates a direct provenance link and keeps its selected result across 
       });
     await press("j");
     expect(router.state.location.search.selected).toBe("fit-1");
+    const firstRow = container.querySelector<HTMLTableRowElement>(".results-section tr.selected")!;
+    const firstRowScroll = vi.spyOn(firstRow, "scrollIntoView").mockImplementation(() => {});
+    const secondRow = firstRow.nextElementSibling as HTMLTableRowElement;
+    const secondRowScroll = vi.spyOn(secondRow, "scrollIntoView").mockImplementation(() => {});
     await press("ArrowDown");
     expect(router.state.location.search.selected).toBe("fit-2");
+    expect(secondRowScroll).toHaveBeenCalledWith({ block: "nearest" });
     await press("j");
     expect(router.state.location.search.selected).toBe("fit-2");
     await press("k");
     expect(router.state.location.search).toMatchObject({ selected: "fit-1", tab: "viewer" });
+    expect(firstRowScroll).toHaveBeenCalledWith({ block: "nearest" });
     await act(async () => {
       await router.navigate({
         to: "/refinements",
