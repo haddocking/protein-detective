@@ -1,4 +1,4 @@
-import { Scatter } from "./scatter";
+import { RefineScatter } from "./refine-scatter";
 import { type Row } from "../data";
 
 export function HaddockChartPanel({
@@ -17,7 +17,7 @@ export function HaddockChartPanel({
         </p>
         <p>Points below the diagonal have a lower (better) HADDOCK score.</p>
       </div>
-      <Scatter rows={rows} onSelect={onSelect} metric="haddock" />
+      <RefineScatter rows={rows} onSelect={onSelect} />
     </section>
   );
 }

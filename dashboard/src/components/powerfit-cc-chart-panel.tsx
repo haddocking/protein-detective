@@ -1,4 +1,4 @@
-import { Scatter } from "./scatter";
+import { PowerfitScatter } from "./powerfit-scatter";
 import { type Row } from "../data";
 
 export function PowerfitCcChartPanel({
@@ -17,7 +17,7 @@ export function PowerfitCcChartPanel({
         </p>
         <p>Points above the diagonal have a higher (better) PowerFit CC.</p>
       </div>
-      <Scatter rows={rows} onSelect={onSelect} metric="cc" />
+      <PowerfitScatter rows={rows} onSelect={onSelect} />
     </section>
   );
 }

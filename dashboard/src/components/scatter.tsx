@@ -8,28 +8,32 @@ import { tooltip } from "@tanstack/charts/tooltip";
 import { ChartResetButton } from "./chart-reset-button";
 import { PanelHelp } from "./panel-help";
 import { display, key, type Row } from "../data";
-import { useRefinementsNavigation } from "../hooks/use-result-navigation";
 
 type ScatterPoint = Row & { x: number; y: number };
+
+export type ScatterProps = {
+  rows: Row[];
+  onSelect: (r: Row) => void;
+};
 
 export function Scatter({
   rows,
   onSelect,
-  metric = "haddock",
-}: {
-  rows: Row[];
-  onSelect: (r: Row) => void;
-  metric?: "haddock" | "cc";
+  before,
+  after,
+  title,
+  selectedId,
+}: ScatterProps & {
+  before: string;
+  after: string;
+  title: string;
+  selectedId: string | null;
 }) {
-  const { selectedId } = useRefinementsNavigation();
   const interaction = useRef<ChartInteractionController<ScatterPoint, number, number> | null>(null);
   const [zoom, setZoom] = useState<{
     extent: string;
     window: ZoomXWindow<number>;
   } | null>(null);
-  const before = metric === "cc" ? "before_cc" : "baseline_score";
-  const after = metric === "cc" ? "after_cc" : "refined_score";
-  const title = metric === "cc" ? "PowerFit CC" : "HADDOCK score";
   const data = rows
     .filter((r) => typeof r[before] === "number" && typeof r[after] === "number")
     .map((r): ScatterPoint => ({ ...r, x: Number(r[before]), y: Number(r[after]) }));
@@ -41,7 +45,7 @@ export function Scatter({
     { x: domain[0], y: domain[0] },
     { x: domain[1], y: domain[1] },
   ];
-  const extent = `${metric}:${domain.join(",")}`;
+  const extent = `${before}:${after}:${domain.join(",")}`;
   let window: ZoomXWindow<number> = { start: domain[0], end: domain[1] };
   if (zoom?.extent === extent) window = zoom.window;
   const zoomed = window.start !== domain[0] || window.end !== domain[1];
