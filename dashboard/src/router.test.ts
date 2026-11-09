@@ -126,7 +126,10 @@ it("authenticates a direct provenance link and keeps its selected result across 
       },
       { command: "protein-detective refine", start_time: "2026-11-04T10:01:00Z", end_time: null },
     ],
-    "/api/candidates": [{ candidate_id: "candidate-1", structure: "1abc", source: "PDB" }],
+    // Different datasets may use the same row ID; only the selected kind should highlight it.
+    "/api/candidates": [
+      { id: "fit-1", candidate_id: "candidate-1", structure: "1abc", source: "PDB" },
+    ],
     "/api/fitting": fitting,
     "/api/refinements": [
       {
@@ -552,6 +555,36 @@ it("authenticates a direct provenance link and keeps its selected result across 
       '(active filters: "Top 3", Search: "1abc", Source: "PDB", Refinement run: "refine-1")',
     );
     expect(activeFilters.getAttribute("title")).toBe(activeFilters.textContent);
+    // Kind-specific details follow the selection even when the page has a different kind.
+    for (const [selection, selected, label, headings] of [
+      ["candidates", "fit-1", "CANDIDATE STRUCTURE", []],
+      ["fitting", "fit-1", "FITTING SOLUTION", []],
+      ["refinements", "refined-1", "REFINEMENT MEMBER", ["Inputs", "Outputs"]],
+    ] as const) {
+      await act(async () => {
+        await router.navigate({
+          to: "/overview",
+          search: { selected, selection, tab: "details" },
+        });
+      });
+      expect(container.querySelector("aside .eyebrow")?.textContent).toBe(label);
+      expect(container.querySelector("aside .file-menu") !== null).toBe(selection !== "candidates");
+      expect(
+        Array.from(container.querySelectorAll("aside .file-paths h3"), (h) => h.textContent),
+      ).toEqual(headings);
+      expect(container.querySelector("aside .notice")).toBeNull();
+      expect(container.querySelectorAll("main tr.selected")).toHaveLength(1);
+    }
+    // Legacy links without an explicit selection use the page's kind.
+    for (const [view, selected, label] of [
+      ["fitting", "fit-1", "FITTING SOLUTION"],
+      ["refinements", "refined-1", "REFINEMENT MEMBER"],
+    ] as const) {
+      await act(async () => {
+        await router.navigate({ to: `/${view}`, search: { selected, tab: "details" } });
+      });
+      expect(container.querySelector("aside .eyebrow")?.textContent).toBe(label);
+    }
     expect(fetchMock.mock.calls.filter(([url]) => url === "/api/auth")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([url]) => url === "/api/summary")).toHaveLength(1);
   } finally {

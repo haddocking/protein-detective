@@ -4,8 +4,7 @@ import { EmptyResults } from "./empty-results";
 import { ResultFilters } from "./result-filters";
 import { ResultsTable } from "./results-table";
 import { useSession } from "../hooks/use-session-data";
-import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
-import { type useResults } from "../hooks/use-results";
+import { type Results } from "../hooks/use-results";
 import { type ResultKind } from "../navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 import { key } from "../data";
@@ -18,14 +17,14 @@ export function ResultsLayout({
   children,
 }: {
   kind: ResultKind;
-  results: ReturnType<typeof useResults>;
+  results: Results;
   noun: string;
   scoreHint: string;
   beforeTable?: ReactNode;
   children: ReactNode;
 }) {
   const { data, summary } = useSession();
-  const { p, navigate } = useDashboardNavigation();
+  const { p, navigate } = results.navigation;
   const { rows, columns, sort, desc, limit, selectedRows, pageSize, page, exportCsv, step } =
     results;
   // j/k or arrow keys step through results, unless typing or interacting with the viewer.
@@ -94,7 +93,7 @@ export function ResultsLayout({
           <ResultsTable
             items={selectedRows.slice((page - 1) * pageSize, page * pageSize)}
             cols={columns}
-            type={kind}
+            navigation={results.navigation}
             sort={sort}
             desc={desc}
           />

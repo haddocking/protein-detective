@@ -5,7 +5,15 @@ import { filterRows, grouped, sorted, positivePage, tablePageSize } from "../dat
 import { ResultsTable } from "../components/results-table";
 import { useSession } from "../hooks/use-session-data";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
+import {
+  useCandidateNavigation,
+  useFittingNavigation,
+  useRefinementsNavigation,
+} from "../hooks/use-result-navigation";
 export function OverviewPage() {
+  const fittingNavigation = useFittingNavigation();
+  const refinementsNavigation = useRefinementsNavigation();
+  const candidateNavigation = useCandidateNavigation();
   const { data, summary } = useSession();
   const { p, navigate } = useDashboardNavigation();
   const candidates = filterRows(data.candidates ?? [], p);
@@ -49,7 +57,7 @@ export function OverviewPage() {
             <ResultsTable
               items={sorted(grouped(data.fitting, "fitting", "1"), "cc", true).slice(0, 5)}
               cols={["structure", "powerfit_run_id", "cc"]}
-              type="fitting"
+              navigation={fittingNavigation}
             />
           ) : (
             <p>Loading fitting results…</p>
@@ -68,7 +76,7 @@ export function OverviewPage() {
                 false,
               ).slice(0, 5)}
               cols={["structure", "refine_run_id", "refined_score"]}
-              type="refinements"
+              navigation={refinementsNavigation}
             />
           ) : (
             <p>Loading refinement results…</p>
@@ -98,7 +106,7 @@ export function OverviewPage() {
               "filtering_status",
               "rejection_reason",
             ]}
-            type="candidates"
+            navigation={candidateNavigation}
           />
         ) : (
           <p>Loading candidates…</p>

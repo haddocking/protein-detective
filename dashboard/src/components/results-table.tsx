@@ -1,15 +1,15 @@
 import { type ReactNode } from "react";
-import { display, key, labels, type Dataset, type Row } from "../data";
-import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
+import { display, key, labels, type Row } from "../data";
+import type { ResultNavigation } from "../hooks/use-result-navigation";
 interface ResultsTableProps {
   items: Row[];
   cols: string[];
-  type: Dataset;
+  navigation: ResultNavigation;
   sort?: string;
   desc?: boolean;
 }
-export function ResultsTable({ items, cols, type, sort, desc = false }: ResultsTableProps) {
-  const { navigate, select, selectedId } = useDashboardNavigation();
+export function ResultsTable({ items, cols, navigation, sort, desc = false }: ResultsTableProps) {
+  const { navigate, select, selectedId } = navigation;
   return (
     <div className="table-scroll">
       <table>
@@ -41,7 +41,7 @@ export function ResultsTable({ items, cols, type, sort, desc = false }: ResultsT
             <tr
               key={key(r) + "-" + i}
               className={selectedId === key(r) ? "selected" : ""}
-              onClick={() => select(r, type)}
+              onClick={() => select(r)}
             >
               {cols.map((c, j) => {
                 let content: ReactNode = display(r[c]);
@@ -51,7 +51,7 @@ export function ResultsTable({ items, cols, type, sort, desc = false }: ResultsT
                       className="text-link"
                       onClick={(e) => {
                         e.stopPropagation();
-                        select(r, type);
+                        select(r);
                       }}
                     >
                       {display(r[c])}

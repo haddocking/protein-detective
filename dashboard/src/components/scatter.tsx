@@ -8,7 +8,7 @@ import { tooltip } from "@tanstack/charts/tooltip";
 import { ChartResetButton } from "./chart-reset-button";
 import { PanelHelp } from "./panel-help";
 import { display, key, type Row } from "../data";
-import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
+import { useRefinementsNavigation } from "../hooks/use-result-navigation";
 
 type ScatterPoint = Row & { x: number; y: number };
 
@@ -21,7 +21,7 @@ export function Scatter({
   onSelect: (r: Row) => void;
   metric?: "haddock" | "cc";
 }) {
-  const { selectedId } = useDashboardNavigation();
+  const { selectedId } = useRefinementsNavigation();
   const interaction = useRef<ChartInteractionController<ScatterPoint, number, number> | null>(null);
   const [zoom, setZoom] = useState<{
     extent: string;

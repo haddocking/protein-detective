@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { display, key, labels, type Dataset, type Row } from "../data";
 import { useSession } from "../hooks/use-session-data";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
+import { useFittingNavigation, useRefinementsNavigation } from "../hooks/use-result-navigation";
 const secondaryScoreFields = [
   "before_cc",
   "cc_change",
@@ -42,17 +43,21 @@ const detailsFields = new Set([
 
 export function ResultDetails({
   selected,
-  selectedKind,
+  resultLabel,
+  viewerMessage,
   candidate,
   accessions,
 }: {
   selected: Row;
-  selectedKind: string;
+  resultLabel: string;
+  viewerMessage: string | null;
   candidate: Row | undefined;
   accessions: string[];
 }) {
   const { data } = useSession();
-  const { navigate, select } = useDashboardNavigation();
+  const { navigate } = useDashboardNavigation();
+  const fittingNavigation = useFittingNavigation();
+  const refinementsNavigation = useRefinementsNavigation();
   const metadata = { ...candidate, ...selected };
   const fields = Object.entries(metadata).filter(([name]) => !secondaryScoreFields.includes(name));
   const ccIndex = fields.findIndex(([name]) => name === "after_cc");
@@ -64,13 +69,6 @@ export function ResultDetails({
   for (const field of secondaryScoreFields) {
     if (metadata[field] != null) fields.push([field, metadata[field]]);
   }
-  let resultLabel = "REFINEMENT MEMBER";
-  if (selectedKind === "candidates") resultLabel = "CANDIDATE STRUCTURE";
-  else if (selectedKind === "fitting") resultLabel = "FITTING SOLUTION";
-
-  let viewerMessage = "Structure or associated density is unavailable.";
-  if (display(selected.viewer_error) !== "—") viewerMessage = display(selected.viewer_error);
-  else if (selected.model_available === false) viewerMessage = "Fitted structure not saved";
   return (
     <div className="details-content">
       <p className="eyebrow">{resultLabel}</p>
@@ -125,7 +123,7 @@ export function ResultDetails({
           View structure
         </button>
       ) : (
-        selectedKind !== "candidates" && <p className="notice">{viewerMessage}</p>
+        viewerMessage && <p className="notice">{viewerMessage}</p>
       )}
       <dl>
         {fields
@@ -149,7 +147,7 @@ export function ResultDetails({
         <summary>Additional recorded metadata</summary>
         <pre>{JSON.stringify({ ...candidate, ...selected }, null, 2)}</pre>
       </details>
-      {(["fitting", "refinements"] as const).map((type) => {
+      {[fittingNavigation, refinementsNavigation].map(({ kind: type, select }) => {
         const related = (data[type as Dataset] ?? []).filter(
           (r) =>
             String(r.candidate_id ?? r.structure) ===
@@ -162,7 +160,7 @@ export function ResultDetails({
                 Related {type} ({related.length})
               </h3>
               {related.slice(0, 20).map((r) => (
-                <button className="related" key={key(r)} onClick={() => select(r, type)}>
+                <button className="related" key={key(r)} onClick={() => select(r)}>
                   {display(r.powerfit_run_id)} ·{" "}
                   {type === "fitting"
                     ? `rank ${display(r.rank)} · PowerFit CC ${display(r.cc)}`

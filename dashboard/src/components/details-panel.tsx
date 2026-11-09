@@ -1,5 +1,5 @@
 import { lazy, Suspense, useId } from "react";
-import { display, fileUrl } from "../data";
+import { display } from "../data";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
 import { useDetailsPanel } from "../hooks/use-details-panel";
 import { CopyPathButton } from "./copy-path-button";
@@ -13,7 +13,9 @@ export function DetailsPanel() {
   const { navigate, selectedId } = useDashboardNavigation();
   const {
     selected,
-    selectedKind,
+    resultLabel,
+    viewerMessage,
+    fileGroups,
     candidate,
     viewerVisible,
     viewerSelection,
@@ -29,7 +31,8 @@ export function DetailsPanel() {
     resultDetails = (
       <ResultDetails
         selected={selected}
-        selectedKind={selectedKind}
+        resultLabel={resultLabel}
+        viewerMessage={viewerMessage}
         candidate={candidate}
         accessions={accessions}
       />
@@ -65,7 +68,7 @@ export function DetailsPanel() {
       />
       <div className="panel-header">
         <strong>{display(selected?.structure ?? selectedId)}</strong>
-        {selected && selectedKind !== "candidates" && (
+        {selected && fileGroups.length > 0 && (
           <div key={selectedId} className="file-menu">
             <button type="button" popoverTarget={fileMenuId}>
               Files ▾
@@ -85,36 +88,9 @@ export function DetailsPanel() {
                 );
               }}
             >
-              {(selectedKind === "refinements"
-                ? [
-                    {
-                      title: "Inputs",
-                      files: [
-                        ["density", "Density"],
-                        ["fitted_model", "Unrefined fitted model"],
-                        ["original_known_structure", "Original known structure"],
-                      ],
-                    },
-                    {
-                      title: "Outputs",
-                      files: [
-                        ["refined_fitted_structure", "Refined fitted structure"],
-                        ["refined_known_structure", "Refined known structure"],
-                      ],
-                    },
-                  ]
-                : [
-                    {
-                      title: "Local files",
-                      files: [
-                        ["model", "Structure"],
-                        ["density", "Density"],
-                      ],
-                    },
-                  ]
-              ).map(({ title, files }) => (
+              {fileGroups.map(({ title, showHeading, files }) => (
                 <section key={title} className="file-paths" aria-label={title}>
-                  {selectedKind === "refinements" && <h3>{title}</h3>}
+                  {showHeading && <h3>{title}</h3>}
                   {files.map(([kind, label]) => {
                     const path = selected[`${kind}_absolute_path`];
                     return typeof path === "string" ? (
@@ -153,17 +129,7 @@ export function DetailsPanel() {
       {viewerSelection && (
         <div className="retained-viewer" hidden={!viewerVisible}>
           <Suspense fallback={<p>Loading 3D viewer…</p>}>
-            <StructureViewer
-              structureUrl={fileUrl(viewerSelection.row.model_path)}
-              densityUrl={fileUrl(viewerSelection.row.density_path)}
-              refinedKnownStructureUrl={
-                viewerSelection.kind === "refinements"
-                  ? fileUrl(viewerSelection.row.refined_known_structure)
-                  : undefined
-              }
-              refined={viewerSelection.kind === "refinements"}
-              label={display(viewerSelection.row.structure)}
-            />
+            <StructureViewer {...viewerSelection.props} />
           </Suspense>
         </div>
       )}

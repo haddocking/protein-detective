@@ -1,13 +1,13 @@
 import { lazy, Suspense } from "react";
 import { display, fileUrl, sorted, type Row } from "../data";
-import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
+import { useRefinementsNavigation } from "../hooks/use-result-navigation";
 
 const StructureViewer = lazy(() =>
   import("../viewer").then((m) => ({ default: m.StructureViewer })),
 );
 
 export function BestStructure({ refinements }: { refinements: Row[] }) {
-  const { select } = useDashboardNavigation();
+  const { select } = useRefinementsNavigation();
   const best = sorted(
     refinements.filter((r) => r.viewer_available),
     "after_cc",
@@ -18,7 +18,7 @@ export function BestStructure({ refinements }: { refinements: Row[] }) {
     <section className="best-structure">
       <div className="section-heading">
         <h2>Best refined structure by PowerFit CC score</h2>
-        <button className="text-link" onClick={() => select(best, "refinements")}>
+        <button className="text-link" onClick={() => select(best)}>
           {display(best.structure)} · {display(best.refine_run_id)} · PowerFit CC{" "}
           {display(best.after_cc)} →
         </button>

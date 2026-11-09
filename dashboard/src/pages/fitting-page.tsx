@@ -1,10 +1,10 @@
 import { FittingChartPanel } from "../components/fitting-chart-panel";
 import { ResultsLayout } from "../components/results-layout";
-import { useResults } from "../hooks/use-results";
+import { useFittingResults } from "../hooks/use-results";
 import { useSession } from "../hooks/use-session-data";
 
 export function FittingPage() {
-  const results = useResults("fitting");
+  const results = useFittingResults();
   const { summary } = useSession();
   return (
     <ResultsLayout

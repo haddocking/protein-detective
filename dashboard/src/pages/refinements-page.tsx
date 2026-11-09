@@ -1,10 +1,10 @@
 import { HaddockChartPanel } from "../components/haddock-chart-panel";
 import { PowerfitCcChartPanel } from "../components/powerfit-cc-chart-panel";
 import { ResultsLayout } from "../components/results-layout";
-import { useResults } from "../hooks/use-results";
+import { useRefinementsResults } from "../hooks/use-results";
 
 export function RefinementsPage() {
-  const results = useResults("refinements");
+  const results = useRefinementsResults();
   return (
     <ResultsLayout
       kind="refinements"

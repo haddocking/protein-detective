@@ -13,10 +13,14 @@ import {
 } from "../data";
 import { type ResultKind } from "../navigation";
 import { useSession } from "./use-session-data";
-import { useDashboardNavigation } from "./use-dashboard-navigation";
-export function useResults(kind: ResultKind) {
+import {
+  useFittingNavigation,
+  useRefinementsNavigation,
+  type ResultNavigation,
+} from "./use-result-navigation";
+function useResults(kind: ResultKind, navigation: ResultNavigation) {
   const { data } = useSession();
-  const { p, navigate } = useDashboardNavigation();
+  const { p, navigate } = navigation;
   const rows = data[kind] ?? [];
   const filtered = filterRows(rows, p);
   const columns = kind === "fitting" ? fittingColumns : refinementColumns;
@@ -56,7 +60,7 @@ export function useResults(kind: ResultKind) {
   /** Select the result `delta` rows away from the current one, across pages. */
   function step(delta: number) {
     if (!selectedRows.length) return;
-    const current = selectedRows.findIndex((r) => key(r) === p.get("selected"));
+    const current = selectedRows.findIndex((r) => key(r) === navigation.selectedId);
     const index =
       current < 0
         ? (page - 1) * pageSize
@@ -71,6 +75,7 @@ export function useResults(kind: ResultKind) {
     });
   }
   return {
+    navigation,
     step,
     rows,
     columns,
@@ -84,3 +89,13 @@ export function useResults(kind: ResultKind) {
     chartSelect,
   };
 }
+
+export function useFittingResults() {
+  return useResults("fitting", useFittingNavigation());
+}
+
+export function useRefinementsResults() {
+  return useResults("refinements", useRefinementsNavigation());
+}
+
+export type Results = ReturnType<typeof useFittingResults>;
