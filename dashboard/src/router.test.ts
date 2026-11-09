@@ -2,9 +2,13 @@
 import { createElement, act } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
+import { notifyManager } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { createDashboardRouter } from "./router";
 import { clusterKey } from "./data";
+
+// Flush query notifications within React's async act.
+notifyManager.setScheduler(queueMicrotask);
 
 vi.mock("./viewer", () => ({
   StructureViewer: ({
@@ -686,6 +690,112 @@ it("charts use the table's top-N results across all pages", async () => {
       await router.navigate({ to: "/refinements", search: { top: "all" } });
     });
     expect(highlightPositions()).toHaveLength(0);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it.each([401, 503])(
+  "retries a failed dataset (%s) without refetching successful snapshots",
+  async (status) => {
+    let failed = false;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "/api/fitting" && !failed) {
+        failed = true;
+        return new Response("", { status });
+      }
+      return new Response(JSON.stringify(url === "/api/summary" ? {} : []));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const router = createDashboardRouter(createMemoryHistory({ initialEntries: ["/overview"] }));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const calls = (url: string) => fetchMock.mock.calls.filter(([name]) => name === url).length;
+    try {
+      await router.load();
+      await act(async () => root.render(createElement(RouterProvider, { router })));
+      expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+        status === 401 ? "authenticate" : "Could not load fitting (503)",
+      );
+      expect(calls("/api/fitting")).toBe(1);
+      expect(calls("/api/provenance")).toBe(0);
+      if (status === 503) {
+        await act(async () => {
+          await router.navigate({ to: "/provenance", search: {} });
+        });
+        expect(container.querySelector('[role="alert"]')).toBeNull();
+        expect(container.querySelector("h1")?.textContent).toBe("Provenance");
+        await act(async () => {
+          await router.navigate({ to: "/overview", search: {} });
+        });
+      } else {
+        await act(async () =>
+          container.querySelector<HTMLButtonElement>('[role="alert"] button')!.click(),
+        );
+      }
+      expect(container.querySelector('[role="alert"]')).toBeNull();
+      expect(container.querySelector("h1")?.textContent).toBe("Overview");
+      expect(calls("/api/fitting")).toBe(2);
+      for (const name of ["summary", "candidates", "refinements"])
+        expect(calls(`/api/${name}`)).toBe(1);
+      await act(async () => {
+        await router.navigate({ to: "/provenance", search: {} });
+      });
+      expect(calls("/api/provenance")).toBe(1);
+      await act(async () => {
+        await router.navigate({ to: "/overview", search: {} });
+      });
+      expect(calls("/api/fitting")).toBe(2);
+      for (const name of ["summary", "candidates", "refinements"])
+        expect(calls(`/api/${name}`)).toBe(1);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
+  },
+);
+
+it("waits for authentication before loading snapshots and allows an explicit retry", async () => {
+  let authenticate = false;
+  const fetchMock = vi.fn(async (url: string) =>
+    url === "/api/auth" && !authenticate
+      ? new Response("", { status: 401 })
+      : new Response(JSON.stringify(url === "/api/summary" ? {} : [])),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const router = createDashboardRouter(
+    createMemoryHistory({ initialEntries: ["/provenance#token=launch-token"] }),
+  );
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await router.load();
+    await act(async () => root.render(createElement(RouterProvider, { router })));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Authentication failed",
+    );
+    expect(router.state.location.hash).toBe("token=launch-token");
+    authenticate = true;
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('[role="alert"] button')!.click(),
+    );
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(container.querySelector("h1")?.textContent).toBe("Provenance");
+    expect(router.state.location.hash).toBe("");
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "/api/auth",
+      "/api/auth",
+      "/api/summary",
+      "/api/provenance",
+    ]);
   } finally {
     await act(async () => root.unmount());
     container.remove();

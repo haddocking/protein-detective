@@ -6,7 +6,7 @@ import { DetailsPanel } from "./details-panel";
 import { ThemeToggle } from "./theme-toggle";
 
 export function SessionLayout() {
-  const { ready, error } = useSession();
+  const { ready, error, retry } = useSession();
   const { view } = useDashboardNavigation();
 
   let content;
@@ -14,6 +14,7 @@ export function SessionLayout() {
     content = (
       <div className="error" role="alert">
         {error}
+        <button onClick={() => void retry()}>Retry loading</button>
       </div>
     );
   } else if (!ready) {

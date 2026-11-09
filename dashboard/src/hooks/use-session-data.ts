@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useState } from "react";
+import { useQueries, useQuery, type QueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { datasetsForView, type Dataset, type Row } from "../data";
 import { useDashboardNavigation } from "./use-dashboard-navigation";
@@ -15,22 +16,17 @@ async function get<T>(name: string): Promise<T> {
   return response.json();
 }
 
-export function useSessionData() {
+const datasets: Dataset[] = ["candidates", "fitting", "refinements", "provenance"];
+
+export function useSessionData(client: QueryClient) {
   const { view, p } = useDashboardNavigation();
   const routerNavigate = useNavigate();
   const hash = useLocation({ select: (location) => location.hash });
   const [token] = useState(() => new URLSearchParams(hash).get("token"));
-  const selectedId = p.get("selected");
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState("");
-  const [data, setData] = useState<Partial<Record<Dataset, Row[]>>>({});
-  const [summary, setSummary] = useState<Row>({});
-  const requested = useRef(new Set<Dataset>());
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
+  const summary = useQuery(
+    {
+      queryKey: ["summary"],
+      queryFn: async () => {
         if (token) {
           const response = await fetch("/api/auth", {
             method: "POST",
@@ -43,36 +39,35 @@ export function useSessionData() {
             );
           await routerNavigate({ to: ".", search: true, hash: "", replace: true });
         }
+        return get<Row>("summary");
+      },
+    },
+    client,
+  );
+  const needed = datasetsForView(view, p.get("selected"));
+  const queries = useQueries(
+    {
+      queries: datasets.map((name) => ({
+        queryKey: [name],
+        queryFn: () => get<Row[]>(name),
+        enabled: summary.isSuccess && needed.includes(name),
+      })),
+    },
+    client,
+  );
+  const data: Partial<Record<Dataset, Row[]>> = Object.fromEntries(
+    queries.flatMap((query, i) => (query.data ? [[datasets[i], query.data]] : [])),
+  );
+  const error =
+    summary.error ?? queries.find((query, i) => needed.includes(datasets[i]) && query.error)?.error;
 
-        const s = await get<Row>("summary");
-        if (!cancelled) {
-          setSummary(s);
-          setReady(true);
-        }
-      } catch (e) {
-        if (!cancelled) setError(String(e instanceof Error ? e.message : e));
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [token, routerNavigate]);
-
-  useEffect(() => {
-    if (!ready) return;
-
-    const names = datasetsForView(view, selectedId);
-    for (const name of names)
-      if (!requested.current.has(name)) {
-        requested.current.add(name);
-        get<Row[]>(name)
-          .then((rows) => setData((current) => ({ ...current, [name]: rows })))
-          .catch((e) => setError(e.message));
-      }
-  }, [ready, view, selectedId]);
-
-  return { ready, error, data, summary };
+  return {
+    ready: summary.isSuccess,
+    error: error?.message ?? "",
+    data,
+    summary: summary.data ?? {},
+    retry: () => client.refetchQueries({ predicate: (query) => query.state.status === "error" }),
+  };
 }
 
 export const SessionContext = createContext<ReturnType<typeof useSessionData> | null>(null);
