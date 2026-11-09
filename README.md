@@ -20,6 +20,8 @@ It uses
   retrieve and filter protein structures from Uniprot, PDBe and AlphaFold DB.
 - [powerfit](https://pypi.org/project/powerfit-em/) to fit protein structure in
   a Electron Microscopy (EM) density map.
+- [haddock3](https://www.bonvinlab.org/haddock3) to refine fitted protein
+  structures against a known structure.
 - [cyclopts](https://cyclopts.readthedocs.io/en/latest/) for command line
   interface
 - [molviewspec](https://molstar.org/mol-view-spec/) to visualize the fitted
@@ -30,13 +32,23 @@ It uses
   [rocrate-action-recorder](https://rocrate-action-recorder.readthedocs.io/) to
   keep track of commands and their input/output files/directories.
 - [duckdb](https://duckdb.org/) to query CSV files like
-  powerfit/\*/\*/solutions.out files.
+  powerfit/\*/\*/solutions.out files, store session metadata and results in the
+  metadata database, and query them for the dashboard.
+- [gemmi](https://gemmi.readthedocs.io/en/latest/) to convert mmCIF files to PDB
+  format for haddock3, which requires PDB formatted input. It is also used by
+  protein-quest.
+- [React](https://react.dev/) for the dashboard, with
+  [aiohttp](https://docs.aiohttp.org/) as the server,
+  [TanStack Router](https://tanstack.com/router) for navigation and
+  [TanStack Charts](https://tanstack.com/charts) for interactive plots, and
+  [Mol\*](https://molstar.org/) for the 3D structure and density map viewer.
 
-Diagram how protein-detective calls protein-quest and powerfit:
+Diagram how protein-detective calls protein-quest, powerfit and haddock3's
+refine:
 
 ```mermaid
 flowchart TB
-    subgraph search [protein-detective search]
+    subgraph search [protein-detective candidates search]
         direction TB
         S2[protein-quest search uniprot]
         S3[protein-quest search alphafold]
@@ -50,14 +62,14 @@ flowchart TB
     end
     search -- "UniProt accessions & PDB ids" --> retrieve
 
-    subgraph retrieve [protein-detective retrieve]
+    subgraph retrieve [protein-detective candidates retrieve]
         direction TB
         R2[protein-quest retrieve pdbe]
         R3[protein-quest retrieve alphafold]
     end
     retrieve -- "mmcif_files" --> filter
 
-    subgraph filter [protein-detective filter]
+    subgraph filter [protein-detective candidates filter]
         direction TB
         F2[protein-quest convert structures --uniprots]
         F3[protein-quest filter chain]
@@ -74,10 +86,24 @@ flowchart TB
     M1[protein-detective powerfit fit-models]
     P1 -- "**/solutions.out" --> E1 & M1
 
+    subgraph refine [protein-detective refine run]
+        R1[haddock3 refine-fitted2known.cfg]
+    end
+    M1 -- "**/fit_*.pdb" --> refine
+
+    E2[protein-detective refine report]
+    refine -- "**/8_caprieval/capri_*.tsv" --> E2
+
+    META[protein-detective meta]
+    DASHBOARD[protein-detective dashboard]
+    refine -- session/ --> META & DASHBOARD
+
     classDef dashedBorder stroke-dasharray: 5 5;
     S6:::dashedBorder
     F5:::dashedBorder
     I1:::dashedBorder
+    META:::dashedBorder
+    DASHBOARD:::dashedBorder
 ```
 
 (Dashed nodes are optional) (The Mermaid figure might not be rendered, see
@@ -110,10 +136,15 @@ pip install "protein-detective[cuda12]"
 The main entry point is the `protein-detective` command line tool which has
 multiple subcommands to perform actions.
 
+For an end-to-end example using [6J5W](https://www.rcsb.org/structure/6J5W) and
+its [EMD-0683](https://www.ebi.ac.uk/emdb/EMD-0683) density map, including
+candidate search, fitting and refinement, see
+[the tutorial](docs/tutorial.ipynb).
+
 ### Search Uniprot for structures
 
 ```shell
-protein-detective search \
+protein-detective candidates search \
     --taxon-id 9606 \
     --reviewed \
     --subcellular-location-uniprot nucleus \
@@ -133,7 +164,7 @@ In `./mysession` directory, you will find the search results.
 <summary>You can also include interaction partners in the search</summary>
 
 ```shell
-protein-detective search --verbose \
+protein-detective candidates search --verbose \
     --taxon-id 9606 \
     --reviewed \
     --subcellular-location-uniprot nucleus \
@@ -155,7 +186,7 @@ macromolecular [complex](https://www.ebi.ac.uk/complexportal/complex/CPX-6266).
 ### To retrieve a bunch of structures
 
 ```shell
-protein-detective retrieve ./mysession
+protein-detective candidates retrieve ./mysession
 ```
 
 In `./mysession` directory, you will find mmCIF files from PDBe and PDB files
@@ -176,14 +207,14 @@ Also uncompresses \*.cif.gz files to \*.cif files for compatibility with
 powerfit.
 
 ```shell
-protein-detective filter \
+protein-detective candidates filter \
     --min-confidence 50 \
     --min-residues 100 \
     --max-residues 1000 \
     ./mysession
 
 # or to filter on secondary structure having some helices
-protein-detective filter mysession --secondary.abs-min-helix-residues 40
+protein-detective candidates filter mysession --secondary.abs-min-helix-residues 40
 ```
 
 ### Import filtered structures
@@ -350,6 +381,19 @@ The results can also be visualized see
 [visualization.ipynb](https://bonvinlab.org/protein-detective/docs/visualization.html)
 for an example.
 
+## Refine
+
+The models fitted with powerfit can be further refined using the refine command
+using haddock3.
+
+```shell
+protein-detective refine run mysession known_structure.pdb
+protein-detective refine list-runs mysession
+protein-detective refine report mysession --top 2 --output refined.csv
+```
+
+See `protein-detective refine report --help` for reporting options and details.
+
 ### Metadata database
 
 Generate a DuckDB database containing the metadata and results from a protein
@@ -358,6 +402,24 @@ detective session:
 ```shell
 protein-detective meta mysession/
 ```
+
+### Dashboard
+
+Browse candidates, fitting and refinement scores, saved structures with density,
+and recorded workflow provenance in a local dashboard:
+
+```shell
+protein-detective dashboard mysession --host localhost --port 8765
+```
+
+The command prints a launch URL by default. Add `--browser` to open the browser
+automatically. Open the printed launch URL to authenticate. **Do not modify the
+session directory while the dashboard is running.**
+
+![Dashboard refinement result](https://raw.githubusercontent.com/haddocking/protein-detective/main/docs/dashboard-refinement-result.png)
+
+_Dashboard refinement result from a session generated by following
+[the tutorial](https://github.com/haddocking/protein-detective/blob/main/docs/tutorial.ipynb)._
 
 ## Contributing
 

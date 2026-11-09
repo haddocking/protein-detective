@@ -38,12 +38,15 @@ def _find_structure_files(session_dir: Path) -> list[Path]:
     if not structure_files_dir.exists():
         msg = (
             f"Structure files directory '{structure_files_dir}' does not exist. "
-            "Please run `protein-detective filter` command."
+            "Please run `protein-detective candidates filter` command."
         )
         raise FileNotFoundError(msg)
     files = sorted(structure_files_dir.glob("*"))
     if not files:
-        msg = f"No structure files found in '{structure_files_dir}'. Please run `protein-detective filter` command."
+        msg = (
+            f"No structure files found in '{structure_files_dir}'. "
+            "Please run `protein-detective candidates filter` command."
+        )
         raise FileNotFoundError(msg)
     return files
 
@@ -128,6 +131,7 @@ def _write_ro_crate4runs(
     start_time: datetime,
     /,
     *,
+    target: Path,
     density_map_target: Path,
     fittable_structures_csv: Path,
     structure_files_root: Path,
@@ -138,7 +142,7 @@ def _write_ro_crate4runs(
             IOArgumentPath(
                 name="density_map_target",
                 path=density_map_target,
-                help="Density map used for fitting.",
+                help=f"Density map used for fitting. Copied from {target.resolve()}.",
             ),
         ],
         input_dirs=[
@@ -248,6 +252,7 @@ def powerfit_runs(
     _write_ro_crate4runs(
         session_dir,
         start_time,
+        target=target,
         density_map_target=density_map_target,
         fittable_structures_csv=fittable_structures_csv,
         structure_files_root=structure_files_root,

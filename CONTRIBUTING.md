@@ -139,6 +139,53 @@ uv run properdocs build
 python3 -m http.server -d site
 ```
 
+The Jupyter notebooks (docs/\*.ipynb) can be run with
+
+```shell
+uv run --group docs jupyter nbconvert --to notebook --execute --inplace docs/tutorial.ipynb
+```
+
+## Running tests
+
+To run the test suite, use `pytest`:
+
+```shell
+uv run pytest
+```
+
+Some tests are skipped
+
+- when CUDA or OpenCL is available or not.
+- when they take too long for CI, for example a haddock3 refinement run takes >2
+  minutes, they can be run with `uv run pytest -m manual` or all tests with
+  `uv run pytest -m ""`.
+
+## Dashboard development
+
+Install Node.js (>=24), then install frontend dependencies from the repository
+root:
+
+```shell
+cd dashboard
+npm ci
+cd ..
+uv run protein-detective dashboard SESSION_DIR --dev --browser
+```
+
+Dev mode runs Vite with hot reloading alongside the authenticated Python API.
+Restart the command after Python changes.
+
+Run frontend checks and build from `dashboard/`:
+
+```shell
+npm run format
+npm run check
+npm test
+npm run build
+```
+
+The build dashboard assets get included during PyPI publication in CI jobs.
+
 ## Automated code quality checks on git commit
 
 This step is **optional** but recommended for developers who want to

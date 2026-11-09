@@ -382,6 +382,9 @@ def test_run(tmp_path: Path, ribosome_map: Path, cif_2y29: Path, capsys: pytest.
         input_ids={"powerfit/run_001/ribosome-KsgA.map", "imported_structures/"},
         output_ids={"powerfit/run_001/", "powerfit/fittable_structures.csv"},
     )
+    metadata = json.loads((session_dir / "ro-crate-metadata.json").read_text())
+    target_node = next(node for node in metadata["@graph"] if node["@id"] == f"powerfit/run_001/{target.name}")
+    assert target_node["description"] == f"Density map used for fitting. Copied from {target.resolve()}."
 
 
 def test_fit_models(tmp_path: Path):

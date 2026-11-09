@@ -2,6 +2,8 @@
 
 import csv
 import sys
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +18,48 @@ from protein_detective.__version__ import __version__
 from protein_detective.cli import app
 
 
+def write_reconstruction_index(refinement_dir: Path) -> None:
+    """Add reconstructed output mappings for synthetic CAPRI results."""
+    output_dir = refinement_dir / "9_reconstruct"
+    output_dir.mkdir(exist_ok=True)
+    with (refinement_dir / "8_caprieval/capri_ss.tsv").open() as stream:
+        models = [
+            row["model"]
+            for row in csv.DictReader((line for line in stream if not line.startswith("#")), delimiter="\t")
+        ]
+    with (output_dir / "io.csv").open("w", newline="") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(["model", "refined_complex", "refined_fitted_structure", "refined_known_structure"])
+        for model in models:
+            name = Path(model).stem
+            writer.writerow(
+                [
+                    model,
+                    f"6_mdref/{name}.pdb.gz",
+                    f"9_reconstruct/{name}_fitted.pdb.gz",
+                    f"9_reconstruct/{name}_known.pdb.gz",
+                ]
+            )
+
+    with (refinement_dir.parent / "powerfit-recscores.csv").open("w", newline="") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(
+            ["model", "before_cc", "before_fishz", "before_relative_z", "after_cc", "after_fishz", "after_relative_z"]
+        )
+        writer.writerows([model, 0.8, 1.1, 10.0, 0.85, 1.2, 11.0] for model in models)
+
+
+@contextmanager
+def cli_args(tokens: list[str]) -> Generator[None]:
+    """Set process arguments for a CLI invocation and restore them afterward."""
+    old_argv = sys.argv
+    sys.argv = ["protein-detective", *tokens]
+    try:
+        yield
+    finally:
+        sys.argv = old_argv
+
+
 def cli(tokens: list[str]):
     """Invoke the CLI with the given tokens.
 
@@ -26,12 +70,8 @@ def cli(tokens: list[str]):
     Args:
         tokens: List of command line tokens to pass to the CLI.
     """
-    old_argv = sys.argv
-    sys.argv = ["protein-detective", *tokens]
-    try:
+    with cli_args(tokens):
         return app(tokens, result_action="return_value")
-    finally:
-        sys.argv = old_argv
 
 
 def fake_setup_retrieve(tmp_path: Path):
@@ -43,7 +83,7 @@ def fake_setup_retrieve(tmp_path: Path):
     pdbe_csv = session_dir / "pdbe.csv"
     pdbe_csv.write_text("pdb_id,uniprot_accession,uniprot_chains,chain\n2Y29,P05067,A=687-692,A\n")
 
-    argv = ["retrieve", str(session_dir), "--alphafold-db-version", "6"]
+    argv = ["candidates", "retrieve", str(session_dir), "--alphafold-db-version", "6"]
     return session_dir, argv
 
 
@@ -80,6 +120,7 @@ def assert_crate(
         assert action["name"] == action_id
 
     assert action["instrument"]["@id"] == f"protein-detective@{__version__}"
+    assert [(item["name"], item["value"]) for item in action["environment"]] == [("PWD", str(Path.cwd()))]
 
     actual_input_ids = {i["@id"] for i in action.get("object", [])}
     if input_ids is not None:

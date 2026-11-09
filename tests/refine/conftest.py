@@ -1,0 +1,59 @@
+from pathlib import Path
+
+import pandas as pd
+import pytest
+from protein_quest.structure.chains import write_single_chain_structure_file
+
+
+@pytest.fixture
+def fitted_structure(cif_6j5w: Path, tmp_path: Path) -> Path:
+    """Extract author chain A from 6J5W for fitting."""
+    return write_single_chain_structure_file(cif_6j5w, chain2keep="A", output_dir=tmp_path, out_chain="A")
+
+
+@pytest.fixture
+def known_structure(cif_6j5w: Path, tmp_path: Path) -> Path:
+    """Extract author chain B from 6J5W as the known partner."""
+    return write_single_chain_structure_file(cif_6j5w, chain2keep="B", output_dir=tmp_path, out_chain="B")
+
+
+@pytest.fixture
+def single_member_cluster_refinement_results():
+    """Final single-member 6J5W results from HADDOCK3 2026.10.0."""
+    fixture_dir = Path(__file__).parent / "fixtures"
+    return {
+        "models": pd.read_csv(fixture_dir / "6j5w-single-member-clusters-capri_ss.tsv", sep="\t", comment="#"),
+        "clusters": pd.read_csv(fixture_dir / "6j5w-single-member-clusters-capri_clt.tsv", sep="\t", comment="#"),
+    }
+
+
+@pytest.fixture
+def clustered_refinement_results():
+    """Final three-replica 6J5W results from HADDOCK3 2026.10.0."""
+    fixture_dir = Path(__file__).parent / "fixtures"
+    return {
+        "models": pd.read_csv(fixture_dir / "6j5w-fixed-origins-clustered-capri_ss.tsv", sep="\t", comment="#"),
+        "clusters": pd.read_csv(fixture_dir / "6j5w-fixed-origins-clustered-capri_clt.tsv", sep="\t", comment="#"),
+    }
+
+
+@pytest.fixture
+def session_with_powerfit_results(tmp_path: Path) -> Path:
+    session_with_powerfit_results = tmp_path / "session"
+    models = []
+    for run_id in ("run_001", "run_003"):
+        model = session_with_powerfit_results / "powerfit" / run_id / "same_structure" / "fit_1.pdb"
+        model.parent.mkdir(parents=True)
+        model.write_text("MODEL\nENDMDL\n")
+        models.append((run_id, str(model.relative_to(session_with_powerfit_results))))
+    pd.DataFrame(models + models[:1], columns=["powerfit_run_id", "fitted_model_file"]).to_csv(
+        session_with_powerfit_results / "powerfit/fitted_models.csv", index=False
+    )
+    return session_with_powerfit_results
+
+
+@pytest.fixture
+def known_structure_file(tmp_path: Path) -> Path:
+    known_structure = tmp_path / "known.pdb"
+    known_structure.write_text("MODEL\nENDMDL\n")
+    return known_structure
