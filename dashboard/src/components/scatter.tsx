@@ -1,39 +1,14 @@
 import { useRef, useState } from "react";
 import { controlledSignal } from "@tanstack/charts/interaction/signal";
 import { zoomX, type ZoomXChange, type ZoomXWindow } from "@tanstack/charts/interaction/zoom";
-import { barY, defineChart, dot, lineY, type ChartInteractionController } from "@tanstack/charts";
+import { defineChart, dot, lineY, type ChartInteractionController } from "@tanstack/charts";
 import { Chart } from "@tanstack/charts/react";
-import { scaleBand } from "@tanstack/charts/scales/band";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
-import { PanelHelp } from "./components/panel-help";
-import { display, histogram, key, labels, type Row } from "./data";
-import { useDashboardNavigation } from "./hooks/use-dashboard-navigation";
-
-export function Histogram({ rows, metric }: { rows: Row[]; metric: string }) {
-  const bins = histogram(rows, metric).map((b) => ({
-    ...b,
-    range: `${b.start.toFixed(3)} – ${b.end.toFixed(3)}`,
-  }));
-  const definition = defineChart({
-    marks: [barY(bins, { x: "range", y: "count", fill: "#26858c" })],
-    scales: {
-      x: {
-        scale: () => scaleBand().padding(0.1),
-        axis: { label: labels[metric] ?? metric, ticks: { count: 4 } },
-      },
-      y: { scale: scaleLinear, axis: { label: "Solutions" }, grid: true },
-    },
-    tooltip,
-  });
-  return (
-    <Chart
-      definition={definition}
-      height={225}
-      ariaLabel={`${labels[metric] ?? metric} histogram of all filtered solutions; tooltip shows score range and count`}
-    />
-  );
-}
+import { ChartResetButton } from "./chart-reset-button";
+import { PanelHelp } from "./panel-help";
+import { display, key, type Row } from "../data";
+import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
 
 type ScatterPoint = Row & { x: number; y: number };
 
@@ -169,17 +144,11 @@ export function Scatter({
           if (target && "id" in target.point.datum) onSelect(target.point.datum);
         }}
       >
-        <button
-          className="chart-reset"
-          onClick={() => setZoom(null)}
-          disabled={!zoomed}
-          aria-label="Reset chart view"
-          title="Reset view"
-        >
+        <ChartResetButton onReset={() => setZoom(null)} disabled={!zoomed} label="Reset chart view">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z" />
           </svg>
-        </button>
+        </ChartResetButton>
         <Chart
           definition={definition}
           aspectRatio={1}

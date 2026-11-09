@@ -7,6 +7,7 @@ import { scaleBand } from "@tanstack/charts/scales/band";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { display, provenanceTiming, type Row } from "../data";
+import { ChartResetButton } from "./chart-reset-button";
 import { PanelHelp } from "./panel-help";
 
 type TimedCommand = NonNullable<ReturnType<typeof provenanceTiming>> & { row: Row; lane: string };
@@ -137,15 +138,13 @@ export function ProvenanceTimeline({
             if (target) onSelect(Number(target.point.datum.lane) - 1);
           }}
         >
-          <button
-            className="chart-reset"
-            onClick={() => setZoom(null)}
+          <ChartResetButton
+            onReset={() => setZoom(null)}
             disabled={!zoomed}
-            aria-label="Reset command timeline view"
-            title="Reset view"
+            label="Reset command timeline view"
           >
             ↺
-          </button>
+          </ChartResetButton>
           <Chart
             definition={definition}
             height={tasks.length * 42 + 76}

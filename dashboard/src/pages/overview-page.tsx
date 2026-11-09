@@ -1,53 +1,10 @@
-import { lazy, Suspense } from "react";
+import { BestStructure } from "../components/best-structure";
 import { PageTitle } from "../components/page-title";
 import { Link } from "@tanstack/react-router";
-import {
-  display,
-  fileUrl,
-  filterRows,
-  grouped,
-  sorted,
-  positivePage,
-  tablePageSize,
-  type Row,
-} from "../data";
+import { filterRows, grouped, sorted, positivePage, tablePageSize } from "../data";
 import { ResultsTable } from "../components/results-table";
 import { useSession } from "../hooks/use-session-data";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
-const StructureViewer = lazy(() =>
-  import("../viewer").then((m) => ({ default: m.StructureViewer })),
-);
-
-function BestStructure({ refinements }: { refinements: Row[] }) {
-  const { select } = useDashboardNavigation();
-  const best = sorted(
-    refinements.filter((r) => r.viewer_available),
-    "after_cc",
-    true,
-  )[0];
-  if (!best) return null;
-  return (
-    <section className="best-structure">
-      <div className="section-heading">
-        <h2>Best refined structure by PowerFit CC score</h2>
-        <button className="text-link" onClick={() => select(best, "refinements")}>
-          {display(best.structure)} · {display(best.refine_run_id)} · PowerFit CC{" "}
-          {display(best.after_cc)} →
-        </button>
-      </div>
-      <Suspense fallback={<p>Loading 3D viewer…</p>}>
-        <StructureViewer
-          structureUrl={fileUrl(best.model_path)}
-          densityUrl={fileUrl(best.density_path)}
-          refinedKnownStructureUrl={fileUrl(best.refined_known_structure)}
-          refined
-          label={display(best.structure)}
-        />
-      </Suspense>
-    </section>
-  );
-}
-
 export function OverviewPage() {
   const { data, summary } = useSession();
   const { p, navigate } = useDashboardNavigation();

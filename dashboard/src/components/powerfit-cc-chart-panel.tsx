@@ -1,4 +1,4 @@
-import { Scatter } from "../charts";
+import { Scatter } from "./scatter";
 import { type Row } from "../data";
 
 export function PowerfitCcChartPanel({

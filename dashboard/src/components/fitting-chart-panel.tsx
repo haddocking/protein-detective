@@ -1,4 +1,4 @@
-import { Histogram } from "../charts";
+import { Histogram } from "./histogram";
 import { PanelHelp } from "./panel-help";
 import { type Row } from "../data";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
