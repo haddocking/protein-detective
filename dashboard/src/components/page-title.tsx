@@ -7,7 +7,6 @@ export function PageTitle({ children }: { children?: ReactNode }) {
   return (
     <div className="page-title">
       <div>
-        <p className="eyebrow">PROTEIN DETECTIVE / {view.toUpperCase()}</p>
         <h1>{views.find(([id]) => id === view)?.[1]}</h1>
       </div>
       {children}
