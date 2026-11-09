@@ -1,6 +1,7 @@
 import { clusterKey, display, labels, type Row } from "../data";
 import { type ResultKind } from "../navigation";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
+
 function clusterLabel(r: Row | undefined) {
   return r
     ? `${display(r.refine_run_id)} / ${display(r.structure)} · fitted ${display(r.fitted_rank)} · cluster ${display(r.cluster_id)}`
@@ -17,6 +18,7 @@ export function ResultFilters({
   limit: string;
 }) {
   const { p, navigate } = useDashboardNavigation();
+
   const activeFilters: string[] = [];
   if (limit === "1") {
     let bestLabel = "Best HADDOCK score";
@@ -25,8 +27,10 @@ export function ResultFilters({
   } else if (limit !== "all") {
     activeFilters.push(`"Top ${limit}"`);
   }
+
   const search = p.get("q");
   if (search) activeFilters.push(`Search: "${search}"`);
+
   const filterKeys = ["source", "powerfit_run_id"];
   if (kind === "refinements") filterKeys.push("refine_run_id", "cluster");
   for (const name of filterKeys) {
@@ -40,10 +44,12 @@ export function ResultFilters({
     }
     activeFilters.push(`${label}: "${text}"`);
   }
+
   let filterSummary = "(no active filters)";
   if (activeFilters.length === 1) filterSummary = `(active filter: ${activeFilters[0]})`;
   else if (activeFilters.length > 1)
     filterSummary = `(active filters: ${activeFilters.join(", ")})`;
+
   return (
     <details className="result-filters">
       <summary>

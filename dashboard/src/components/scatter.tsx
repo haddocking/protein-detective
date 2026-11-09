@@ -34,9 +34,11 @@ export function Scatter({
     extent: string;
     window: ZoomXWindow<number>;
   } | null>(null);
+
   const data = rows
     .filter((r) => typeof r[before] === "number" && typeof r[after] === "number")
     .map((r): ScatterPoint => ({ ...r, x: Number(r[before]), y: Number(r[after]) }));
+
   const values = data.flatMap((r) => [r.x, r.y]);
   const lo = values.length ? Math.min(...values) : 0,
     hi = values.length ? Math.max(...values) : 1;
@@ -45,10 +47,12 @@ export function Scatter({
     { x: domain[0], y: domain[0] },
     { x: domain[1], y: domain[1] },
   ];
+
   const extent = `${before}:${after}:${domain.join(",")}`;
   let window: ZoomXWindow<number> = { start: domain[0], end: domain[1] };
   if (zoom?.extent === extent) window = zoom.window;
   const zoomed = window.start !== domain[0] || window.end !== domain[1];
+
   const definition = defineChart({
     margin: { top: 12, right: 12, bottom: 48, left: 48 },
     clip: true,
@@ -115,6 +119,7 @@ export function Scatter({
       }),
     },
   });
+
   return (
     <div className="scatter">
       <PanelHelp label={`${title} chart controls`}>

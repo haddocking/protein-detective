@@ -9,6 +9,7 @@ import {
   useRefinementsNavigation,
   type ResultNavigation,
 } from "./use-result-navigation";
+
 type FileGroup = { title: string; showHeading: boolean; files: [kind: string, label: string][] };
 
 function useSelectedResult({ kind, active, selectedId }: ResultNavigation) {
@@ -21,9 +22,11 @@ function useSelectedResult({ kind, active, selectedId }: ResultNavigation) {
         label: display(selected.structure),
       }
     : undefined;
+
   let viewerMessage = "Structure or associated density is unavailable.";
   if (display(selected?.viewer_error) !== "—") viewerMessage = display(selected?.viewer_error);
   else if (selected?.model_available === false) viewerMessage = "Fitted structure not saved";
+
   return { kind, active, selected, viewer, viewerMessage };
 }
 
@@ -55,6 +58,7 @@ function useFittingDetails() {
 
 function useRefinementDetails() {
   const details = useSelectedResult(useRefinementsNavigation());
+
   return {
     ...details,
     resultLabel: "REFINEMENT MEMBER",
@@ -91,6 +95,7 @@ export function useDetailsPanel() {
   const candidates = useCandidateDetails();
   const fitting = useFittingDetails();
   const refinements = useRefinementDetails();
+
   const { kind, selected, viewer, resultLabel, viewerMessage, fileGroups } =
     [candidates, fitting, refinements].find((details) => details.active) ?? fitting;
   const tab = p.get("tab") ?? "viewer";
@@ -99,6 +104,7 @@ export function useDetailsPanel() {
     kind: string;
     props: StructureViewerProps;
   } | null>(null);
+
   const candidate =
     selected &&
     (data.candidates ?? []).find(
@@ -111,6 +117,7 @@ export function useDetailsPanel() {
     viewerVisible ? Math.max(440, Math.round(window.innerWidth * 0.6)) : 440,
   );
   const [previousViewerVisible, setPreviousViewerVisible] = useState(viewerVisible);
+
   // Retain the loaded viewer while showing details, and update before children render.
   if (!selectedId && viewerSelection) setViewerSelection(null);
   else if (
@@ -121,14 +128,17 @@ export function useDetailsPanel() {
   ) {
     setViewerSelection({ row: selected, kind, props: viewer });
   }
+
   const accessionValue = selected?.uniprot_accessions ?? candidate?.uniprot_accessions;
   const accessions =
     typeof accessionValue === "string" ? accessionValue.split(/[,:;\s]+/).filter(Boolean) : [];
+
   if (previousViewerVisible !== viewerVisible) {
     setPreviousViewerVisible(viewerVisible);
     if (viewerVisible)
       setWidth((current) => Math.max(current, Math.round(window.innerWidth * 0.6)));
   }
+
   return {
     selected,
     resultLabel,

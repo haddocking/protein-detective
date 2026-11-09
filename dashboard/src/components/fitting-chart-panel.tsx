@@ -6,6 +6,7 @@ import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
 export function FittingChartPanel({ rows }: { rows: Row[] }) {
   const { p, navigate } = useDashboardNavigation();
   const metric = p.get("metric") || "cc";
+
   return (
     <section className="chart-section">
       <div className="chart-panel-heading">

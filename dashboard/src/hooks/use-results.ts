@@ -18,12 +18,15 @@ import {
   useRefinementsNavigation,
   type ResultNavigation,
 } from "./use-result-navigation";
+
 function useResults(kind: ResultKind, navigation: ResultNavigation) {
   const { data } = useSession();
   const { p, navigate } = navigation;
+
   const rows = data[kind] ?? [];
   const filtered = filterRows(rows, p);
   const columns = kind === "fitting" ? fittingColumns : refinementColumns;
+
   let sort = "after_cc";
   if (kind === "fitting") sort = "cc";
   const requestedSort = p.get("sort");
@@ -31,13 +34,16 @@ function useResults(kind: ResultKind, navigation: ResultNavigation) {
   const desc = p.get("dir")
     ? p.get("dir") === "desc"
     : kind === "fitting" || sort === "after_cc" || sort === "cc_change";
+
   const limit = topSelection(p.get("top"));
   const selectedRows = sorted(grouped(filtered, kind, limit), sort, desc);
+
   const pageSize = tablePageSize(p.get("size"));
   const page = Math.min(
     positivePage(p.get("page")),
     Math.max(1, Math.ceil(selectedRows.length / pageSize)),
   );
+
   function exportCsv() {
     const blob = new Blob([csv(selectedRows, columns)], { type: "text/csv;charset=utf-8" });
     const href = URL.createObjectURL(blob);
@@ -47,9 +53,11 @@ function useResults(kind: ResultKind, navigation: ResultNavigation) {
     a.click();
     URL.revokeObjectURL(href);
   }
+
   function chartSelect(row: Row) {
     const index = selectedRows.findIndex((r) => key(r) === key(row));
     if (index < 0) return;
+
     navigate({
       selected: key(row),
       selection: kind,
@@ -57,16 +65,20 @@ function useResults(kind: ResultKind, navigation: ResultNavigation) {
       page: String(Math.floor(index / pageSize) + 1),
     });
   }
+
   /** Select the result `delta` rows away from the current one, across pages. */
   function step(delta: number) {
     if (!selectedRows.length) return;
+
     const current = selectedRows.findIndex((r) => key(r) === navigation.selectedId);
     const index =
       current < 0
         ? (page - 1) * pageSize
         : Math.max(0, Math.min(selectedRows.length - 1, current + delta));
     if (index === current) return;
+
     const row = selectedRows[index];
+
     navigate({
       selected: key(row),
       selection: kind,
@@ -74,6 +86,7 @@ function useResults(kind: ResultKind, navigation: ResultNavigation) {
       page: String(Math.floor(index / pageSize) + 1),
     });
   }
+
   return {
     navigation,
     step,

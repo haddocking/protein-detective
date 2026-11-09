@@ -3,6 +3,7 @@ import { useRefinementsNavigation } from "../hooks/use-result-navigation";
 
 export function PowerfitScatter(props: ScatterProps) {
   const { selectedId } = useRefinementsNavigation();
+
   return (
     <Scatter
       {...props}

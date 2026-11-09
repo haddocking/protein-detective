@@ -1,4 +1,5 @@
 import { type Row } from "../data";
+
 export function EmptyResults({ summary }: { summary: Row }) {
   if (summary.fitting_status === "no_runs" || !summary.fitting_solutions)
     return (
@@ -12,6 +13,7 @@ export function EmptyResults({ summary }: { summary: Row }) {
         <code>protein-detective powerfit run TARGET_MAP RESOLUTION SESSION_DIR</code>
       </div>
     );
+
   return (
     <div className="empty">
       <h3>No refinement results</h3>

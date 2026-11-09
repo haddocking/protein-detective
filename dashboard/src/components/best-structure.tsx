@@ -13,7 +13,9 @@ export function BestStructure({ refinements }: { refinements: Row[] }) {
     "after_cc",
     true,
   )[0];
+
   if (!best) return null;
+
   return (
     <section className="best-structure">
       <div className="section-heading">

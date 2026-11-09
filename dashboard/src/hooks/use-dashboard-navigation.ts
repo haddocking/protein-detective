@@ -6,6 +6,7 @@ export function useDashboardNavigation() {
   const routerNavigate = useNavigate();
   const view: View = views.find(([id]) => location.pathname === `/${id}`)?.[0] ?? "overview";
   const p = new URLSearchParams(location.searchStr);
+
   function navigate(
     changes: Record<string, string | null>,
     nextView: View = view,
@@ -22,9 +23,11 @@ export function useDashboardNavigation() {
           if (value === null) delete next[name];
           else next[name] = value;
         }
+
         return next;
       },
     });
   }
+
   return { view, p, navigate, selectedId: p.get("selected") };
 }

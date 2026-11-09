@@ -4,6 +4,7 @@ import { display, key, labels, type Dataset, type Row } from "../data";
 import { useSession } from "../hooks/use-session-data";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
 import { useFittingNavigation, useRefinementsNavigation } from "../hooks/use-result-navigation";
+
 const secondaryScoreFields = [
   "before_cc",
   "cc_change",
@@ -58,6 +59,7 @@ export function ResultDetails({
   const { navigate } = useDashboardNavigation();
   const fittingNavigation = useFittingNavigation();
   const refinementsNavigation = useRefinementsNavigation();
+
   const metadata = { ...candidate, ...selected };
   const fields = Object.entries(metadata).filter(([name]) => !secondaryScoreFields.includes(name));
   const ccIndex = fields.findIndex(([name]) => name === "after_cc");
@@ -66,9 +68,11 @@ export function ResultDetails({
     const scoreIndex = fields.findIndex(([name]) => name === "refined_score");
     fields.splice(scoreIndex >= 0 ? scoreIndex : fields.length, 0, cc);
   }
+
   for (const field of secondaryScoreFields) {
     if (metadata[field] != null) fields.push([field, metadata[field]]);
   }
+
   return (
     <div className="details-content">
       <p className="eyebrow">{resultLabel}</p>

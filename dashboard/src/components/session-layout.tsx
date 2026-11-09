@@ -8,6 +8,7 @@ import { ThemeToggle } from "./theme-toggle";
 export function SessionLayout() {
   const { ready, error } = useSession();
   const { view } = useDashboardNavigation();
+
   let content;
   if (error) {
     content = (
@@ -27,6 +28,7 @@ export function SessionLayout() {
       </div>
     );
   }
+
   return (
     <>
       <header>

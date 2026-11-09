@@ -10,6 +10,7 @@ export function Histogram({ rows, metric }: { rows: Row[]; metric: string }) {
     ...b,
     range: `${b.start.toFixed(3)} – ${b.end.toFixed(3)}`,
   }));
+
   const definition = defineChart({
     marks: [barY(bins, { x: "range", y: "count", fill: "#26858c" })],
     scales: {
@@ -21,6 +22,7 @@ export function Histogram({ rows, metric }: { rows: Row[]; metric: string }) {
     },
     tooltip,
   });
+
   return (
     <Chart
       definition={definition}

@@ -9,6 +9,7 @@ function getStoredTheme(): Theme {
   if (stored === "light" || stored === "dark" || stored === "system") {
     return stored;
   }
+
   return "system";
 }
 
@@ -37,6 +38,7 @@ function resolveDark(): boolean {
   const attr = document.documentElement.getAttribute("data-theme");
   if (attr === "dark") return true;
   if (attr === "light") return false;
+
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
@@ -48,6 +50,7 @@ function subscribeDarkTheme(update: () => void) {
     attributeFilter: ["data-theme"],
   });
   media.addEventListener("change", update);
+
   return () => {
     observer.disconnect();
     media.removeEventListener("change", update);

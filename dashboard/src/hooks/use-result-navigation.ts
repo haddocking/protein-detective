@@ -9,9 +9,11 @@ function useResultNavigation<Kind extends "candidates" | "fitting" | "refinement
   const navigation = useDashboardNavigation();
   const selection = navigation.p.get("selection");
   const active = selection ? selection === kind : defaultViews.includes(navigation.view);
+
   function select(row: Row, tab = row.viewer_available ? "viewer" : "details") {
     navigation.navigate({ selected: key(row), selection: kind, tab });
   }
+
   return {
     ...navigation,
     kind,

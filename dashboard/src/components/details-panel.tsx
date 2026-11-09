@@ -4,6 +4,7 @@ import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
 import { useDetailsPanel } from "../hooks/use-details-panel";
 import { CopyPathButton } from "./copy-path-button";
 import { ResultDetails } from "./result-details";
+
 const StructureViewer = lazy(() =>
   import("../viewer").then((m) => ({ default: m.StructureViewer })),
 );
@@ -23,7 +24,9 @@ export function DetailsPanel() {
     width,
     setWidth,
   } = useDetailsPanel();
+
   if (!selectedId) return null;
+
   let resultDetails = null;
   if (!selected) {
     resultDetails = <p className="empty">Loading selected result…</p>;
@@ -38,6 +41,7 @@ export function DetailsPanel() {
       />
     );
   }
+
   return (
     <aside className={viewerVisible ? "viewer-panel" : undefined} style={{ width }}>
       <div

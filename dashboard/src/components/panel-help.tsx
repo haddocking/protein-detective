@@ -2,6 +2,7 @@ import { useId, type ReactNode } from "react";
 
 export function PanelHelp({ label, children }: { label: string; children: ReactNode }) {
   const id = useId();
+
   return (
     <div className="panel-help">
       <button type="button" popoverTarget={id} aria-label={label} title={label}>

@@ -8,6 +8,7 @@ import { type Results } from "../hooks/use-results";
 import { type ResultKind } from "../navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 import { key } from "../data";
+
 export function ResultsLayout({
   kind,
   results,
@@ -27,6 +28,7 @@ export function ResultsLayout({
   const { p, navigate } = results.navigation;
   const { rows, columns, sort, desc, limit, selectedRows, pageSize, page, exportCsv, step } =
     results;
+
   // j/k or arrow keys step through results, unless typing or interacting with the viewer.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -47,6 +49,7 @@ export function ResultsLayout({
     addEventListener("keydown", onKeyDown);
     return () => removeEventListener("keydown", onKeyDown);
   });
+
   // Show the first visible result in the viewer once, unless the URL already selects one.
   const autoSelected = useRef(Boolean(p.get("selected")));
   const first = data[kind] ? selectedRows[(page - 1) * pageSize] : undefined;
@@ -64,6 +67,7 @@ export function ResultsLayout({
         true,
       );
   });
+
   let content: ReactNode;
   if (!data[kind]) {
     content = <p className="empty">Loading {kind}…</p>;
@@ -129,6 +133,7 @@ export function ResultsLayout({
       </>
     );
   }
+
   return (
     <>
       <PageTitle>

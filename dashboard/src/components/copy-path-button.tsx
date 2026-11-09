@@ -2,11 +2,15 @@ import { useEffect, useState } from "react";
 
 export function CopyPathButton({ path, label }: { path: string; label: string }) {
   const [status, setStatus] = useState("");
+
   useEffect(() => {
     if (!status) return;
+
     const timer = setTimeout(() => setStatus(""), 2000);
+
     return () => clearTimeout(timer);
   }, [status]);
+
   return (
     <button
       type="button"

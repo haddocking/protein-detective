@@ -4,6 +4,7 @@ import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
 
 export function PageTitle({ children }: { children?: ReactNode }) {
   const { view } = useDashboardNavigation();
+
   return (
     <div className="page-title">
       <div>

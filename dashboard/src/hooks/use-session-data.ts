@@ -11,6 +11,7 @@ async function get<T>(name: string): Promise<T> {
         ? "Open the current launch URL printed by protein-detective dashboard to authenticate."
         : `Could not load ${name} (${response.status}).`,
     );
+
   return response.json();
 }
 
@@ -25,6 +26,7 @@ export function useSessionData() {
   const [data, setData] = useState<Partial<Record<Dataset, Row[]>>>({});
   const [summary, setSummary] = useState<Row>({});
   const requested = useRef(new Set<Dataset>());
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -41,6 +43,7 @@ export function useSessionData() {
             );
           await routerNavigate({ to: ".", search: true, hash: "", replace: true });
         }
+
         const s = await get<Row>("summary");
         if (!cancelled) {
           setSummary(s);
@@ -50,12 +53,15 @@ export function useSessionData() {
         if (!cancelled) setError(String(e instanceof Error ? e.message : e));
       }
     })();
+
     return () => {
       cancelled = true;
     };
   }, [token, routerNavigate]);
+
   useEffect(() => {
     if (!ready) return;
+
     const names = datasetsForView(view, selectedId);
     for (const name of names)
       if (!requested.current.has(name)) {
@@ -65,11 +71,15 @@ export function useSessionData() {
           .catch((e) => setError(e.message));
       }
   }, [ready, view, selectedId]);
+
   return { ready, error, data, summary };
 }
+
 export const SessionContext = createContext<ReturnType<typeof useSessionData> | null>(null);
+
 export function useSession() {
   const session = useContext(SessionContext);
   if (!session) throw new Error("SessionProvider is required");
+
   return session;
 }

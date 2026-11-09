@@ -21,18 +21,23 @@ export function ProvenanceTimeline({
 }) {
   const interaction = useRef<ChartInteractionController<TimedCommand, number, string> | null>(null);
   const [zoom, setZoom] = useState<{ extent: string; window: ZoomXWindow<number> } | null>(null);
+
   const tasks = rows.flatMap((row, index) => {
     const timing = provenanceTiming(row);
     return timing ? [{ ...timing, row, lane: String(index + 1) }] : [];
   });
+
   if (!tasks.length) return <p className="muted">No complete command timings available.</p>;
+
   const start = Math.min(...tasks.map((task) => task.start));
   const end = Math.max(...tasks.map((task) => task.end));
   const padding = (end - start || 1000) * 0.02;
   const domain: [number, number] = [start - padding, end + padding];
+
   const extent = domain.join(":");
   const window = zoom?.extent === extent ? zoom.window : { start: domain[0], end: domain[1] };
   const zoomed = window.start !== domain[0] || window.end !== domain[1];
+
   const definition = defineChart({
     margin: { top: 12, right: 24, bottom: 64, left: 48 },
     clip: true,
@@ -109,6 +114,7 @@ export function ProvenanceTimeline({
       }),
     },
   });
+
   return (
     <section aria-labelledby="command-timeline-title">
       <div className="chart-panel-heading">

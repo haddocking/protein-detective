@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { display, key, labels, type Row } from "../data";
 import type { ResultNavigation } from "../hooks/use-result-navigation";
+
 interface ResultsTableProps {
   items: Row[];
   cols: string[];
@@ -23,6 +24,7 @@ export function ResultsTable({
   scrollSelected = false,
 }: ResultsTableProps) {
   const { navigate, select, selectedId } = navigation;
+
   return (
     <div className="table-scroll">
       <table>

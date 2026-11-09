@@ -3,6 +3,7 @@ import React, { useState, type ReactNode } from "react";
 import { display, provenanceTiming, sorted } from "../data";
 import { ProvenanceTimeline } from "../components/provenance-timeline";
 import { useSession } from "../hooks/use-session-data";
+
 export function ProvenancePage() {
   const { data } = useSession();
   const [copied, setCopied] = useState("");

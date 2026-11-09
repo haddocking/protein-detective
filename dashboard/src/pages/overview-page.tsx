@@ -10,6 +10,7 @@ import {
   useFittingNavigation,
   useRefinementsNavigation,
 } from "../hooks/use-result-navigation";
+
 export function OverviewPage() {
   const fittingNavigation = useFittingNavigation();
   const refinementsNavigation = useRefinementsNavigation();
